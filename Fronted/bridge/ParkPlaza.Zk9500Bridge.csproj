@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProjectGuid>{6E27B37D-1F76-4FB8-A7A0-12AA09B49618}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>ParkPlaza.Zk9500Bridge</RootNamespace>
+    <AssemblyName>ParkPlaza.Zk9500Bridge</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <PlatformTarget>x86</PlatformTarget>
+    <FileAlignment>512</FileAlignment>
+    <ZkSdkPath Condition=" '$(ZkSdkPath)' == '' ">vendor\libzkfpcsharp.dll</ZkSdkPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="libzkfpcsharp">
+      <HintPath>$(ZkSdkPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BridgeConfig.cs" />
+    <Compile Include="BridgeException.cs" />
+    <Compile Include="FileAuditLog.cs" />
+    <Compile Include="FileTemplateStore.cs" />
+    <Compile Include="HttpBridgeServer.cs" />
+    <Compile Include="OperationManager.cs" />
+    <Compile Include="PrivateDataDirectory.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="ZkFingerprintDevice.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bridge.config.json.example" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

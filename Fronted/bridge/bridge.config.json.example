@@ -1,0 +1,11 @@
+{
+  "Port": 17345,
+  "ApiToken": "change-this-with-setup-script",
+  "AllowedOrigins": [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+  ],
+  "DataDirectory": "%LOCALAPPDATA%\\ParkPlaza\\Zk9500Bridge",
+  "DefaultTimeoutMs": 30000,
+  "DeviceIndex": 0
+}
