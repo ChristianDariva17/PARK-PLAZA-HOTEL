@@ -1,8 +1,9 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog } from '../ui/Overlay';
+import { canAccessRoute } from './navigation';
 
-export default function GlobalSearch({ open, onClose, state, onNavigate }) {
+export default function GlobalSearch({ open, onClose, state, onNavigate, can }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
@@ -13,7 +14,7 @@ export default function GlobalSearch({ open, onClose, state, onNavigate }) {
     { label: 'Reservas', route: 'reservas', records: state.reservations.filter((item) => `${item.id} ${item.roomId} ${state.clients.find((client) => client.id === item.clientId)?.name}`.toLowerCase().includes(deferred)).map((item) => ({ id: item.id, title: item.id, detail: `Habitación ${item.roomId} · ${item.status}` })) },
     { label: 'Habitaciones', route: 'habitaciones', records: state.rooms.filter((item) => `${item.id} ${item.category} ${item.status}`.toLowerCase().includes(deferred)).map((item) => ({ id: item.id, title: `Habitación ${item.id}`, detail: `${item.category} · ${item.status}` })) },
     { label: 'Pedidos', route: 'pedidos-qr', records: state.orders.filter((item) => `${item.id} ${item.roomId || ''} ${item.items.map((entry) => entry.name).join(' ')}`.toLowerCase().includes(deferred)).map((item) => ({ id: item.id, title: item.id, detail: `${item.source} · ${item.status}` })) },
-  ].map((group) => ({ ...group, records: group.records.slice(0, 5) })).filter((group) => group.records.length) : [];
+  ].filter((group) => canAccessRoute(can, group.route)).map((group) => ({ ...group, records: group.records.slice(0, 5) })).filter((group) => group.records.length) : [];
   const flat = groups.flatMap((group) => group.records.map((record) => ({ ...record, route: group.route })));
   const choose = (result) => { onNavigate(result.route, { type: 'select-record', recordId: result.id }); onClose(); };
   const keyDown = (event) => {

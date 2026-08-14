@@ -1,0 +1,168 @@
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
+import { CryptoService } from '../auth/crypto.service.js';
+import { PasswordPolicyService } from '../auth/password-policy.service.js';
+import { DATABASE, type Database } from '../database/database.module.js';
+import { accounts, auditEvents, roles, sessions, staff } from '../database/schema/index.js';
+import type { CreateAccountDto, ResetPasswordDto, UpdateAccountDto } from './accounts.dto.js';
+import { assertAccountTransitionSafe } from './accounts.safety.js';
+
+@Injectable()
+export class AccountsService {
+  constructor(
+    @Inject(DATABASE) private readonly database: Database,
+    private readonly crypto: CryptoService,
+    private readonly passwordPolicy: PasswordPolicyService,
+  ) {}
+
+  async list(propertyId: string) {
+    const [accountRows, roleRows, personnelRows] = await Promise.all([
+      this.database.select({
+        id: accounts.id, email: accounts.email, status: accounts.status, passwordChangeRequired: accounts.passwordChangeRequired,
+        createdAt: accounts.createdAt, updatedAt: accounts.updatedAt, roleKey: roles.key, roleName: roles.name,
+        personnelId: staff.id, personnelFirstName: staff.firstName, personnelLastName: staff.lastName,
+      }).from(accounts).innerJoin(roles, eq(accounts.roleId, roles.id)).leftJoin(staff, eq(staff.accountId, accounts.id))
+        .where(eq(accounts.propertyId, propertyId)).orderBy(asc(accounts.email)),
+      this.database.select({ key: roles.key, name: roles.name }).from(roles).orderBy(asc(roles.name)),
+      this.database.select({ id: staff.id, accountId: staff.accountId, firstName: staff.firstName, lastName: staff.lastName })
+        .from(staff).where(eq(staff.propertyId, propertyId)).orderBy(asc(staff.lastName), asc(staff.firstName)),
+    ]);
+    return {
+      accounts: accountRows.map((item) => ({
+        id: item.id, email: item.email, status: item.status, passwordChangeRequired: item.passwordChangeRequired,
+        createdAt: item.createdAt, updatedAt: item.updatedAt, role: { key: item.roleKey, name: item.roleName },
+        personnel: item.personnelId ? { id: item.personnelId, firstName: item.personnelFirstName!, lastName: item.personnelLastName! } : null,
+      })),
+      roles: roleRows,
+      personnel: personnelRows,
+    };
+  }
+
+  async create(actor: AuthenticatedAccount, input: CreateAccountDto, context: RequestContext) {
+    await this.passwordPolicy.assertAcceptable(input.temporaryPassword);
+    const passwordHash = await this.crypto.hashPassword(input.temporaryPassword);
+    try {
+      const accountId = await this.database.transaction(async (tx) => {
+        await this.lockProperty(tx, actor.propertyId);
+        const role = await tx.select({ id: roles.id }).from(roles).where(eq(roles.key, input.roleKey)).limit(1);
+        if (!role[0]) throw new BadRequestException('Unknown role');
+        const created = await tx.insert(accounts).values({
+          propertyId: actor.propertyId, roleId: role[0].id, email: input.email, passwordHash,
+          passwordChangeRequired: true, status: 'active',
+        }).returning({ id: accounts.id });
+        const id = created[0]!.id;
+        if (input.personnelId) await this.claimPersonnel(tx, actor.propertyId, id, input.personnelId);
+        await tx.insert(auditEvents).values({
+          ...this.auditBase(actor, context), eventType: 'account.created', subjectType: 'account', subjectId: id,
+          metadata: { email: input.email, roleKey: input.roleKey, personnelId: input.personnelId ?? null },
+        });
+        return id;
+      });
+      return (await this.list(actor.propertyId)).accounts.find((item) => item.id === accountId)!;
+    } catch (error) {
+      this.rethrowConstraint(error);
+    }
+  }
+
+  async update(actor: AuthenticatedAccount, accountId: string, input: UpdateAccountDto, context: RequestContext) {
+    let revokeReason: string | null = null;
+    try {
+      await this.database.transaction(async (tx) => {
+        await this.lockProperty(tx, actor.propertyId);
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${accountId}))`);
+        const rows = await tx.select({ id: accounts.id, roleId: accounts.roleId, roleKey: roles.key, status: accounts.status, email: accounts.email })
+          .from(accounts).innerJoin(roles, eq(accounts.roleId, roles.id))
+          .where(and(eq(accounts.id, accountId), eq(accounts.propertyId, actor.propertyId))).limit(1).for('update');
+        const current = rows[0];
+        if (!current) throw new NotFoundException('Account not found');
+        const nextStatus = input.status ?? current.status;
+        let nextRoleId = current.roleId;
+        let nextRoleKey = current.roleKey;
+        if (input.roleKey !== undefined) {
+          const role = await tx.select({ id: roles.id, key: roles.key }).from(roles).where(eq(roles.key, input.roleKey)).limit(1);
+          if (!role[0]) throw new BadRequestException('Unknown role');
+          nextRoleId = role[0].id;
+          nextRoleKey = role[0].key;
+        }
+        const activeAdministrators = await tx.select({ id: accounts.id }).from(accounts).innerJoin(roles, eq(accounts.roleId, roles.id))
+          .where(and(eq(accounts.propertyId, actor.propertyId), eq(accounts.status, 'active'), eq(roles.key, 'administrator'))).for('update');
+        assertAccountTransitionSafe({
+          actorAccountId: actor.accountId, targetAccountId: accountId,
+          currentStatus: current.status, currentRoleKey: current.roleKey,
+          nextStatus, nextRoleKey, activeAdministratorCount: activeAdministrators.length,
+        });
+        await tx.update(accounts).set({
+          ...(input.email !== undefined ? { email: input.email } : {}),
+          ...(input.roleKey !== undefined ? { roleId: nextRoleId } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          updatedAt: new Date(),
+        }).where(eq(accounts.id, accountId));
+        if (input.personnelId !== undefined) {
+          await tx.update(staff).set({ accountId: null, updatedAt: new Date() }).where(and(eq(staff.propertyId, actor.propertyId), eq(staff.accountId, accountId)));
+          if (input.personnelId !== null) await this.claimPersonnel(tx, actor.propertyId, accountId, input.personnelId);
+        }
+        await tx.insert(auditEvents).values({
+          ...this.auditBase(actor, context), eventType: 'account.updated', subjectType: 'account', subjectId: accountId,
+          metadata: { fields: Object.keys(input), roleKey: input.roleKey, status: input.status, personnelId: input.personnelId },
+        });
+        if (nextStatus === 'disabled' && current.status !== 'disabled') revokeReason = 'account_disabled';
+        else if (nextRoleKey !== current.roleKey) revokeReason = 'role_changed';
+        else if (input.email !== undefined && input.email !== current.email) revokeReason = 'email_changed';
+        if (revokeReason) await this.revokeSessions(tx, actor, accountId, revokeReason, context);
+      });
+      return (await this.list(actor.propertyId)).accounts.find((item) => item.id === accountId)!;
+    } catch (error) {
+      this.rethrowConstraint(error);
+    }
+  }
+
+  async resetPassword(actor: AuthenticatedAccount, accountId: string, input: ResetPasswordDto, context: RequestContext): Promise<void> {
+    if (accountId === actor.accountId) throw new ForbiddenException('You cannot reset your own password; use change password instead');
+    await this.passwordPolicy.assertAcceptable(input.temporaryPassword);
+    const passwordHash = await this.crypto.hashPassword(input.temporaryPassword);
+    await this.database.transaction(async (tx) => {
+      await this.lockProperty(tx, actor.propertyId);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${accountId}))`);
+      const changed = await tx.update(accounts).set({ passwordHash, passwordChangeRequired: true, updatedAt: new Date() })
+        .where(and(eq(accounts.id, accountId), eq(accounts.propertyId, actor.propertyId))).returning({ id: accounts.id });
+      if (!changed.length) throw new NotFoundException('Account not found');
+      await tx.insert(auditEvents).values({ ...this.auditBase(actor, context), eventType: 'account.password_reset', subjectType: 'account', subjectId: accountId });
+      await this.revokeSessions(tx, actor, accountId, 'password_reset', context);
+    });
+  }
+
+  private async lockProperty(tx: Parameters<Parameters<Database['transaction']>[0]>[0], propertyId: string): Promise<void> {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${propertyId}))`);
+  }
+
+  private async claimPersonnel(tx: Parameters<Parameters<Database['transaction']>[0]>[0], propertyId: string, accountId: string, personnelId: string): Promise<void> {
+    const available = await tx.select({ id: staff.id }).from(staff)
+      .where(and(eq(staff.id, personnelId), eq(staff.propertyId, propertyId), isNull(staff.accountId))).limit(1).for('update');
+    if (!available.length) throw new ConflictException('Personnel record is unavailable or already linked');
+    await tx.update(staff).set({ accountId, updatedAt: new Date() }).where(eq(staff.id, personnelId));
+  }
+
+  private async revokeSessions(tx: Parameters<Parameters<Database['transaction']>[0]>[0], actor: AuthenticatedAccount, accountId: string, reason: string, context: RequestContext): Promise<void> {
+    const changed = await tx.update(sessions).set({ revokedAt: new Date(), revocationReason: reason })
+      .where(and(eq(sessions.accountId, accountId), isNull(sessions.revokedAt))).returning({ id: sessions.id });
+    if (changed.length) await tx.insert(auditEvents).values(changed.map(({ id }) => ({
+      ...this.auditBase(actor, context), eventType: `auth.session.${reason}`, subjectType: 'session', subjectId: id,
+    })));
+  }
+
+  private auditBase(actor: AuthenticatedAccount, context: RequestContext) {
+    return {
+      actorAccountId: actor.accountId, propertyId: actor.propertyId,
+      ...(context.requestId ? { requestId: context.requestId } : {}),
+      ...(context.ipAddress ? { ipAddress: context.ipAddress } : {}),
+      ...(context.userAgent ? { userAgent: context.userAgent } : {}),
+    };
+  }
+
+  private rethrowConstraint(error: unknown): never {
+    if (error && typeof error === 'object' && 'getStatus' in error) throw error;
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') throw new ConflictException('Email or personnel link is already in use');
+    throw error;
+  }
+}

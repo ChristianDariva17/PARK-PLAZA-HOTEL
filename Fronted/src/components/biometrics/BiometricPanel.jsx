@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Fingerprint, RefreshCw, X } from 'lucide-react';
+import { usePermissions } from '../../auth/authContext.js';
+import { PERMISSIONS } from '../../auth/permissions.js';
 import { getBridgeHealth, runBiometricOperation } from '../../integrations/biometrics/zkBridgeClient.js';
 
 const errorMessages = {
@@ -20,6 +22,7 @@ const errorMessages = {
 const describeError = (error) => errorMessages[error.code] || 'La operación biométrica no pudo completarse.';
 
 export function BiometricPanel({ subjectType, subjectId, subjectName, reference, onEnrolled, onVerified, onAttempt }) {
+  const { can } = usePermissions();
   const [health, setHealth] = useState(null);
   const [healthError, setHealthError] = useState(null);
   const [operation, setOperation] = useState(null);
@@ -94,6 +97,9 @@ export function BiometricPanel({ subjectType, subjectId, subjectName, reference,
   };
 
   const connected = Boolean(health?.device.connected);
+  const biometricPermission = subjectType === 'employee' ? PERMISSIONS.staffBiometric : subjectType === 'client' ? PERMISSIONS.guestsBiometric : null;
+  const canEnroll = Boolean(biometricPermission && can(biometricPermission));
+  const canVerify = canEnroll && (subjectType !== 'employee' || can(PERMISSIONS.staffAttendance));
   return <section className="biometric-panel" aria-label={`Biometría de ${subjectName || subjectId}`}>
     <div className="biometric-panel-heading">
       <span className="biometric-icon"><Fingerprint size={20} aria-hidden="true" /></span>
@@ -103,8 +109,8 @@ export function BiometricPanel({ subjectType, subjectId, subjectName, reference,
     <p className="biometric-message" aria-live="polite">{message}</p>
     {operation && operation.kind === 'enroll' && operation.status !== 'finished' ? <progress max="3" value={operation.samplesCaptured || 0}>Muestras {operation.samplesCaptured || 0} de 3</progress> : null}
     <div className="inline-actions">
-      <button className="btn btn-sm btn-outline" disabled={busy || !connected || !subjectId} onClick={() => execute('enroll')}>Enrolar huella</button>
-      <button className="btn btn-sm btn-primary" disabled={busy || !connected || !subjectId} onClick={() => execute('verify')}>Verificar huella</button>
+      {canEnroll ? <button className="btn btn-sm btn-outline" disabled={busy || !connected || !subjectId} onClick={() => execute('enroll')}>Enrolar huella</button> : null}
+      {canVerify ? <button className="btn btn-sm btn-primary" disabled={busy || !connected || !subjectId} onClick={() => execute('verify')}>Verificar huella</button> : null}
       {busy ? <button className="btn btn-sm btn-danger" onClick={() => controllerRef.current?.abort()}><X size={15} />Cancelar</button> : <button className="btn btn-sm btn-outline" onClick={() => checkHealth(true)}><RefreshCw size={15} />Consultar lector</button>}
     </div>
     <small>El navegador recibe sólo referencias opacas, metadatos y resultados; nunca imágenes ni templates.</small>

@@ -1,4 +1,6 @@
 import { AlertTriangle, CheckCircle2, Circle, Clock3, Search, XCircle } from 'lucide-react';
+import { usePermissions } from '../../auth/authContext';
+import { permissionForAction, permissionForPrimaryAction } from '../../auth/permissions';
 
 const STATUS_TONES = {
   disponible: 'green', aprobada: 'green', aprobado: 'green', pagado: 'green', firmado: 'green', activa: 'green', activo: 'green', completada: 'green', completado: 'green', confirmado: 'green', confirmada: 'green', entregado: 'green', registrado: 'green', generado: 'green', habilitado: 'green', respondida: 'green', leída: 'green', óptimo: 'green', abierta: 'green', dentro: 'green', 'sin daños': 'green', ingreso: 'green', listo: 'green', finalizado: 'green', finalizada: 'green', resuelta: 'green', cerrada: 'green', consumido: 'green', liberado: 'green',
@@ -10,8 +12,13 @@ const STATUS_TONES = {
 
 const STATUS_ICONS = { green: CheckCircle2, blue: Circle, yellow: Clock3, purple: Circle, red: XCircle, gray: Circle };
 
-export function PageHeader({ title, description, action, metadata }) {
-  return <header className="page-heading"><div>{metadata ? <span className="page-metadata">{metadata}</span> : null}<h2>{title}</h2><p>{description}</p></div>{action ? <div className="page-actions">{action}</div> : null}</header>;
+export function PageHeader({ title, description, action, actionType, metadata }) {
+  const { can } = usePermissions();
+  const route = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+  const explicitActionType = actionType || action?.props?.actionType;
+  const required = explicitActionType ? permissionForAction({ type: explicitActionType }) : permissionForPrimaryAction(route, action?.props?.children);
+  const authorizedAction = action && required && can(required) ? action : null;
+  return <header className="page-heading"><div>{metadata ? <span className="page-metadata">{metadata}</span> : null}<h2>{title}</h2><p>{description}</p></div>{authorizedAction ? <div className="page-actions">{authorizedAction}</div> : null}</header>;
 }
 
 export function Kpi({ label, value, detail, icon: Icon = CheckCircle2, tone = 'green' }) {

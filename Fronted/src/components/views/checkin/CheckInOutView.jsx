@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { usePermissions } from '../../../auth/authContext';
+import { PERMISSIONS } from '../../../auth/permissions';
 import { formatMoney, PAYMENT_METHODS, selectAccountBalance, selectClientName } from '../../../domain/hotelModel';
 import { useHotel } from '../../../state/hotelContext';
 import { BiometricPanel } from '../../biometrics/BiometricPanel';
@@ -47,12 +49,13 @@ function CheckOutFlow({ stay, onClose, notify }) {
 }
 
 export default function CheckInOutView({ notify }) {
+  const { can } = usePermissions();
   const { state } = useHotel();
   const [tab, setTab] = useState('checkin');
   const [reservationId, setReservationId] = useState(null);
   const [stayId, setStayId] = useState(null);
-  const arrivals = state.reservations.filter((item) => item.status === 'Confirmada');
-  const stays = state.stays.filter((item) => item.status === 'Activa');
+  const arrivals = can(PERMISSIONS.staysCheckIn) ? state.reservations.filter((item) => item.status === 'Confirmada') : [];
+  const stays = can(PERMISSIONS.staysCheckOut) ? state.stays.filter((item) => item.status === 'Activa') : [];
   const reservation = state.reservations.find((item) => item.id === reservationId);
   const stay = state.stays.find((item) => item.id === stayId);
   return <div className="view-container"><PageHeader metadata="Biometría preservada · alternativa documental" title="Check-in y check-out" description="Flujos guiados con revisión persistente antes de cada operación atómica." /><MetricStrip items={[{ label: 'Llegadas listas', value: arrivals.length }, { label: 'Estadías activas', value: stays.length }, { label: 'Saldos a liquidar', value: formatMoney(stays.reduce((sum, item) => sum + selectAccountBalance(state.accounts.find((account) => account.id === item.accountId)), 0)) }]} /><Tabs label="Operación de recepción" tabs={[{ id: 'checkin', label: `Llegadas (${arrivals.length})` }, { id: 'checkout', label: `Salidas (${stays.length})` }]} activeTab={tab} onChange={setTab} /><TabPanel id="checkin" active={tab === 'checkin'} label="Llegadas confirmadas"><div className="operation-cards">{arrivals.length ? arrivals.map((item) => <article className="card operation-card" key={item.id}><div className="row-between"><div><span className="eyebrow">{item.id}</span><h3>{selectClientName(state, item.clientId)}</h3></div><StatusBadge>{item.status}</StatusBadge></div><p>Habitación {item.roomId} · saldo {formatMoney(item.balance)}</p><button className="btn btn-primary" onClick={() => setReservationId(item.id)}>Iniciar check-in guiado</button></article>) : <EmptyState title="Sin llegadas confirmadas" />}</div></TabPanel><TabPanel id="checkout" active={tab === 'checkout'} label="Estadías activas"><div className="operation-cards">{stays.length ? stays.map((item) => <article className="card operation-card" key={item.id}><div className="row-between"><div><span className="eyebrow">{item.id} · Hab. {item.roomId}</span><h3>{selectClientName(state, item.clientId)}</h3></div><StatusBadge>{item.status}</StatusBadge></div><p>Saldo {formatMoney(selectAccountBalance(state.accounts.find((account) => account.id === item.accountId)))}</p><button className="btn btn-primary" onClick={() => setStayId(item.id)}>Iniciar check-out guiado</button></article>) : <EmptyState title="Sin estadías activas" />}</div></TabPanel><Dialog open={Boolean(reservation)} onClose={() => setReservationId(null)} title="Check-in guiado" description="El borrador se limpia al cerrar el flujo." wide>{reservation ? <CheckInFlow reservation={reservation} onClose={() => setReservationId(null)} notify={notify} /> : null}</Dialog><Dialog open={Boolean(stay)} onClose={() => setStayId(null)} title="Check-out guiado" description="Revisá la cuenta antes de confirmar." wide>{stay ? <CheckOutFlow stay={stay} onClose={() => setStayId(null)} notify={notify} /> : null}</Dialog></div>;

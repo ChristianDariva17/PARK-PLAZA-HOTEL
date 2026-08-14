@@ -1,6 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Bell, CalendarPlus, CheckCheck, Clock3, Menu, Search, X } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
+import { getAccountInitials, getRoleLabel } from '../../auth/authContext';
+import { usePermissions } from '../../auth/authContext';
+import { PERMISSIONS } from '../../auth/permissions';
+import { canAccessRoute } from './navigation';
 
 const TITLES = {
   dashboard: ['Panel operativo', 'Resumen del estado compartido'], habitaciones: ['Habitaciones', 'Mapa y detalle operativo'], reservas: ['Reservas', 'Disponibilidad, precio y adelantos'],
@@ -15,7 +19,8 @@ const TITLES = {
   auditoria: ['Auditoría y seguridad', 'Actividad y controles'], configuracion: ['Configuración', 'Integraciones y respaldos'],
 };
 
-export default function Topbar({ currentView, state, notifications, onMenu, onNavigate, onRead, onReadAll }) {
+export default function Topbar({ currentView, state, notifications, menuOpen, onMenu, onNavigate, onRead, onReadAll, account }) {
+  const { can } = usePermissions();
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -23,7 +28,10 @@ export default function Topbar({ currentView, state, notifications, onMenu, onNa
   const notificationTriggerRef = useRef(null);
   const notificationPanelId = useId();
   const [title, subtitle] = TITLES[currentView] || ['Hotel Park Plaza', 'Sistema integral de gestión'];
-  const unread = notifications.filter((item) => !item.read).length;
+  const canSearch = [PERMISSIONS.guestsRead, PERMISSIONS.reservationsRead, PERMISSIONS.roomsRead, PERMISSIONS.ordersRead].some(can);
+  const authorizedNotifications = useMemo(() => notifications.filter((item) => canAccessRoute(can, item.route)), [can, notifications]);
+  const unreadNotificationIds = authorizedNotifications.filter((item) => !item.read).map((item) => item.id);
+  const unread = unreadNotificationIds.length;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,6 +61,7 @@ export default function Topbar({ currentView, state, notifications, onMenu, onNa
   }, []);
 
   useEffect(() => {
+    if (!canSearch) return undefined;
     const openSearch = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -61,23 +70,23 @@ export default function Topbar({ currentView, state, notifications, onMenu, onNa
     };
     document.addEventListener('keydown', openSearch);
     return () => document.removeEventListener('keydown', openSearch);
-  }, []);
+  }, [canSearch]);
 
   return <header className="topbar">
     <div className="topbar-left">
-      <button className="icon-button menu-button" onClick={onMenu} aria-label="Abrir navegación"><Menu size={22} /></button>
+      <button type="button" className="icon-button menu-button" onClick={onMenu} aria-label="Abrir navegación" aria-expanded={menuOpen} aria-controls="primary-navigation"><Menu size={22} aria-hidden="true" /></button>
       <div className="topbar-title-group"><h1>{title}</h1><p>{subtitle}</p></div>
     </div>
     <div className="topbar-right">
       <div className="topbar-datetime" aria-label="Fecha y hora actuales"><Clock3 size={16} aria-hidden="true" /><time dateTime={now.toISOString()}><strong>{now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</strong><span>{now.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}</span></time></div>
-      <button type="button" className="global-search-trigger" onClick={() => setSearchOpen(true)} aria-haspopup="dialog"><Search size={17} aria-hidden="true" /><span>Buscar en el hotel</span><kbd>Ctrl K</kbd></button>
-      <div className="notification-wrap" ref={panelRef}>
+      {canSearch ? <button type="button" className="global-search-trigger" onClick={() => setSearchOpen(true)} aria-haspopup="dialog"><Search size={17} aria-hidden="true" /><span>Buscar en el hotel</span><kbd>Ctrl K</kbd></button> : null}
+      {can(PERMISSIONS.notificationsRead) ? <div className="notification-wrap" ref={panelRef}>
         <button ref={notificationTriggerRef} className="topbar-bell-btn" aria-label={`Notificaciones: ${unread} sin leer`} aria-expanded={open} aria-controls={notificationPanelId} onClick={() => setOpen((value) => !value)}><Bell size={18} />{unread ? <span className="bell-badge">{unread}</span> : null}</button>
-        {open ? <section id={notificationPanelId} className="notification-panel" aria-label="Notificaciones internas"><header><span><strong>Notificaciones internas</strong><small>{unread} sin leer · canal local</small></span><button className="icon-button" aria-label="Cerrar notificaciones" onClick={() => { setOpen(false); notificationTriggerRef.current?.focus(); }}><X size={16} /></button></header><div>{notifications.length ? notifications.map((item) => <button key={item.id} className={item.read ? 'read' : ''} onClick={() => { if (!item.read) onRead(item.id); onNavigate(item.route); setOpen(false); notificationTriggerRef.current?.focus(); }}><strong>{item.title}</strong><span>{item.description}</span><small>{item.read ? 'Leída' : 'Sin leer'} · destino {item.route}</small></button>) : <p>Sin notificaciones internas.</p>}</div><footer><button className="btn btn-sm btn-outline" disabled={!unread} onClick={onReadAll}><CheckCheck size={15} /> Marcar leídas</button></footer></section> : null}
-      </div>
-      <button className="btn btn-primary topbar-cta" onClick={() => onNavigate('reservas', { type: 'create-reservation' })}><CalendarPlus size={17} /><span>Nueva reserva</span></button>
-      <div className="topbar-profile"><span className="topbar-avatar">AD</span><span><strong>Administrador</strong><small>Sesión demo</small></span></div>
+        {open ? <section id={notificationPanelId} className="notification-panel" aria-label="Notificaciones internas"><header><span><strong>Notificaciones internas</strong><small>{unread} sin leer · canal local</small></span><button className="icon-button" aria-label="Cerrar notificaciones" onClick={() => { setOpen(false); notificationTriggerRef.current?.focus(); }}><X size={16} /></button></header><div>{authorizedNotifications.length ? authorizedNotifications.map((item) => <button key={item.id} className={item.read ? 'read' : ''} onClick={() => { if (!item.read && can(PERMISSIONS.notificationsUpdate)) onRead(item.id); onNavigate(item.route); setOpen(false); notificationTriggerRef.current?.focus(); }}><strong>{item.title}</strong><span>{item.description}</span><small>{item.read ? 'Leída' : 'Sin leer'} · destino {item.route}</small></button>) : <p>Sin notificaciones internas.</p>}</div>{can(PERMISSIONS.notificationsUpdate) ? <footer><button className="btn btn-sm btn-outline" disabled={!unread} onClick={() => onReadAll(unreadNotificationIds)}><CheckCheck size={15} /> Marcar leídas</button></footer> : null}</section> : null}
+      </div> : null}
+      {can(PERMISSIONS.reservationsCreate) ? <button className="btn btn-primary topbar-cta" onClick={() => onNavigate('reservas', { type: 'create-reservation' })}><CalendarPlus size={17} /><span>Nueva reserva</span></button> : null}
+       <div className="topbar-profile"><span className="topbar-avatar">{getAccountInitials(account.email)}</span><span><strong>{account.email}</strong><small>{getRoleLabel(account.role)}</small></span></div>
     </div>
-    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} state={state} onNavigate={onNavigate} />
+    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} state={state} onNavigate={onNavigate} can={can} />
   </header>;
 }

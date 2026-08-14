@@ -43,8 +43,8 @@ La confirmación de una reserva actualiza disponibilidad y registra adelanto del
 
 ## Límites del prototipo
 
-- Todo el estado vive en memoria y se reinicia al recargar la página.
-- No hay autenticación, autorización de servidor ni protección real de datos personales.
+- El estado operativo de demostración vive en memoria y se reinicia al recargar la página.
+- La autenticación, las sesiones, la autorización y las cuentas de acceso son administradas por el backend; los controles de permisos del frontend complementan esa protección.
 - No se procesan pagos ni se emiten comprobantes fiscales.
 - No se generan, firman, almacenan ni envían documentos reales.
 - Correo, WhatsApp y pasarelas están pendientes de integración.

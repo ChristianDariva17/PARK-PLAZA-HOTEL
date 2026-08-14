@@ -107,7 +107,8 @@ export const validateHotelAction = (state, action) => {
       return { ok: !message, message };
     }
     case 'BIOMETRIC_ATTEMPT': {
-      const subject = [...state.clients, ...state.staff].find((item) => item.id === action.subjectId);
+      const collection = action.subjectType === 'client' ? state.clients : action.subjectType === 'employee' ? state.staff : [];
+      const subject = collection.find((item) => item.id === action.subjectId);
       const scoreValid = action.score == null || Number.isFinite(Number(action.score));
       const message = !subject ? 'La persona biométrica no existe.' : !['enroll', 'verify'].includes(action.kind) || !hasText(action.result) ? 'El intento biométrico no tiene metadatos válidos.' : !scoreValid ? 'El puntaje biométrico no es finito.' : null;
       return { ok: !message, message };
@@ -474,6 +475,11 @@ export const validateHotelAction = (state, action) => {
     }
     case 'NOTIFICATIONS_READ_ALL':
       return { ok: state.notifications.some((item) => !item.read), message: 'No hay notificaciones sin leer.' };
+    case 'NOTIFICATIONS_READ_AUTHORIZED': {
+      const notificationIds = [...new Set(action.notificationIds || [])];
+      const unreadIds = new Set(state.notifications.filter((item) => !item.read).map((item) => item.id));
+      return { ok: notificationIds.length > 0 && notificationIds.every((id) => unreadIds.has(id)), message: 'No hay notificaciones autorizadas sin leer.' };
+    }
     default:
       return { ok: false, message: `Acción no admitida: ${action.type || 'sin tipo'}.` };
   }
@@ -1089,6 +1095,11 @@ export function hotelReducer(state, action) {
         const readAt = new Date().toISOString();
         return { ...state, notifications: state.notifications.map((item) => item.read ? item : { ...item, read: true, readAt }) };
       }
+    case 'NOTIFICATIONS_READ_AUTHORIZED': {
+      const notificationIds = new Set(action.notificationIds);
+      const readAt = new Date().toISOString();
+      return { ...state, notifications: state.notifications.map((item) => !item.read && notificationIds.has(item.id) ? { ...item, read: true, readAt } : item) };
+    }
     case 'NOTIFICATION_READ':
       return { ...state, notifications: state.notifications.map((item) => item.id === action.notificationId ? { ...item, read: true, readAt: new Date().toISOString() } : item) };
     default:

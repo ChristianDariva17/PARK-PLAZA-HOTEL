@@ -1,5 +1,7 @@
 import { useDeferredValue, useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
+import { usePermissions } from '../../../auth/authContext';
+import { PERMISSIONS } from '../../../auth/permissions';
 import { formatMoney, getReservationAvailability, PAYMENT_METHODS, RESERVATION_STATUSES, selectClientName, validateReservation } from '../../../domain/hotelModel';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
 import { useHotel } from '../../../state/hotelContext';
@@ -38,13 +40,14 @@ function ReservationForm({ reservation, onClose, notify }) {
 }
 
 export default function ReservationsView({ notify, navigationIntent, consumeNavigationIntent }) {
+  const { can } = usePermissions();
   const { state, execute } = useHotel();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Todos');
   const [editor, setEditor] = useState(undefined);
   const [selectedId, setSelectedId] = useState(null);
   const deferred = useDeferredValue(query.toLowerCase());
-  useEffect(() => { if (!navigationIntent) return; if (navigationIntent.type === 'create-reservation') setEditor(null); if (navigationIntent.type === 'select-record') setSelectedId(navigationIntent.recordId); consumeNavigationIntent(navigationIntent.id); }, [navigationIntent, consumeNavigationIntent]);
+  useEffect(() => { if (!navigationIntent) return; if (navigationIntent.type === 'create-reservation' && can(PERMISSIONS.reservationsCreate)) setEditor(null); if (navigationIntent.type === 'select-record') setSelectedId(navigationIntent.recordId); consumeNavigationIntent(navigationIntent.id); }, [can, navigationIntent, consumeNavigationIntent]);
   const records = state.reservations.filter((item) => `${item.id} ${item.roomId} ${selectClientName(state, item.clientId)}`.toLowerCase().includes(deferred) && (status === 'Todos' || item.status === status)).map((item) => ({ ...item, clientName: selectClientName(state, item.clientId) }));
   const table = useCollectionTable(records, 'checkIn', 8, JSON.stringify([deferred, status, records.map((item) => item.id)]));
   const selected = state.reservations.find((item) => item.id === selectedId);

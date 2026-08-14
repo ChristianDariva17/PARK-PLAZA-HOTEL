@@ -4,6 +4,7 @@ import {
   PawPrint, QrCode, Settings, ShieldCheck, Sparkles, Star, Truck, UserCheck, Users,
   UtensilsCrossed, Waves, Wrench,
 } from 'lucide-react';
+import { permissionForRoute } from '../../auth/permissions';
 
 export const NAV_SECTIONS = [
   { title: 'Recepción', items: [
@@ -27,9 +28,10 @@ export const NAV_SECTIONS = [
   ] },
   { title: 'Administración', items: [
     { id: 'personal', label: 'Personal y turnos', icon: UserCheck }, { id: 'caja', label: 'Caja', icon: CreditCard },
-    { id: 'reportes', label: 'Reportes', icon: BarChart3 }, { id: 'roles', label: 'Roles y permisos', icon: ShieldCheck },
+    { id: 'reportes', label: 'Reportes', icon: BarChart3 }, { id: 'cuentas-acceso', label: 'Cuentas de acceso', icon: LockKeyhole }, { id: 'roles', label: 'Roles y permisos', icon: ShieldCheck },
     { id: 'auditoria', label: 'Auditoría y seguridad', icon: LockKeyhole }, { id: 'configuracion', label: 'Configuración', icon: Settings },
   ] },
 ];
 
 export const VALID_ROUTES = new Set(NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.id)));
+export const canAccessRoute = (can, route) => can(permissionForRoute(route));

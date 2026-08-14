@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
 
-const DEFAULT_ROUTE = 'dashboard';
+const readRoute = () => window.location.hash.replace(/^#\/?/, '').split('?')[0];
 
-const readRoute = () => window.location.hash.replace(/^#\/?/, '').split('?')[0] || DEFAULT_ROUTE;
-
-export function useHashRoute(validRoutes) {
-  const [route, setRoute] = useState(readRoute);
+export function useHashRoute(validRoutes, defaultRoute = 'dashboard') {
+  const [route, setRoute] = useState(() => readRoute() || defaultRoute);
 
   useEffect(() => {
     const onHashChange = () => {
       const nextRoute = readRoute();
-      setRoute(validRoutes.has(nextRoute) ? nextRoute : DEFAULT_ROUTE);
+      if (validRoutes.has(nextRoute)) {
+        setRoute(nextRoute);
+        return;
+      }
+      setRoute(defaultRoute);
+      const fallbackHash = defaultRoute ? `#/${defaultRoute}` : '#/';
+      if (window.location.hash !== fallbackHash) window.history.replaceState(null, '', fallbackHash);
     };
     window.addEventListener('hashchange', onHashChange);
     onHashChange();
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [validRoutes]);
+  }, [defaultRoute, validRoutes]);
 
   const navigate = (nextRoute) => {
-    const safeRoute = validRoutes.has(nextRoute) ? nextRoute : DEFAULT_ROUTE;
+    const safeRoute = validRoutes.has(nextRoute) ? nextRoute : defaultRoute;
     window.location.hash = `/${safeRoute}`;
   };
 
