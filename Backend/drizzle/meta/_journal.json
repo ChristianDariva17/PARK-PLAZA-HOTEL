@@ -2,9 +2,82 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
-    { "idx": 0, "version": "7", "when": 1786482000000, "tag": "0000_initial", "breakpoints": true },
-    { "idx": 1, "version": "7", "when": 1786485600000, "tag": "0001_security", "breakpoints": true },
-    { "idx": 2, "version": "7", "when": 1786539600000, "tag": "0002_permission_catalog", "breakpoints": true },
-    { "idx": 3, "version": "7", "when": 1786543200000, "tag": "0003_account_provisioning", "breakpoints": true }
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786482000000,
+      "tag": "0000_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786485600000,
+      "tag": "0001_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786539600000,
+      "tag": "0002_permission_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786543200000,
+      "tag": "0003_account_provisioning",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786716000000,
+      "tag": "0004_property_scoped_guests",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786802400000,
+      "tag": "0005_persistent_stays_intervals",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786987639697,
+      "tag": "0006_silky_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787099590007,
+      "tag": "0007_sour_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787109923664,
+      "tag": "0008_fair_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787114923861,
+      "tag": "0009_daffy_freak",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787149078732,
+      "tag": "0010_ambitious_warpath",
+      "breakpoints": true
+    }
   ]
 }

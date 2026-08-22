@@ -1,7 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DATABASE, type Database } from '../database/database.module.js';
+import { DATABASE } from '../database/database.module.js';
 import { auditEvents } from '../database/schema/index.js';
 import type { RequestContext } from '../auth/auth.types.js';
+
+type AuditEventRow = typeof auditEvents.$inferInsert;
+
+interface AuditInsert {
+  values(value: AuditEventRow): PromiseLike<unknown>;
+  values(values: AuditEventRow[]): PromiseLike<unknown>;
+}
+
+export interface AuditExecutor {
+  insert(table: typeof auditEvents): AuditInsert;
+}
 
 export interface AuditEventInput extends RequestContext {
   eventType: string;
@@ -14,9 +25,19 @@ export interface AuditEventInput extends RequestContext {
 
 @Injectable()
 export class AuditService {
-  constructor(@Inject(DATABASE) private readonly database: Database) {}
-  async record(event: AuditEventInput): Promise<void> {
-    await this.database.insert(auditEvents).values({
+  constructor(@Inject(DATABASE) private readonly database: AuditExecutor) {}
+
+  async record(event: AuditEventInput, executor: AuditExecutor = this.database): Promise<void> {
+    await executor.insert(auditEvents).values(this.buildEvent(event));
+  }
+
+  async recordMany(events: readonly AuditEventInput[], executor: AuditExecutor = this.database): Promise<void> {
+    if (events.length === 0) return;
+    await executor.insert(auditEvents).values(events.map((event) => this.buildEvent(event)));
+  }
+
+  private buildEvent(event: AuditEventInput): AuditEventRow {
+    return {
       eventType: event.eventType,
       metadata: this.sanitize(event.metadata ?? {}),
       ...(event.requestId ? { requestId: event.requestId } : {}),
@@ -26,7 +47,7 @@ export class AuditService {
       ...(event.propertyId ? { propertyId: event.propertyId } : {}),
       ...(event.ipAddress ? { ipAddress: event.ipAddress } : {}),
       ...(event.userAgent ? { userAgent: event.userAgent } : {}),
-    });
+    };
   }
 
   private sanitize(value: Record<string, unknown>): Record<string, unknown> {

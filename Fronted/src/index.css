@@ -502,8 +502,10 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.52; transform: 
 .wizard-stage { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
 .wizard-stage > header span { color: var(--color-primary); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .wizard-stage > header p { margin-top: 4px; color: var(--color-muted); font-size: 11px; }
-.wizard-summary { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #bfdbfe; border-radius: var(--radius-md); background: var(--color-primary-soft); }
+.wizard-summary { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #bfdbfe; border-radius: var(--radius-md); background: var(--color-primary-soft); overflow-wrap: break-word; word-break: break-word; }
 .wizard-summary > h3 { color: var(--color-primary-dark); font-size: 13px; }
+.wizard-summary .detail-grid-item strong { word-break: break-word; overflow-wrap: break-word; }
+
 .route-loading, .route-error { display: grid; min-height: 50vh; place-content: center; gap: 10px; padding: 32px; color: var(--color-muted); text-align: center; }
 
 /* Authentication */

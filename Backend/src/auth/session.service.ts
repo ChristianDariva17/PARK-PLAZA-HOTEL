@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import { AuditService } from '../audit/audit.service.js';
 import type { Environment } from '../config/environment.js';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { accounts, auditEvents, permissions, rolePermissions, roles, sessions } from '../database/schema/index.js';
+import { accounts, permissions, rolePermissions, roles, sessions } from '../database/schema/index.js';
+import { acquireAccountTransactionLock } from '../database/transaction-policy.js';
 import type { AuthenticatedAccount, RequestContext } from './auth.types.js';
 import { CryptoService } from './crypto.service.js';
 
@@ -13,18 +15,19 @@ export class SessionService {
     @Inject(DATABASE) private readonly database: Database,
     private readonly config: ConfigService<Environment, true>,
     private readonly crypto: CryptoService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(accountId: string, propertyId: string, context: RequestContext): Promise<{ token: string; sessionId: string; expiresAt: Date }> {
     const token = this.crypto.createOpaqueToken();
     const expiresAt = new Date(Date.now() + this.config.get('AUTH_SESSION_MAX_HOURS', { infer: true }) * 3_600_000);
     const result = await this.database.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${accountId}))`);
+      await acquireAccountTransactionLock(tx, accountId);
       const replaced = await tx.update(sessions).set({ revokedAt: new Date(), revocationReason: 'replaced' }).where(and(eq(sessions.accountId, accountId), isNull(sessions.revokedAt))).returning({ id: sessions.id });
       const inserted = await tx.insert(sessions).values({ accountId, tokenHash: this.crypto.hashToken(token), expiresAt, ...(context.ipAddress ? { ipAddress: context.ipAddress } : {}), ...(context.userAgent ? { userAgent: context.userAgent } : {}) }).returning({ id: sessions.id });
       const sessionId = inserted[0]!.id;
-      if (replaced.length) await tx.insert(auditEvents).values(replaced.map(({ id }) => this.sessionAudit('auth.session.replaced', accountId, propertyId, id, context)));
-      await tx.insert(auditEvents).values(this.sessionAudit('auth.login.succeeded', accountId, propertyId, sessionId, context));
+      if (replaced.length) await this.audit.recordMany(replaced.map(({ id }) => this.sessionAudit('auth.session.replaced', accountId, propertyId, id, context)), tx);
+      await this.audit.record(this.sessionAudit('auth.login.succeeded', accountId, propertyId, sessionId, context), tx);
       return inserted[0]!.id;
     });
     return { token, sessionId: result, expiresAt };
@@ -63,9 +66,10 @@ export class SessionService {
 
   async revokeAllForAccount(accountId: string, propertyId: string, reason: string, context: RequestContext): Promise<void> {
     await this.database.transaction(async (tx) => {
+      await acquireAccountTransactionLock(tx, accountId);
       const changed = await tx.update(sessions).set({ revokedAt: new Date(), revocationReason: reason })
         .where(and(eq(sessions.accountId, accountId), isNull(sessions.revokedAt))).returning({ id: sessions.id });
-      if (changed.length) await tx.insert(auditEvents).values(changed.map(({ id }) => this.sessionAudit(`auth.session.${reason}`, accountId, propertyId, id, context)));
+      if (changed.length) await this.audit.recordMany(changed.map(({ id }) => this.sessionAudit(`auth.session.${reason}`, accountId, propertyId, id, context)), tx);
     });
   }
 
@@ -85,7 +89,7 @@ export class SessionService {
   private async revokeById(sessionId: string, reason: string, accountId: string, propertyId: string, context: RequestContext): Promise<void> {
     await this.database.transaction(async (tx) => {
       const changed = await tx.update(sessions).set({ revokedAt: new Date(), revocationReason: reason }).where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt))).returning({ id: sessions.id });
-      if (changed.length) await tx.insert(auditEvents).values(this.sessionAudit(`auth.session.${reason}`, accountId, propertyId, sessionId, context));
+      if (changed.length) await this.audit.record(this.sessionAudit(`auth.session.${reason}`, accountId, propertyId, sessionId, context), tx);
     });
   }
 

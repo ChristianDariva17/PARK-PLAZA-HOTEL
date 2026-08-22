@@ -1,0 +1,44 @@
+schema: spec-driven
+
+context: |
+  Project: park-plaza-hotel.
+  Stack: NestJS/Fastify backend with Drizzle ORM and PostgreSQL; two Vite/React frontends.
+  Architecture: Feature-oriented backend modules and React client applications.
+  Testing: Vitest unit/integration suites in Backend and Fronted; no E2E runner detected.
+  Style: TypeScript/JavaScript ES modules; existing project conventions take precedence.
+
+strict_tdd: false
+
+testing:
+  strict_tdd: false
+  mode: standard
+  requirements: Behavior-focused tests and final verification remain required. RED-before-production sequencing and an agent-executed test loop are not mandatory.
+  execution_owner: The user runs tests, builds, migrations, Docker, servers, and Git operations.
+  runner: Vitest
+  commands:
+    backend_unit: "cd Backend && npm test"
+    backend_integration: "cd Backend && npm run test:integration"
+    frontend: "cd Fronted && npm test"
+  coverage: unavailable
+  e2e: unavailable
+  linter: "cd Fronted && npm run lint"
+  type_checker: "cd Backend && npx tsc --noEmit"
+  formatter: unavailable
+
+rules:
+  proposal:
+    - Include rollback considerations for persistence or lifecycle changes.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords.
+  design:
+    - Document persistence boundaries, lifecycle transitions, and rationale.
+  tasks:
+    - Group tasks by phase and keep each task independently verifiable.
+  apply:
+    tdd: false
+    guidelines:
+      - Follow existing backend and frontend feature patterns.
+  verify:
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive schema or data changes.

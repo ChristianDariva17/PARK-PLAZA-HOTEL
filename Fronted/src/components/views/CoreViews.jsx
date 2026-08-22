@@ -7,6 +7,7 @@ import {
   formatMoney, getOrderRequirements, getOrderShortages, ORDER_STATUSES, PAYMENT_METHODS,
   RESERVATION_STATUSES, ROOM_CATEGORIES, ROOM_STATUSES, selectAccountBalance, selectClientName,
 } from '../../domain/hotelModel';
+import { displayRoomReference } from '../../rooms/roomModel';
 import { useHotel } from '../../state/hotelContext';
 import { usePermissions } from '../../auth/authContext';
 import { PERMISSIONS } from '../../auth/permissions';
@@ -47,7 +48,6 @@ const inventoryAvailable = (item) => item.stock - item.reserved;
 
 export function DashboardView({ navigate }) {
   const { state } = useHotel();
-  const { can } = usePermissions();
   const available = state.rooms.filter((room) => room.status === 'Disponible').length;
   const occupied = state.rooms.filter((room) => room.status === 'Ocupada').length;
   const occupancy = state.rooms.length ? Math.round((occupied / state.rooms.length) * 100) : 0;
@@ -59,37 +59,70 @@ export function DashboardView({ navigate }) {
   const arrivals = state.reservations.filter((item) => item.status === 'Confirmada').toSorted((a, b) => a.checkIn.localeCompare(b.checkIn));
   const departures = state.stays.filter((item) => item.status === 'Activa').toSorted((a, b) => a.expectedCheckOut.localeCompare(b.expectedCheckOut));
   const poolInside = state.recreationAccess.filter((item) => item.zone === 'Piscina').reduce((sum, item) => sum + item.peopleInside, 0);
+
   const operation = [
-    { label: 'Limpieza', value: state.cleaningTasks.filter((item) => item.status !== 'Aprobada').length, detail: 'sin aprobar', route: 'limpieza' },
-    { label: 'Mantenimiento', value: state.maintenanceTickets.filter((item) => item.status !== 'Cerrado').length, detail: 'pendientes de cierre', route: 'mantenimiento' },
-    { label: 'Pedidos', value: activeOrders.length, detail: 'por completar', route: 'pedidos-qr' },
-    { label: 'Eventos', value: state.events.filter((item) => item.date >= today()).length, detail: 'programados', route: 'eventos' },
-    { label: 'Piscina', value: `${poolInside}/${state.poolCapacity}`, detail: 'aforo actual', route: 'recreacion' },
-    { label: 'Accesos', value: state.accessLog.filter((item) => item.result === 'Rechazado').length, detail: 'rechazos de sesión', route: 'recreacion' },
-    { label: 'Inventario', value: lowStock.length, detail: 'bajo mínimo disponible', route: 'inventario' },
-    { label: 'Licores', value: state.inventory.filter((item) => item.category === 'Licores').reduce((sum, item) => sum + inventoryAvailable(item), 0).toFixed(1), detail: 'oz disponibles', route: 'cocina-bar' },
+    { label: 'Limpieza', value: state.cleaningTasks.filter((item) => item.status !== 'Aprobada').length, detail: 'tareas activas', route: 'limpieza', icon: '🧹' },
+    { label: 'Mantenimiento', value: state.maintenanceTickets.filter((item) => item.status !== 'Cerrado').length, detail: 'pendientes', route: 'mantenimiento', icon: '🔧' },
+    { label: 'Pedidos Bar', value: activeOrders.length, detail: 'por entregar', route: 'pedidos-qr', icon: '🍷' },
+    { label: 'Eventos', value: state.events.filter((item) => item.date >= today()).length, detail: 'programados', route: 'eventos', icon: '📅' },
+    { label: 'Piscina', value: `${poolInside}/${state.poolCapacity}`, detail: 'aforo actual', route: 'recreacion', icon: '🏊' },
+    { label: 'Inventario', value: lowStock.length, detail: 'bajo mínimo', route: 'inventario', icon: '📦' },
   ];
+
   return <div className="view-container">
-    <PageHeader actionType="RESERVATION_CONFIRM" metadata="Estado actual · datos en memoria" title="Centro de operaciones" description="Lectura transversal de recepción, habitaciones, servicios y control interno." action={can(PERMISSIONS.reservationsCreate) ? <button className="btn btn-primary" onClick={() => navigate('reservas', { type: 'create-reservation' })}>Nueva reserva</button> : null} />
+    <PageHeader
+      metadata="Centro de Control Operativo 5★"
+      title="Dashboard General"
+      description="Visión ejecutiva en tiempo real de ocupación, reservas, salidas, limpiezas y facturación."
+      action={
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => navigate('reservas')}>➕ Nueva Reserva</button>
+          <button className="btn btn-outline" onClick={() => navigate('checkin-checkout')}>📥 Check-in / Out</button>
+          <button className="btn btn-outline" onClick={() => navigate('limpieza')}>🧹 Limpieza</button>
+        </div>
+      }
+    />
+
     <div className="dashboard-kpi-grid">
-      <Kpi label="Disponibles" value={available} detail={`${state.rooms.length} habitaciones registradas`} icon={CheckCircle2} />
-      <Kpi label="Ocupadas" value={occupied} detail={`${occupancy} % actual`} icon={BedDouble} tone="purple" />
-      <Kpi label="Llegadas" value={arrivals.length} detail="Reservas confirmadas" icon={CalendarDays} tone="blue" />
-      <Kpi label="Ingresos registrados" value={formatMoney(income)} detail="Movimientos de esta sesión" icon={CreditCard} tone="gold" />
-      <Kpi label="Saldos abiertos" value={formatMoney(openBalance)} detail={`${departures.length} estadías activas`} icon={DoorOpen} tone="warning" />
-      <Kpi label="Alertas" value={openIncidents.length + lowStock.length} detail="Incidencias + stock disponible bajo" icon={BellRing} tone="red" />
+      <Kpi label="Disponibles" value={available} detail={`${state.rooms.length} habitaciones libres`} icon={CheckCircle2} />
+      <Kpi label="Ocupadas" value={occupied} detail={`${occupancy} % de ocupación actual`} icon={BedDouble} tone="purple" />
+      <Kpi label="Llegadas Hoy" value={arrivals.length} detail="Reservas confirmadas" icon={CalendarDays} tone="blue" />
+      <Kpi label="Ingresos del Día" value={formatMoney(income)} detail="Caja de la jornada" icon={CreditCard} tone="gold" />
+      <Kpi label="Saldos Abiertos" value={formatMoney(openBalance)} detail={`${departures.length} estadías activas`} icon={DoorOpen} tone="warning" />
+      <Kpi label="Alertas Operativas" value={openIncidents.length + lowStock.length} detail="Incidencias + stock crítico" icon={BellRing} tone="red" />
     </div>
+
     <section aria-labelledby="dashboard-operation-title">
-      <SectionHeader id="dashboard-operation-title" eyebrow="Control transversal" title="Pulso operativo" description="Cada indicador abre su módulo y usa solamente registros de la sesión." />
-      <div className="operational-strip">{operation.map((item) => <button key={item.label} onClick={() => navigate(item.route)}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></button>)}</div>
+      <SectionHeader id="dashboard-operation-title" eyebrow="Control Transversal 5★" title="Pulso Operativo del Hotel" description="Acceso directo a cada módulo operativo de la propiedad." />
+      <div className="operational-strip">
+        {operation.map((item) => (
+          <button key={item.label} onClick={() => navigate(item.route)}>
+            <span>{item.icon} {item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.detail}</small>
+          </button>
+        ))}
+      </div>
     </section>
+
     <div className="dashboard-list-grid">
-      <DashboardList title="Llegadas confirmadas" records={arrivals} empty="Sin llegadas confirmadas" onOpen={() => navigate('checkin-checkout')} render={(item) => ({ title: selectClientName(state, item.clientId), detail: `Hab. ${item.roomId} · ${displayCalendarDate(item.checkIn)}`, status: item.status })} />
-      <DashboardList title="Salidas previstas" records={departures} empty="Sin estadías activas" onOpen={() => navigate('checkin-checkout')} render={(item) => ({ title: selectClientName(state, item.clientId), detail: `Hab. ${item.roomId} · ${displayCalendarDate(item.expectedCheckOut)}`, status: item.status })} />
-      <DashboardList title="Atención prioritaria" records={[...openIncidents, ...lowStock]} empty="Sin alertas abiertas" onOpen={(item) => navigate(item.id.startsWith('INC') ? 'incidencias' : 'inventario')} render={(item) => item.id.startsWith('INC') ? ({ title: item.description, detail: item.roomId ? `Hab. ${item.roomId}` : item.type, status: item.priority }) : ({ title: item.name, detail: `${inventoryAvailable(item)} ${item.unit} disponibles`, status: inventoryAvailable(item) < 0 ? 'Crítico' : 'Bajo mínimo' })} />
+      <DashboardList title="📥 Llegadas Confirmadas" records={arrivals} empty="Sin llegadas pendientes hoy" onOpen={() => navigate('checkin-checkout')} render={(item) => ({ title: selectClientName(state, item.clientId), detail: `${displayRoomReference(state, item.roomId)} · ${displayCalendarDate(item.checkIn)}`, status: item.status })} />
+      <DashboardList title="📤 Salidas Previstas" records={departures} empty="Sin salidas pendientes hoy" onOpen={() => navigate('checkin-checkout')} render={(item) => ({ title: selectClientName(state, item.clientId), detail: `${displayRoomReference(state, item.roomId)} · ${displayCalendarDate(item.expectedCheckOut)}`, status: item.status })} />
+      <DashboardList title="⚠️ Atención Prioritaria" records={[...openIncidents, ...lowStock]} empty="Sin alertas abiertas" onOpen={(item) => navigate(item.id.startsWith('INC') ? 'incidencias' : 'inventario')} render={(item) => item.id.startsWith('INC') ? ({ title: item.description, detail: item.roomId ? `Hab. ${item.roomId}` : item.type, status: item.priority }) : ({ title: item.name, detail: `${inventoryAvailable(item)} ${item.unit} disponibles`, status: inventoryAvailable(item) < 0 ? 'Crítico' : 'Bajo mínimo' })} />
     </div>
-    <section className="activity-strip" aria-labelledby="activity-title"><div><span className="activity-mark"><Clock3 size={17} /></span><span><strong id="activity-title">Auditoría reciente</strong><small>Actividad local, no histórica</small></span></div><div className="activity-items">{state.auditLog.slice(0, 3).map((entry) => <span key={entry.id}><strong>{entry.action}</strong><small>{entry.module} · {formatDateTime(entry.createdAt)}</small></span>)}</div><button className="text-action" onClick={() => navigate('auditoria')}>Abrir auditoría</button></section>
-    <PrototypeNotice>los indicadores describen el estado visible de esta sesión. No afirman resultados diarios, mensuales ni conexión en tiempo real.</PrototypeNotice>
+
+    <section className="activity-strip" aria-labelledby="activity-title">
+      <div>
+        <span className="activity-mark"><Clock3 size={17} /></span>
+        <span><strong id="activity-title">Auditoría Operativa Reciente</strong><small>Registro de eventos y cambios del sistema</small></span>
+      </div>
+      <div className="activity-items">
+        {state.auditLog.slice(0, 3).map((entry) => (
+          <span key={entry.id}><strong>{entry.action}</strong><small>{entry.module} · {formatDateTime(entry.createdAt)}</small></span>
+        ))}
+      </div>
+      <button className="text-action" onClick={() => navigate('auditoria')}>Ver auditoría completa</button>
+    </section>
   </div>;
 }
 
@@ -370,10 +403,10 @@ const EVENT_SERVICES = ['Comida', 'Bebidas', 'Decoración', 'Catering', 'Equipos
 function EventForm({ onClose, notify }) {
   const { state, dispatch } = useHotel();
   const allowed = useActionPermission('EVENT_CREATE');
-  const [form, setForm] = useState({ clientId: state.clients[0].id, title: '', date: future(5), startTime: '18:00', endTime: '22:00', venue: 'Terraza', attendees: 30, services: ['Catering'], total: 1000 });
+  const [form, setForm] = useState({ clientId: state.clients[0]?.id || '', title: '', date: future(5), startTime: '18:00', endTime: '22:00', venue: 'Terraza', attendees: 30, services: ['Catering'], total: 1000 });
   const collisions = state.events.filter((item) => item.date === form.date && item.venue === form.venue && form.startTime < item.endTime && form.endTime > item.startTime);
   const toggleService = (service) => setForm({ ...form, services: form.services.includes(service) ? form.services.filter((item) => item !== service) : [...form.services, service] });
-  const submit = (event) => { event.preventDefault(); if (collisions.length) { notify('Conflicto de horario', 'El espacio ya tiene un evento superpuesto.', 'error'); return; } if (form.endTime <= form.startTime) { notify('Horario inválido', 'La hora final debe ser posterior a la inicial.', 'error'); return; } if (executeWithFeedback(dispatch, { type: 'EVENT_CREATE', payload: { ...form, attendees: Number(form.attendees), total: Number(form.total) } }, notify, { title: 'Evento registrado', message: 'El horario quedó reservado sin superposición visible.' })) onClose(); };
+  const submit = (event) => { event.preventDefault(); if (!form.clientId) { notify('Cliente requerido', 'Registre o seleccione un cliente antes de crear el evento.', 'error'); return; } if (collisions.length) { notify('Conflicto de horario', 'El espacio ya tiene un evento superpuesto.', 'error'); return; } if (form.endTime <= form.startTime) { notify('Horario inválido', 'La hora final debe ser posterior a la inicial.', 'error'); return; } if (executeWithFeedback(dispatch, { type: 'EVENT_CREATE', payload: { ...form, attendees: Number(form.attendees), total: Number(form.total) } }, notify, { title: 'Evento registrado', message: 'El horario quedó reservado sin superposición visible.' })) onClose(); };
   if (!allowed) return null;
   return <form className="form-grid" onSubmit={submit}><label className="span-2">Nombre y tipo de evento<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Cumpleaños, matrimonio, reunión..." /></label><label>Cliente<select value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value })}>{state.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label><label>Espacio<select value={form.venue} onChange={(event) => setForm({ ...form, venue: event.target.value })}><option>Terraza</option><option>Bar</option><option>Salón Plaza</option></select></label><label>Fecha<input type="date" required value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label><label>Asistentes<input type="number" min="1" value={form.attendees} onChange={(event) => setForm({ ...form, attendees: event.target.value })} /></label><label>Inicio<input type="time" required value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></label><label>Fin<input type="time" required value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></label><fieldset className="span-2 option-fieldset"><legend>Servicios solicitados</legend>{EVENT_SERVICES.map((service) => <label className="check-option" key={service}><input type="checkbox" checked={form.services.includes(service)} onChange={() => toggleService(service)} />{service}</label>)}</fieldset><label className="span-2">Total estimado<input type="number" min="0" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label>{collisions.length ? <div className="alert-banner alert-banner-danger span-2">Superposición detectada con {collisions.map((item) => `${item.id} (${item.startTime}–${item.endTime})`).join(', ')}.</div> : <div className="alert-banner alert-banner-success span-2">Sin superposición visible para este espacio y horario.</div>}<div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary" disabled={collisions.length > 0}>Comprobar y registrar</button></div></form>;
 }

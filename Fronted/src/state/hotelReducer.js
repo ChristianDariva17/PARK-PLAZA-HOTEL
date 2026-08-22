@@ -14,6 +14,15 @@ import {
   validateReservation,
 } from '../domain/hotelModel.js';
 
+const PERSISTENT_ROOM_ACTIONS = new Set([
+  'ROOM_UPDATE', 'ROOM_BLOCK', 'ROOM_UNBLOCK',
+  'RESERVATION_CONFIRM', 'RESERVATION_UPDATE', 'RESERVATION_STATUS',
+  'CHECK_IN', 'CHECK_OUT',
+  'MAINTENANCE_CREATE', 'MAINTENANCE_UPDATE', 'MAINTENANCE_PROGRESS', 'MAINTENANCE_REOPEN',
+  'INCIDENT_CREATE', 'INCIDENT_UPDATE', 'INCIDENT_PROGRESS', 'INCIDENT_REOPEN',
+]);
+
+
 const nextId = (prefix, records) => {
   const highest = records.reduce((max, record) => {
     const match = String(record.id).match(/(\d+)$/);
@@ -99,6 +108,9 @@ const roomStatusAfterBlockChange = (state, roomId, ignoredMaintenanceId = null) 
 const updateRoomStatus = (state, roomId, ignoredMaintenanceId = null) => state.rooms.map((room) => room.id === roomId ? { ...room, status: roomStatusAfterBlockChange(state, roomId, ignoredMaintenanceId) } : room);
 
 export const validateHotelAction = (state, action) => {
+  if (PERSISTENT_ROOM_ACTIONS.has(action.type)) {
+    return { ok: false, message: 'Esta operación no está disponible hasta contar con persistencia operativa de habitaciones.' };
+  }
   switch (action.type) {
     case 'BIOMETRIC_ENROLLED': {
       const collection = action.subjectType === 'client' ? state.clients : action.subjectType === 'employee' ? state.staff : [];
@@ -238,7 +250,7 @@ export const validateHotelAction = (state, action) => {
       const current = action.type === 'PARKING_UPDATE' ? state.vehicles.find((item) => item.id === action.vehicleId) : null;
       const payload = action.payload;
       const duplicate = state.vehicles.some((item) => item.id !== current?.id && item.status === 'Dentro' && (item.plate.toUpperCase() === payload.plate?.trim().toUpperCase() || item.space.toUpperCase() === payload.space?.trim().toUpperCase()));
-      const message = action.type === 'PARKING_UPDATE' && (!current || current.status !== 'Dentro') ? 'Sólo se editan vehículos que están dentro.' : !state.stays.some((stay) => stay.id === payload.stayId && stay.status === 'Activa') ? 'Seleccioná una estadía activa.' : !hasText(payload.plate) || !hasText(payload.space) || !Number.isFinite(Number(payload.fee)) || Number(payload.fee) < 0 ? 'Revisá placa, espacio y tarifa manual.' : duplicate ? 'La placa o el espacio ya están ocupados.' : null;
+      const message = action.type === 'PARKING_UPDATE' && (!current || current.status !== 'Dentro') ? 'Sólo se editan vehículos que están dentro.' : !state.stays.some((stay) => stay.id === payload.stayId && ['Activa', 'active'].includes(stay.status)) ? 'Seleccioná una estadía activa.' : !hasText(payload.plate) || !hasText(payload.space) || !Number.isFinite(Number(payload.fee)) || Number(payload.fee) < 0 ? 'Revisá placa, espacio y tarifa manual.' : duplicate ? 'La placa o el espacio ya están ocupados.' : null;
       return { ok: !message, message };
     }
     case 'PARKING_EXIT': {
@@ -253,11 +265,13 @@ export const validateHotelAction = (state, action) => {
     case 'PET_UPDATE': {
       const pet = action.type === 'PET_UPDATE' ? state.pets.find((item) => item.id === action.petId) : null;
       const payload = action.payload;
-      const stay = payload.stayId ? state.stays.find((item) => item.id === payload.stayId && item.status === 'Activa' && item.clientId === payload.clientId) : null;
-      const account = stay ? getOpenAccount(state, stay.accountId) : null;
+      const stay = payload.stayId ? state.stays.find((item) => {
+        const primaryGuestId = state.reservations.find((reservation) => reservation.id === item.reservationId)?.primaryGuestId;
+        return item.id === payload.stayId && ['Activa', 'active'].includes(item.status) && (item.clientId || primaryGuestId) === payload.clientId;
+      }) : null;
       const duplicateRequest = hasText(action.requestId) && (state.auditLog.some((entry) => entry.requestId === action.requestId) || state.accounts.some((item) => item.charges.some((charge) => charge.requestId === action.requestId)));
       const chargeChanged = pet && Number(payload.charge) !== pet.charge;
-      const message = action.type === 'PET_UPDATE' && !pet ? 'La mascota no existe.' : pet?.status === 'Archivada' ? 'Reactivá la mascota antes de editarla.' : !state.clients.some((client) => client.id === payload.clientId && client.status !== 'Archivado') || !hasText(payload.name) || !isFiniteAtLeast(payload.charge) ? 'Revisá propietario activo, nombre y cargo.' : action.type === 'PET_UPDATE' && chargeChanged ? 'El cargo aplicado no se edita; registrá una operación financiera separada.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && (!stay || !account) ? 'Para aplicar el cargo seleccioná una estadía y cuenta abiertas del propietario.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && !hasText(action.requestId) ? 'Falta el identificador estable del cargo.' : action.type === 'PET_CREATE' && duplicateRequest ? 'La operación de mascota ya fue aplicada.' : null;
+      const message = action.type === 'PET_UPDATE' && !pet ? 'La mascota no existe.' : pet?.status === 'Archivada' ? 'Reactivá la mascota antes de editarla.' : !state.clients.some((client) => client.id === payload.clientId && client.status !== 'Archivado') || !hasText(payload.name) || !isFiniteAtLeast(payload.charge) ? 'Revisá propietario activo, nombre y tarifa.' : action.type === 'PET_UPDATE' && chargeChanged ? 'La tarifa registrada no se edita; registrá una operación financiera separada.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && !stay ? 'Para registrar una tarifa seleccioná una estadía activa del propietario.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && !hasText(action.requestId) ? 'Falta el identificador estable de la tarifa.' : action.type === 'PET_CREATE' && duplicateRequest ? 'La operación de mascota ya fue aplicada.' : null;
       return { ok: !message, message };
     }
     case 'PET_ARCHIVE':
@@ -473,6 +487,26 @@ export const validateHotelAction = (state, action) => {
       const amount = Number(action.countedAmount);
       return { ok: Boolean(session && Number.isFinite(amount) && amount >= 0), message: session ? 'Ingresá un conteo válido.' : 'No hay una caja abierta.' };
     }
+
+    // ─── Restaurant (Persistent) ─────────────────────────────────────────────
+    case 'RESTAURANT_LOAD_STARTED':
+      return { ...state, restaurantRequest: { status: 'loading' } };
+    case 'RESTAURANT_LOAD_SUCCEEDED':
+      return { ...state, recipes: action.recipes, inventory: action.inventory, inventoryLedger: action.inventoryLedger, orders: action.orders, restaurantRequest: { status: 'success' } };
+    case 'RESTAURANT_LOAD_FAILED':
+      return { ...state, restaurantRequest: { status: 'error', error: action.error } };
+    case 'RESTAURANT_ORDER_CREATED':
+      return { ...state, orders: [action.order, ...state.orders] };
+    case 'RESTAURANT_ORDER_UPDATED':
+      return { ...state, orders: state.orders.map((o) => o.id === action.order.id ? action.order : o) };
+    case 'RESTAURANT_MENU_ITEM_CREATED':
+      return { ...state, recipes: [action.item, ...state.recipes] };
+    case 'RESTAURANT_MENU_ITEM_UPDATED':
+      return { ...state, recipes: state.recipes.map((r) => r.id === action.item.id ? action.item : r) };
+    case 'RESTAURANT_INVENTORY_ITEM_CREATED':
+      return { ...state, inventory: [action.item, ...state.inventory] };
+    case 'RESTAURANT_INVENTORY_ITEM_UPDATED':
+      return { ...state, inventory: state.inventory.map((i) => i.id === action.item.id ? action.item : i) };
     case 'NOTIFICATIONS_READ_ALL':
       return { ok: state.notifications.some((item) => !item.read), message: 'No hay notificaciones sin leer.' };
     case 'NOTIFICATIONS_READ_AUTHORIZED': {
@@ -485,18 +519,199 @@ export const validateHotelAction = (state, action) => {
   }
 };
 
-const syncRoomBalances = (state) => ({
-  ...state,
-  rooms: state.rooms.map((room) => {
-    if (!room.activeStayId) return room.balance === 0 ? room : { ...room, balance: 0 };
-    const stay = state.stays.find((item) => item.id === room.activeStayId);
-    const account = state.accounts.find((item) => item.id === stay?.accountId);
-    const balance = selectAccountBalance(account);
-    return room.balance === balance ? room : { ...room, balance };
-  }),
-});
+const syncRoomBalances = (state) => state;
 
 export function hotelReducer(state, action) {
+  switch (action.type) {
+    case 'PARKING_RESET':
+      return { ...state, vehicles: [], parkingRequest: { status: 'idle', error: null } };
+    case 'PARKING_LOAD_STARTED':
+      return { ...state, parkingRequest: { status: 'loading', error: null } };
+    case 'PARKING_LOAD_SUCCEEDED':
+      return { ...state, vehicles: action.vehicles, parkingRequest: { status: 'success', error: null } };
+    case 'PARKING_LOAD_FAILED':
+      return { ...state, parkingRequest: { status: 'error', error: action.error } };
+    case 'PARKING_RECORD_COMMITTED':
+      return { ...state, vehicles: [action.vehicle, ...state.vehicles.filter((item) => item.id !== action.vehicle.id)], parkingRequest: { status: 'success', error: null } };
+    case 'PET_RESET':
+      return { ...state, pets: [], petRequest: { status: 'idle', error: null } };
+    case 'PET_LOAD_STARTED':
+      return { ...state, petRequest: { status: 'loading', error: null } };
+    case 'PET_LOAD_SUCCEEDED':
+      return { ...state, pets: action.pets, petRequest: { status: 'success', error: null } };
+    case 'PET_LOAD_FAILED':
+      return { ...state, petRequest: { status: 'error', error: action.error } };
+    case 'PET_RECORD_COMMITTED':
+      return { ...state, pets: [action.pet, ...state.pets.filter((item) => item.id !== action.pet.id)], petRequest: { status: 'success', error: null } };
+    case 'PARKING_CREATE':
+    case 'PARKING_UPDATE':
+    case 'PARKING_EXIT':
+    case 'PARKING_ARCHIVE':
+    case 'PET_CREATE':
+    case 'PET_UPDATE':
+    case 'PET_ARCHIVE':
+    case 'PET_REACTIVATE':
+      return state;
+    case 'STAYS_RESET':
+      return { ...state, persistentStays: [], stayRequest: { status: 'idle', error: null }, stayCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
+    case 'STAYS_LOAD_STARTED':
+      return { ...state, stayRequest: { status: 'loading', error: null } };
+    case 'STAYS_LOAD_SUCCEEDED':
+      return { ...state, persistentStays: action.stays, stayRequest: { status: 'success', error: null } };
+    case 'STAYS_LOAD_FAILED':
+      return { ...state, stayRequest: { status: 'error', error: action.error } };
+    case 'STAYS_LOAD_CANCELLED':
+      return { ...state, stayRequest: { status: state.persistentStays.length ? 'success' : 'idle', error: null } };
+    case 'STAY_COMMAND_STARTED':
+      return { ...state, stayCommandRequest: { status: 'saving', error: null, retryBlocked: false } };
+    case 'STAY_COMMAND_RECONCILING':
+      return { ...state, stayCommandRequest: { status: 'reconciling', error: action.error, retryBlocked: true } };
+    case 'STAY_COMMAND_COMMITTED': {
+      const existing = state.persistentStays.some((stay) => stay.id === action.stay.id);
+      const persistentStays = existing ? state.persistentStays.map((stay) => stay.id === action.stay.id ? action.stay : stay) : [action.stay, ...state.persistentStays];
+      const persistentReservations = state.persistentReservations.map((reservation) => reservation.id === action.reservation.id ? { ...reservation, ...action.reservation } : reservation);
+      const rooms = state.rooms.map((room) => room.id === action.room.id ? { ...room, status: action.room.status } : room);
+      return { ...state, persistentStays, persistentReservations, rooms, stayCommandRequest: { status: 'success', error: null, retryBlocked: false } };
+    }
+    case 'STAY_COMMAND_FAILED':
+      return { ...state, stayCommandRequest: { status: 'error', error: action.error, retryBlocked: Boolean(action.retryBlocked) } };
+    case 'STAY_COMMAND_CANCELLED':
+      return { ...state, stayCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
+    case 'CLEANING_RESET':
+      return { ...state, cleaningRequest: { status: 'idle', error: null }, cleaningCommandRequest: { status: 'idle', error: null } };
+    case 'CLEANING_LOAD_STARTED':
+      return { ...state, cleaningRequest: { status: 'loading', error: null } };
+    case 'CLEANING_LOAD_SUCCEEDED':
+      return { ...state, cleaningTasks: action.cleaningTasks, cleaningRequest: { status: 'success', error: null } };
+    case 'CLEANING_LOAD_FAILED':
+      return { ...state, cleaningRequest: { status: 'error', error: action.error } };
+    case 'CLEANING_LOAD_CANCELLED':
+      return { ...state, cleaningRequest: { status: state.cleaningTasks.length ? 'success' : 'idle', error: null } };
+    case 'CLEANING_COMMAND_STARTED':
+      return { ...state, cleaningCommandRequest: { status: 'saving', error: null } };
+    case 'CLEANING_COMMAND_COMMITTED': {
+      const existing = state.cleaningTasks.some((task) => task.id === action.task.id);
+      const cleaningTasks = existing ? state.cleaningTasks.map((task) => task.id === action.task.id ? action.task : task) : [action.task, ...state.cleaningTasks];
+      const rooms = action.room ? state.rooms.map((room) => room.id === action.room.id ? { ...room, status: action.room.status } : room) : state.rooms;
+      return { ...state, cleaningTasks, rooms, cleaningCommandRequest: { status: 'success', error: null } };
+    }
+    case 'CLEANING_COMMAND_FAILED':
+      return { ...state, cleaningCommandRequest: { status: 'error', error: action.error } };
+    case 'CLEANING_COMMAND_CANCELLED':
+      return { ...state, cleaningCommandRequest: { status: 'idle', error: null } };
+
+    case 'INCIDENTS_RESET':
+      return { ...state, incidentRequest: { status: 'idle', error: null }, incidentCommandRequest: { status: 'idle', error: null } };
+    case 'INCIDENTS_LOAD_STARTED':
+      return { ...state, incidentRequest: { status: 'loading', error: null } };
+    case 'INCIDENTS_LOAD_SUCCEEDED':
+      return { ...state, incidents: action.incidents, incidentRequest: { status: 'success', error: null } };
+    case 'INCIDENTS_LOAD_FAILED':
+      return { ...state, incidentRequest: { status: 'error', error: action.error } };
+    case 'INCIDENTS_LOAD_CANCELLED':
+      return { ...state, incidentRequest: { status: state.incidents.length ? 'success' : 'idle', error: null } };
+
+    case 'MAINTENANCE_RESET':
+      return { ...state, maintenanceRequest: { status: 'idle', error: null }, maintenanceCommandRequest: { status: 'idle', error: null } };
+    case 'MAINTENANCE_LOAD_STARTED':
+      return { ...state, maintenanceRequest: { status: 'loading', error: null } };
+    case 'MAINTENANCE_LOAD_SUCCEEDED':
+      return { ...state, maintenanceTickets: action.maintenanceTickets, maintenanceRequest: { status: 'success', error: null } };
+    case 'MAINTENANCE_LOAD_FAILED':
+      return { ...state, maintenanceRequest: { status: 'error', error: action.error } };
+    case 'MAINTENANCE_LOAD_CANCELLED':
+      return { ...state, maintenanceRequest: { status: state.maintenanceTickets.length ? 'success' : 'idle', error: null } };
+
+    case 'CASH_RESET':
+      return { ...state, cashRequest: { status: 'idle', error: null }, cashCommandRequest: { status: 'idle', error: null } };
+    case 'CASH_LOAD_STARTED':
+      return { ...state, cashRequest: { status: 'loading', error: null } };
+    case 'CASH_LOAD_SUCCEEDED':
+      return { ...state, openSession: action.openSession, cashSessions: action.cashSessions, cashMovements: action.cashMovements, cashRequest: { status: 'success', error: null } };
+    case 'CASH_LOAD_FAILED':
+      return { ...state, cashRequest: { status: 'error', error: action.error } };
+    case 'CASH_LOAD_CANCELLED':
+      return { ...state, cashRequest: { status: state.cashSessions.length ? 'success' : 'idle', error: null } };
+
+    case 'RESERVATIONS_RESET':
+      return {
+        ...state,
+        persistentReservations: [],
+        reservationRequest: { status: 'idle', error: null },
+        reservationAvailability: null,
+        reservationAvailabilityRequest: { status: 'idle', error: null },
+        reservationCreateRequest: { status: 'idle', error: null, retryBlocked: false },
+      };
+    case 'RESERVATIONS_LOAD_STARTED':
+      return { ...state, reservationRequest: { status: 'loading', error: null } };
+    case 'RESERVATIONS_LOAD_SUCCEEDED':
+      return { ...state, persistentReservations: action.reservations, reservationRequest: { status: 'success', error: null } };
+    case 'RESERVATIONS_LOAD_FAILED':
+      return { ...state, reservationRequest: { status: 'error', error: action.error } };
+    case 'RESERVATIONS_LOAD_CANCELLED':
+      return { ...state, reservationRequest: { status: state.persistentReservations.length ? 'success' : 'idle', error: null } };
+    case 'RESERVATION_AVAILABILITY_STARTED':
+      return { ...state, reservationAvailability: null, reservationAvailabilityRequest: { status: 'loading', error: null } };
+    case 'RESERVATION_AVAILABILITY_SUCCEEDED':
+      return { ...state, reservationAvailability: action.availability, reservationAvailabilityRequest: { status: 'success', error: null } };
+    case 'RESERVATION_AVAILABILITY_FAILED':
+      return { ...state, reservationAvailability: null, reservationAvailabilityRequest: { status: 'error', error: action.error } };
+    case 'RESERVATION_AVAILABILITY_CANCELLED':
+      return { ...state, reservationAvailabilityRequest: { status: state.reservationAvailability ? 'success' : 'idle', error: null } };
+    case 'RESERVATION_AVAILABILITY_CLEARED':
+      return { ...state, reservationAvailability: null, reservationAvailabilityRequest: { status: 'idle', error: null } };
+    case 'RESERVATION_CREATE_STARTED':
+      return { ...state, reservationCreateRequest: { status: 'saving', error: null, retryBlocked: false } };
+    case 'RESERVATION_CREATE_RECONCILING':
+      return { ...state, reservationCreateRequest: { status: 'reconciling', error: action.error, retryBlocked: true } };
+    case 'RESERVATION_CREATE_COMMITTED': {
+      const existing = state.persistentReservations.some((reservation) => reservation.id === action.reservation.id);
+      const persistentReservations = existing
+        ? state.persistentReservations.map((reservation) => reservation.id === action.reservation.id ? action.reservation : reservation)
+        : [action.reservation, ...state.persistentReservations];
+      return { ...state, persistentReservations, reservationCreateRequest: { status: 'success', error: null, retryBlocked: false } };
+    }
+    case 'RESERVATION_CREATE_FAILED':
+      return { ...state, reservationCreateRequest: { status: 'error', error: action.error, retryBlocked: Boolean(action.retryBlocked) } };
+    case 'RESERVATION_CREATE_RECONCILED':
+      return { ...state, reservationCreateRequest: { status: 'idle', error: null, retryBlocked: false } };
+    case 'RESERVATION_CREATE_CANCELLED':
+      return { ...state, reservationCreateRequest: { status: 'idle', error: null, retryBlocked: false } };
+    case 'ROOMS_RESET':
+      return { ...state, rooms: [], roomCategories: [], roomRequest: { status: 'idle', error: null } };
+    case 'ROOMS_LOAD_STARTED':
+      return { ...state, roomRequest: { status: 'loading', error: null } };
+    case 'ROOMS_LOAD_SUCCEEDED':
+      return { ...state, rooms: action.rooms, roomCategories: action.categories, roomRequest: { status: 'success', error: null } };
+    case 'ROOM_MUTATION_STARTED':
+      return { ...state, roomRequest: { status: 'saving', error: null } };
+    case 'ROOM_MUTATION_COMMITTED':
+      return { ...state, rooms: state.rooms.map((room) => room.id === action.room.id ? action.room : room), roomRequest: { status: 'success', error: null } };
+    case 'ROOM_REQUEST_FAILED':
+      return { ...state, roomRequest: { status: 'error', error: action.error } };
+    case 'ROOM_REQUEST_CANCELLED':
+      return { ...state, roomRequest: { status: state.rooms.length ? 'success' : 'idle', error: null } };
+    case 'ROOM_UPDATE':
+    case 'ROOM_BLOCK':
+    case 'ROOM_UNBLOCK':
+      return state;
+    case 'GUESTS_RESET':
+      return { ...state, clients: [], guestRequest: { status: 'idle', error: null } };
+    case 'GUESTS_LOAD_STARTED':
+      return { ...state, guestRequest: { status: 'loading', error: null } };
+    case 'GUESTS_LOAD_SUCCEEDED':
+      return { ...state, clients: action.clients, guestRequest: { status: 'success', error: null } };
+    case 'GUESTS_LOAD_FAILED':
+      return { ...state, guestRequest: { status: 'error', error: action.error } };
+    case 'GUESTS_LOAD_CANCELLED':
+      return { ...state, guestRequest: { status: state.clients.length ? 'success' : 'idle', error: null } };
+    case 'GUEST_CREATED_COMMITTED':
+      return { ...state, clients: [action.client, ...state.clients] };
+    case 'GUEST_UPDATED_COMMITTED':
+      return { ...state, clients: state.clients.map((client) => client.id === action.client.id ? action.client : client) };
+    default:
+      break;
+  }
   if (!validateHotelAction(state, action).ok) return state;
   switch (action.type) {
     case 'CLIENT_CREATE': {
@@ -992,46 +1207,6 @@ export function hotelReducer(state, action) {
       const rooms = current.roomId ? updateRoomStatus(nextState, current.roomId) : state.rooms;
       return addAudit({ ...nextState, rooms }, 'Reabrió incidencia', 'Incidencias', current.id, action.reason || 'Reapertura operativa');
     }
-    case 'PARKING_CREATE': {
-      const stay = state.stays.find((item) => item.id === action.payload.stayId);
-      const vehicle = { ...action.payload, id: nextId('VEH', state.vehicles), clientId: stay.clientId, roomId: stay.roomId, plate: action.payload.plate.trim().toUpperCase(), space: action.payload.space.trim().toUpperCase(), fee: Number(action.payload.fee), status: 'Dentro', entryAt: new Date().toISOString(), exitAt: null, entryResponsible: action.responsible || 'Administrador demo' };
-      return addAudit({ ...state, vehicles: [vehicle, ...state.vehicles] }, 'Registró ingreso a cochera', 'Cochera', vehicle.id, `${vehicle.plate}; espacio ${vehicle.space}; tarifa ${vehicle.fee}`);
-    }
-    case 'PARKING_UPDATE': {
-      const payload = action.payload;
-      const vehicles = state.vehicles.map((item) => item.id === action.vehicleId ? { ...item, ...payload, plate: payload.plate.trim().toUpperCase(), space: payload.space.trim().toUpperCase(), fee: Number(payload.fee), updatedAt: new Date().toISOString(), updatedBy: action.responsible || 'Administrador demo' } : item);
-      return addAudit({ ...state, vehicles }, 'Actualizó vehículo dentro', 'Cochera', action.vehicleId, `${payload.plate}; ${payload.space}; tarifa ${payload.fee}`);
-    }
-    case 'PARKING_EXIT': {
-      const vehicle = state.vehicles.find((item) => item.id === action.vehicleId);
-      const stay = state.stays.find((item) => item.id === vehicle.stayId);
-      const account = getOpenAccount(state, stay?.accountId);
-      const chargeId = `CAR-${vehicle.id}`;
-      const shouldCharge = account && vehicle.fee > 0 && !account.charges.some((charge) => charge.id === chargeId);
-      const charge = shouldCharge ? { id: chargeId, concept: `Cochera ${vehicle.plate}`, category: 'Cochera', amount: vehicle.fee, createdAt: new Date().toISOString(), responsible: action.responsible } : null;
-      const accounts = charge ? state.accounts.map((item) => item.id === account.id ? { ...item, charges: [...item.charges, charge] } : item) : state.accounts;
-      const vehicles = state.vehicles.map((item) => item.id === vehicle.id ? { ...item, status: 'Fuera', exitAt: new Date().toISOString(), exitResponsible: action.responsible, exitObservation: action.observation?.trim() || '', chargeId: charge?.id || item.chargeId || null } : item);
-      return addAudit(syncRoomBalances({ ...state, vehicles, accounts }), 'Registró salida de cochera', 'Cochera', vehicle.id, `${vehicle.plate}; cargo ${charge ? vehicle.fee : 'no aplicable'}`, { user: action.responsible });
-    }
-    case 'PARKING_ARCHIVE':
-      return addAudit({ ...state, vehicles: state.vehicles.map((item) => item.id === action.vehicleId ? { ...item, status: 'Archivado', archivedAt: new Date().toISOString(), archiveReason: action.reason } : item) }, 'Archivó vehículo', 'Cochera', action.vehicleId, action.reason);
-    case 'PET_CREATE': {
-      const pet = { ...action.payload, id: nextId('PET', state.pets), charge: Number(action.payload.charge), status: 'Activa', createdAt: new Date().toISOString() };
-      const stay = pet.stayId ? state.stays.find((item) => item.id === pet.stayId && item.status === 'Activa' && item.clientId === pet.clientId) : null;
-      const account = stay ? getOpenAccount(state, stay.accountId) : null;
-      const charge = pet.charge > 0 ? { id: `CAR-${pet.id}`, concept: `Mascota ${pet.name}`, category: 'Mascotas', amount: pet.charge, requestId: action.requestId, createdAt: pet.createdAt, responsible: action.responsible || 'Administrador demo' } : null;
-      pet.chargeId = charge?.id || null;
-      pet.chargeApplied = Boolean(charge);
-      const clients = state.clients.map((client) => client.id === pet.clientId ? { ...client, petIds: [...new Set([...client.petIds, pet.id])] } : client);
-      const accounts = charge ? state.accounts.map((item) => item.id === account.id ? { ...item, charges: [...item.charges, charge] } : item) : state.accounts;
-      return addAudit(syncRoomBalances({ ...state, accounts, clients, pets: [pet, ...state.pets] }), 'Registró mascota', 'Mascotas', pet.id, `${pet.name}; ${pet.type}; ${charge ? `cargo ${charge.amount} en ${account.id}` : 'sin cargo'}`, { requestId: action.requestId });
-    }
-    case 'PET_UPDATE':
-      return addAudit({ ...state, pets: state.pets.map((item) => item.id === action.petId ? { ...item, ...action.payload, charge: Number(action.payload.charge), updatedAt: new Date().toISOString() } : item) }, 'Actualizó mascota', 'Mascotas', action.petId, action.payload.name);
-    case 'PET_ARCHIVE':
-      return addAudit({ ...state, pets: state.pets.map((item) => item.id === action.petId ? { ...item, status: 'Archivada', archivedAt: new Date().toISOString(), archiveReason: action.reason } : item) }, 'Archivó mascota', 'Mascotas', action.petId, action.reason);
-    case 'PET_REACTIVATE':
-      return addAudit({ ...state, pets: state.pets.map((item) => item.id === action.petId ? { ...item, status: 'Activa', reactivatedAt: new Date().toISOString(), reactivationReason: action.reason } : item) }, 'Reactivó mascota', 'Mascotas', action.petId, action.reason);
     case 'STAFF_CREATE': {
       const person = { ...action.payload, id: nextId('PER', state.staff), documentNumber: normalizeDocument(action.payload.documentNumber), salary: Number(action.payload.salary || 0), status: 'Activo', attendance: 'Pendiente', overtimeHours: 0, createdAt: new Date().toISOString() };
       return addAudit({ ...state, staff: [person, ...state.staff] }, 'Registró personal', 'Personal', person.id, person.name);
@@ -1089,6 +1264,26 @@ export function hotelReducer(state, action) {
       const cashSessions = state.cashSessions.map((item) => item.id === session.id ? { ...item, status: 'Cerrada', closedAt: new Date().toISOString(), countedAmount, expectedAmount, difference: countedAmount - expectedAmount, closingNote: action.note || '' } : item);
       return addAudit({ ...state, cashSessions }, 'Cerró caja', 'Caja', session.id, `Esperado ${expectedAmount}; contado ${countedAmount}; diferencia ${countedAmount - expectedAmount}`);
     }
+
+    // ─── Restaurant (Persistent) ─────────────────────────────────────────────
+    case 'RESTAURANT_LOAD_STARTED':
+      return { ...state, restaurantRequest: { status: 'loading' } };
+    case 'RESTAURANT_LOAD_SUCCEEDED':
+      return { ...state, recipes: action.recipes, inventory: action.inventory, inventoryLedger: action.inventoryLedger, orders: action.orders, restaurantRequest: { status: 'success' } };
+    case 'RESTAURANT_LOAD_FAILED':
+      return { ...state, restaurantRequest: { status: 'error', error: action.error } };
+    case 'RESTAURANT_ORDER_CREATED':
+      return { ...state, orders: [action.order, ...state.orders] };
+    case 'RESTAURANT_ORDER_UPDATED':
+      return { ...state, orders: state.orders.map((o) => o.id === action.order.id ? action.order : o) };
+    case 'RESTAURANT_MENU_ITEM_CREATED':
+      return { ...state, recipes: [action.item, ...state.recipes] };
+    case 'RESTAURANT_MENU_ITEM_UPDATED':
+      return { ...state, recipes: state.recipes.map((r) => r.id === action.item.id ? action.item : r) };
+    case 'RESTAURANT_INVENTORY_ITEM_CREATED':
+      return { ...state, inventory: [action.item, ...state.inventory] };
+    case 'RESTAURANT_INVENTORY_ITEM_UPDATED':
+      return { ...state, inventory: state.inventory.map((i) => i.id === action.item.id ? action.item : i) };
     case 'NOTIFICATIONS_READ_ALL':
       if (state.notifications.every((item) => item.read)) return state;
       {

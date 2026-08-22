@@ -6,10 +6,12 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
 import { validateEnv, type Environment } from './config/environment.js';
+import { HttpExceptionFilter } from './http/http-exception.filter.js';
 
 async function bootstrap(): Promise<void> {
   const environment = validateEnv(process.env);
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ trustProxy: environment.API_TRUST_PROXY_HOPS }));
+  app.useGlobalFilters(new HttpExceptionFilter());
   await app.register(helmet);
   await app.register(cookie);
   app.enableShutdownHooks();

@@ -1,10 +1,13 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
+import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { CryptoService } from '../auth/crypto.service.js';
 import { PasswordPolicyService } from '../auth/password-policy.service.js';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { accounts, auditEvents, roles, sessions, staff } from '../database/schema/index.js';
+import { getPostgresErrorFields } from '../database/postgres-error.js';
+import { accounts, roles, sessions, staff } from '../database/schema/index.js';
+import { acquirePropertyThenAccountTransactionLocks, acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import type { CreateAccountDto, ResetPasswordDto, UpdateAccountDto } from './accounts.dto.js';
 import { assertAccountTransitionSafe } from './accounts.safety.js';
 
@@ -14,6 +17,7 @@ export class AccountsService {
     @Inject(DATABASE) private readonly database: Database,
     private readonly crypto: CryptoService,
     private readonly passwordPolicy: PasswordPolicyService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(propertyId: string) {
@@ -44,7 +48,7 @@ export class AccountsService {
     const passwordHash = await this.crypto.hashPassword(input.temporaryPassword);
     try {
       const accountId = await this.database.transaction(async (tx) => {
-        await this.lockProperty(tx, actor.propertyId);
+        await acquirePropertyTransactionLock(tx, actor.propertyId);
         const role = await tx.select({ id: roles.id }).from(roles).where(eq(roles.key, input.roleKey)).limit(1);
         if (!role[0]) throw new BadRequestException('Unknown role');
         const created = await tx.insert(accounts).values({
@@ -53,10 +57,10 @@ export class AccountsService {
         }).returning({ id: accounts.id });
         const id = created[0]!.id;
         if (input.personnelId) await this.claimPersonnel(tx, actor.propertyId, id, input.personnelId);
-        await tx.insert(auditEvents).values({
+        await this.audit.record({
           ...this.auditBase(actor, context), eventType: 'account.created', subjectType: 'account', subjectId: id,
           metadata: { email: input.email, roleKey: input.roleKey, personnelId: input.personnelId ?? null },
-        });
+        }, tx);
         return id;
       });
       return (await this.list(actor.propertyId)).accounts.find((item) => item.id === accountId)!;
@@ -69,8 +73,7 @@ export class AccountsService {
     let revokeReason: string | null = null;
     try {
       await this.database.transaction(async (tx) => {
-        await this.lockProperty(tx, actor.propertyId);
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${accountId}))`);
+        await acquirePropertyThenAccountTransactionLocks(tx, actor.propertyId, accountId);
         const rows = await tx.select({ id: accounts.id, roleId: accounts.roleId, roleKey: roles.key, status: accounts.status, email: accounts.email })
           .from(accounts).innerJoin(roles, eq(accounts.roleId, roles.id))
           .where(and(eq(accounts.id, accountId), eq(accounts.propertyId, actor.propertyId))).limit(1).for('update');
@@ -102,10 +105,10 @@ export class AccountsService {
           await tx.update(staff).set({ accountId: null, updatedAt: new Date() }).where(and(eq(staff.propertyId, actor.propertyId), eq(staff.accountId, accountId)));
           if (input.personnelId !== null) await this.claimPersonnel(tx, actor.propertyId, accountId, input.personnelId);
         }
-        await tx.insert(auditEvents).values({
+        await this.audit.record({
           ...this.auditBase(actor, context), eventType: 'account.updated', subjectType: 'account', subjectId: accountId,
           metadata: { fields: Object.keys(input), roleKey: input.roleKey, status: input.status, personnelId: input.personnelId },
-        });
+        }, tx);
         if (nextStatus === 'disabled' && current.status !== 'disabled') revokeReason = 'account_disabled';
         else if (nextRoleKey !== current.roleKey) revokeReason = 'role_changed';
         else if (input.email !== undefined && input.email !== current.email) revokeReason = 'email_changed';
@@ -122,18 +125,13 @@ export class AccountsService {
     await this.passwordPolicy.assertAcceptable(input.temporaryPassword);
     const passwordHash = await this.crypto.hashPassword(input.temporaryPassword);
     await this.database.transaction(async (tx) => {
-      await this.lockProperty(tx, actor.propertyId);
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${accountId}))`);
+      await acquirePropertyThenAccountTransactionLocks(tx, actor.propertyId, accountId);
       const changed = await tx.update(accounts).set({ passwordHash, passwordChangeRequired: true, updatedAt: new Date() })
         .where(and(eq(accounts.id, accountId), eq(accounts.propertyId, actor.propertyId))).returning({ id: accounts.id });
       if (!changed.length) throw new NotFoundException('Account not found');
-      await tx.insert(auditEvents).values({ ...this.auditBase(actor, context), eventType: 'account.password_reset', subjectType: 'account', subjectId: accountId });
+      await this.audit.record({ ...this.auditBase(actor, context), eventType: 'account.password_reset', subjectType: 'account', subjectId: accountId }, tx);
       await this.revokeSessions(tx, actor, accountId, 'password_reset', context);
     });
-  }
-
-  private async lockProperty(tx: Parameters<Parameters<Database['transaction']>[0]>[0], propertyId: string): Promise<void> {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${propertyId}))`);
   }
 
   private async claimPersonnel(tx: Parameters<Parameters<Database['transaction']>[0]>[0], propertyId: string, accountId: string, personnelId: string): Promise<void> {
@@ -146,9 +144,9 @@ export class AccountsService {
   private async revokeSessions(tx: Parameters<Parameters<Database['transaction']>[0]>[0], actor: AuthenticatedAccount, accountId: string, reason: string, context: RequestContext): Promise<void> {
     const changed = await tx.update(sessions).set({ revokedAt: new Date(), revocationReason: reason })
       .where(and(eq(sessions.accountId, accountId), isNull(sessions.revokedAt))).returning({ id: sessions.id });
-    if (changed.length) await tx.insert(auditEvents).values(changed.map(({ id }) => ({
+    if (changed.length) await this.audit.recordMany(changed.map(({ id }) => ({
       ...this.auditBase(actor, context), eventType: `auth.session.${reason}`, subjectType: 'session', subjectId: id,
-    })));
+    })), tx);
   }
 
   private auditBase(actor: AuthenticatedAccount, context: RequestContext) {
@@ -161,8 +159,13 @@ export class AccountsService {
   }
 
   private rethrowConstraint(error: unknown): never {
-    if (error && typeof error === 'object' && 'getStatus' in error) throw error;
-    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') throw new ConflictException('Email or personnel link is already in use');
+    const postgresError = getPostgresErrorFields(error);
+    if (postgresError?.code === '23505' && postgresError.constraint === 'accounts_email_unique') {
+      throw new ConflictException('Email is already in use');
+    }
+    if (postgresError?.code === '23505' && postgresError.constraint === 'staff_account_id_key') {
+      throw new ConflictException('Personnel record is unavailable or already linked');
+    }
     throw error;
   }
 }

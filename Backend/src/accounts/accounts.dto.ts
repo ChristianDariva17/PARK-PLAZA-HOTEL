@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 const email = z.string().trim().email().max(254).transform((value) => value.toLowerCase());
 const uuid = z.string().uuid();
@@ -20,17 +20,11 @@ const updateAccountSchema = z.object({
 
 const resetPasswordSchema = z.object({ temporaryPassword: z.string().min(1).max(1024) }).strict();
 
-export type CreateAccountDto = z.infer<typeof createAccountSchema>;
-export type UpdateAccountDto = z.infer<typeof updateAccountSchema>;
-export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
+export type CreateAccountDto = z.output<typeof createAccountSchema>;
+export type UpdateAccountDto = z.output<typeof updateAccountSchema>;
+export type ResetPasswordDto = z.output<typeof resetPasswordSchema>;
 
-function parse<T>(schema: z.ZodType<T>, input: unknown): T {
-  const result = schema.safeParse(input);
-  if (!result.success) throw new BadRequestException('Invalid request body');
-  return result.data;
-}
-
-export const parseCreateAccountDto = (input: unknown) => parse(createAccountSchema, input);
-export const parseUpdateAccountDto = (input: unknown) => parse(updateAccountSchema, input);
-export const parseResetPasswordDto = (input: unknown) => parse(resetPasswordSchema, input);
-export const parseAccountId = (input: unknown) => parse(uuid, input);
+export const parseCreateAccountDto = (input: unknown) => parseZodHttp(createAccountSchema, input);
+export const parseUpdateAccountDto = (input: unknown) => parseZodHttp(updateAccountSchema, input);
+export const parseResetPasswordDto = (input: unknown) => parseZodHttp(resetPasswordSchema, input);
+export const parseAccountId = (input: unknown) => parseZodHttp(uuid, input, 'Invalid account ID');

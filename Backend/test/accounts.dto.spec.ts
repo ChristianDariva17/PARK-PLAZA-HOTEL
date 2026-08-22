@@ -9,11 +9,11 @@ describe('account management DTOs', () => {
     expect(parseUpdateAccountDto({ personnelId: null })).toEqual({ personnelId: null });
     expect(() => parseUpdateAccountDto({})).toThrow('Invalid request body');
   });
-  it('rejects unexpected secret-shaped fields', () => {
+  it('rejects unexpected properties with the public body message', () => {
     expect(() => parseResetPasswordDto({ temporaryPassword: 'valid input value', passwordHash: 'must-not-pass' })).toThrow('Invalid request body');
   });
   it('accepts only UUID account route parameters', () => {
     expect(parseAccountId('550e8400-e29b-41d4-a716-446655440000')).toBe('550e8400-e29b-41d4-a716-446655440000');
-    expect(() => parseAccountId('not-a-uuid')).toThrow('Invalid request body');
+    expect(() => parseAccountId('not-a-uuid')).toThrow('Invalid account ID');
   });
 });

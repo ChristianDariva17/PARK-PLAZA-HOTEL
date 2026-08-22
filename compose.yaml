@@ -13,25 +13,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  migrate:
-    profiles: ["tools"]
-    build:
-      context: Backend
-      target: dependencies
-    env_file: Backend/.env
-    environment:
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-    volumes:
-      - ./Backend/src:/app/src:ro
-      - ./Backend/drizzle:/app/drizzle:ro
-      - ./Backend/test:/app/test:ro
-    command: ["npm", "run", "migrate"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
   api:
     build: Backend
     env_file: Backend/.env
@@ -50,6 +31,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+    restart: unless-stopped
+
+  frontend:
+    build: Fronted
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

@@ -1,15 +1,13 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { parseZodHttp } from '../../http/zod-parser.js';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(1024),
   newPassword: z.string().min(1).max(1024),
 }).strict();
 
-export interface ChangePasswordDto { currentPassword: string; newPassword: string }
+export type ChangePasswordDto = z.output<typeof changePasswordSchema>;
 
 export function parseChangePasswordDto(input: unknown): ChangePasswordDto {
-  const result = changePasswordSchema.safeParse(input);
-  if (!result.success) throw new BadRequestException('Invalid request body');
-  return result.data;
+  return parseZodHttp(changePasswordSchema, input);
 }

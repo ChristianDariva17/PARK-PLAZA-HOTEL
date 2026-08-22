@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Wrench, AlertTriangle, Plus, Lock, Unlock, Hammer } from 'lucide-react';
 import {
   formatMoney,
   getOrderRequirements,
@@ -13,6 +13,7 @@ import {
   validateReservation,
 } from '../../domain/hotelModel';
 import { useHotel } from '../../state/hotelContext';
+import { CASH_PAYMENT_METHODS } from '../../cash/cashModel';
 import { PermissionButton } from '../auth/PermissionButton';
 import { useActionPermission } from '../auth/useActionPermission';
 import { Dialog, Drawer, PrototypeNotice, Tabs, TabPanel } from '../ui/Overlay';
@@ -103,26 +104,205 @@ export function OperationalReservationsView({ notify }) {
   </div>;
 }
 
+// Helper Components for Incidents and Maintenance
+function StatusStepper({ currentStatus, steps }) {
+  const currentIndex = steps.indexOf(currentStatus);
+  return (
+    <div className="status-stepper-container" style={{ display: 'flex', alignItems: 'center', width: '100%', margin: '14px 0 8px 0', gap: '4px' }}>
+      {steps.map((step, idx) => {
+        const isCompleted = idx < currentIndex;
+        const isActive = idx === currentIndex;
+
+        let color = 'var(--color-muted)';
+        if (isCompleted) {
+          color = 'var(--color-success)';
+        } else if (isActive) {
+          color = 'var(--color-primary)';
+        }
+
+        return (
+          <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: color,
+              zIndex: 2,
+              boxShadow: isActive ? '0 0 0 3px rgba(15, 60, 44, 0.2)' : 'none',
+              transition: 'all 0.2s ease'
+            }} />
+            {idx < steps.length - 1 && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '3px',
+                width: '100%',
+                height: '2px',
+                backgroundColor: isCompleted ? 'var(--color-success)' : 'var(--color-border)',
+                zIndex: 1
+              }} />
+            )}
+            <span style={{
+              fontSize: '9px',
+              fontWeight: isActive ? '700' : '500',
+              color: isActive ? 'var(--color-primary)' : 'var(--color-muted)',
+              marginTop: '4px',
+              textAlign: 'center',
+              whiteSpace: 'nowrap'
+            }}>{step}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PriorityTag({ priority }) {
+  let badgeClass = 'badge-gray';
+  const norm = String(priority || '').toLowerCase().trim();
+  if (norm === 'urgente' || norm === 'urgent') badgeClass = 'badge-red';
+  else if (norm === 'alta' || norm === 'high') badgeClass = 'badge-yellow';
+  else if (norm === 'media' || norm === 'medium') badgeClass = 'badge-blue';
+
+  return <span className={`badge ${badgeClass}`}>{priority}</span>;
+}
+
 function MaintenanceCreateForm({ onClose, notify }) {
-  const { state, execute } = useHotel();
+  const { state, execute, maintenanceCommands } = useHotel();
   const allowed = useActionPermission('MAINTENANCE_CREATE');
   const [form, setForm] = useState({ roomId: state.rooms[0]?.id || '', type: 'Aire acondicionado', description: '', priority: 'Media', assignedTo: 'Por asignar', severe: false, evidence: '' });
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = (event) => { event.preventDefault(); if (run(execute, { type: 'MAINTENANCE_CREATE', payload: form }, notify, 'Ticket creado', 'Ticket, incidencia y estado de habitación quedaron vinculados.')) onClose(); };
+  const submit = async (event) => {
+    event.preventDefault();
+    if (maintenanceCommands) {
+      try {
+        await maintenanceCommands.create({
+          roomId: form.roomId || undefined,
+          description: `[${form.type}] ${form.description}`,
+          priority: form.priority,
+          assignedTo: form.assignedTo || undefined,
+          blocksRoom: Boolean(form.severe),
+          evidence: form.evidence || undefined
+        });
+        notify('Ticket creado', 'Ticket de mantenimiento registrado exitosamente en el servidor.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al crear ticket', error.message, 'error');
+      }
+    } else {
+      if (run(execute, { type: 'MAINTENANCE_CREATE', payload: form }, notify, 'Ticket creado', 'Ticket, incidencia y estado de habitación quedaron vinculados.')) onClose();
+    }
+  };
   if (!allowed) return null;
-  return <form className="form-grid" onSubmit={submit}><label>Habitación<select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}>{state.rooms.map((room) => <option key={room.id} value={room.id}>{room.id} · {room.status}</option>)}</select></label><label>Tipo<input required value={form.type} onChange={(event) => set('type', event.target.value)} /></label><label>Prioridad<select value={form.priority} onChange={(event) => set('priority', event.target.value)}>{['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}</select></label><label>Responsable<input value={form.assignedTo} onChange={(event) => set('assignedTo', event.target.value)} /></label><label className="span-2">Descripción<textarea required value={form.description} onChange={(event) => set('description', event.target.value)} /></label><label className="span-2">Evidencia o referencia<input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} /></label><label className="toggle-row span-2"><input type="checkbox" checked={form.severe} onChange={(event) => set('severe', event.target.checked)} /><span>Falla grave: habitación fuera de servicio</span></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Crear ticket e incidencia</button></div></form>;
+  return (
+    <form className="form-grid" onSubmit={submit}>
+      <label>
+        Habitación
+        <select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}>
+          {state.rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              Habitación {room.number} (Piso {room.floor}) — {room.status}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Tipo de Avería
+        <input required value={form.type} onChange={(event) => set('type', event.target.value)} placeholder="Ej. Plomería, Eléctrico, Climatización..." />
+      </label>
+      <label>
+        Prioridad
+        <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
+          {['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </label>
+      <label>
+        Técnico Responsable
+        <input value={form.assignedTo} onChange={(event) => set('assignedTo', event.target.value)} placeholder="Nombre del técnico o por asignar" />
+      </label>
+      <label className="span-2">
+        Descripción del Problema
+        <textarea required value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Describa el problema detalladamente..." />
+      </label>
+      <label className="span-2">
+        Enlace de Evidencia / Referencia
+        <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="URL de imagen, video o documento de referencia" />
+      </label>
+
+      <label className="toggle-row span-2" style={{ marginTop: '4px' }}>
+        <input type="checkbox" checked={form.severe} onChange={(event) => set('severe', event.target.checked)} />
+        <span>Falla grave: bloquear habitación inmediatamente (Fuera de Servicio)</span>
+      </label>
+
+      {form.severe && (
+        <div className="alert-banner alert-banner-danger span-2" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span><strong>Falla Grave Activada:</strong> La habitación seleccionada quedará en estado <strong>Fuera de servicio / Mantenimiento</strong> y se bloqueará para futuras reservas.</span>
+        </div>
+      )}
+
+      <div className="form-actions span-2">
+        <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary">Crear ticket de mantenimiento</button>
+      </div>
+    </form>
+  );
 }
 
 function MaintenanceManager({ ticket, onClose, notify }) {
-  const { execute } = useHotel();
+  const { execute, maintenanceCommands } = useHotel();
   const canUpdate = useActionPermission('MAINTENANCE_UPDATE');
   const progressActionType = ticket.status === 'Cerrado' ? 'MAINTENANCE_REOPEN' : 'MAINTENANCE_PROGRESS';
   const canProgress = useActionPermission(progressActionType);
   const [form, setForm] = useState({ assignedTo: ticket.assignedTo, priority: ticket.priority, evidence: '', solution: ticket.solution || '', note: '' });
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const save = () => run(execute, { type: 'MAINTENANCE_UPDATE', ticketId: ticket.id, payload: form }, notify, 'Ticket actualizado', 'Responsable, prioridad y evidencia se sincronizaron con la incidencia.');
-  const advance = () => { if (run(execute, { type: 'MAINTENANCE_PROGRESS', ticketId: ticket.id, expectedStatus: ticket.status, note: form.note || form.solution }, notify, 'Ticket avanzado', 'Ticket, incidencia y habitación quedaron sincronizados.')) onClose(); };
-  const reopen = () => { if (run(execute, { type: 'MAINTENANCE_REOPEN', ticketId: ticket.id, reason: form.note }, notify, 'Ticket reabierto', 'La incidencia volvió a proceso y la habitación recuperó el bloqueo.')) onClose(); };
+
+  const save = async () => {
+    if (maintenanceCommands) {
+      try {
+        await maintenanceCommands.update(ticket.id, {
+          assignedTo: form.assignedTo,
+          priority: form.priority,
+          solution: form.solution || undefined,
+          evidence: form.evidence || undefined
+        });
+        notify('Ticket actualizado', 'Responsable, prioridad y solución quedaron sincronizados.', 'success');
+      } catch (error) {
+        notify('Error al actualizar ticket', error.message, 'error');
+      }
+    } else {
+      run(execute, { type: 'MAINTENANCE_UPDATE', ticketId: ticket.id, payload: form }, notify, 'Ticket actualizado', 'Responsable, prioridad y evidencia se sincronizaron con la incidencia.');
+    }
+  };
+
+  const advance = async () => {
+    if (maintenanceCommands) {
+      try {
+        await maintenanceCommands.progress(ticket.id, ticket.status);
+        notify('Ticket avanzado', 'El ticket avanzó de estado exitosamente.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al avanzar ticket', error.message, 'error');
+      }
+    } else {
+      if (run(execute, { type: 'MAINTENANCE_PROGRESS', ticketId: ticket.id, expectedStatus: ticket.status, note: form.note || form.solution }, notify, 'Ticket avanzado', 'Ticket, incidencia y habitación quedaron sincronizados.')) onClose();
+    }
+  };
+
+  const reopen = async () => {
+    if (maintenanceCommands) {
+      try {
+        await maintenanceCommands.progress(ticket.id, 'closed');
+        notify('Ticket reabierto', 'El ticket volvió a proceso y la habitación recuperó el bloqueo.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al reabrir ticket', error.message, 'error');
+      }
+    } else {
+      if (run(execute, { type: 'MAINTENANCE_REOPEN', ticketId: ticket.id, reason: form.note }, notify, 'Ticket reabierto', 'La incidencia volvió a proceso y la habitación recuperó el bloqueo.'));
+    }
+  };
+
   if (!canUpdate && !canProgress) return null;
   return <div className="form-grid"><label>Responsable<input value={form.assignedTo} onChange={(event) => set('assignedTo', event.target.value)} /></label><label>Prioridad<select value={form.priority} onChange={(event) => set('priority', event.target.value)}>{['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}</select></label><label className="span-2">Nueva evidencia<input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} /></label><label className="span-2">Solución / nota operativa<textarea value={form.solution} onChange={(event) => set('solution', event.target.value)} /></label><label className="span-2">Motivo de acción<textarea value={form.note} onChange={(event) => set('note', event.target.value)} /></label><div className="form-actions span-2">{canUpdate ? <PermissionButton actionType="MAINTENANCE_UPDATE" className="btn btn-outline" onClick={save}>Guardar datos</PermissionButton> : null}{canProgress ? ticket.status === 'Cerrado' ? <PermissionButton actionType={progressActionType} className="btn btn-primary" onClick={reopen}>Reabrir</PermissionButton> : <PermissionButton actionType={progressActionType} className="btn btn-primary" onClick={advance}>{ticket.status === 'Solucionado' ? 'Cerrar y evaluar liberación' : 'Avanzar estado'}</PermissionButton> : null}</div></div>;
 }
@@ -132,10 +312,227 @@ export function OperationalMaintenanceView({ notify }) {
   const canUpdateMaintenance = useActionPermission('MAINTENANCE_UPDATE');
   const canProgressMaintenance = useActionPermission('MAINTENANCE_PROGRESS');
   const canReopenMaintenance = useActionPermission('MAINTENANCE_REOPEN');
+
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+
+  // Custom filter states
+  const [statusFilter, setStatusFilter] = useState('Todos');
+  const [priorityFilter, setPriorityFilter] = useState('Todos');
+  const [roomQuery, setRoomQuery] = useState('');
+
   const selected = state.maintenanceTickets.find((item) => item.id === selectedId);
-  return <div className="view-container"><PageHeader actionType="MAINTENANCE_CREATE" metadata="Ticket · incidencia · habitación" title="Mantenimiento" description="Asignación, avance, solución, cierre y reapertura sincronizados." action={<PermissionButton actionType="MAINTENANCE_CREATE" className="btn btn-primary" onClick={() => setOpen(true)}>Nuevo ticket</PermissionButton>} /><MetricStrip items={[{ label: 'Pendientes de cierre', value: state.maintenanceTickets.filter((item) => item.status !== 'Cerrado').length }, { label: 'En reparación', value: state.maintenanceTickets.filter((item) => item.status === 'En reparación').length }, { label: 'Urgentes', value: state.maintenanceTickets.filter((item) => item.priority === 'Urgente').length }, { label: 'Cerrados', value: state.maintenanceTickets.filter((item) => item.status === 'Cerrado').length }]} /><div className="operation-cards">{state.maintenanceTickets.map((ticket) => { const incident = state.incidents.find((item) => item.referenceId === ticket.id); const room = state.rooms.find((item) => item.id === ticket.roomId); return <article className="card operation-card" key={ticket.id}><div className="row-between"><div><span className="eyebrow">{ticket.id} · Hab. {ticket.roomId}</span><h3>{ticket.type}</h3></div><StatusBadge>{ticket.status}</StatusBadge></div><p>{ticket.description}</p><DetailGrid compact items={[{ label: 'Responsable', value: ticket.assignedTo }, { label: 'Prioridad', value: ticket.priority }, { label: 'Incidencia', value: incident?.id, detail: incident?.status }, { label: 'Habitación', value: room?.status }, { label: 'Evidencias', value: ticket.evidence.length }, { label: 'Solución', value: ticket.solution || 'Pendiente' }]} />{(canUpdateMaintenance || (ticket.status === 'Cerrado' ? canReopenMaintenance : canProgressMaintenance)) ? <button className="btn btn-outline" onClick={() => setSelectedId(ticket.id)}>Gestionar ticket</button> : null}</article>; })}</div><Dialog open={open} onClose={() => setOpen(false)} title="Nuevo ticket de mantenimiento" wide><MaintenanceCreateForm onClose={() => setOpen(false)} notify={notify} /></Dialog><Dialog open={Boolean(selected)} onClose={() => setSelectedId(null)} title={selected ? `Gestionar ${selected.id}` : 'Gestionar ticket'} wide>{selected ? <MaintenanceManager ticket={selected} onClose={() => setSelectedId(null)} notify={notify} /> : null}</Dialog></div>;
+
+  // Apply filters
+  const filteredTickets = state.maintenanceTickets.filter((ticket) => {
+    const matchesStatus = statusFilter === 'Todos' || ticket.status === statusFilter;
+    const matchesPriority = priorityFilter === 'Todos' || ticket.priority === priorityFilter;
+    const matchesRoom = !roomQuery || (ticket.roomId && String(ticket.roomId).toLowerCase().includes(roomQuery.toLowerCase()));
+    return matchesStatus && matchesPriority && matchesRoom;
+  });
+
+  const MAINTENANCE_STATUS_STEPS = ['Pendiente', 'Asignado', 'En reparacion', 'Solucionado', 'Cerrado'];
+
+  return (
+    <div className="view-container">
+      <style>{`
+        .custom-filter-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          background: var(--color-surface);
+          padding: 16px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--color-border);
+          margin-bottom: 24px;
+          align-items: center;
+          box-shadow: var(--shadow-sm);
+        }
+        .custom-filter-bar label {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-weight: 600;
+          font-size: 12px;
+          color: var(--color-body);
+        }
+        .custom-filter-bar select, .custom-filter-bar input {
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--color-border);
+          background: var(--color-bg);
+          font-size: 13.5px;
+          outline: none;
+          min-width: 160px;
+          transition: border-color 0.2s;
+        }
+        .custom-filter-bar select:focus, .custom-filter-bar input:focus {
+          border-color: var(--color-primary);
+        }
+        .maintenance-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+          gap: 20px;
+          margin-top: 12px;
+        }
+        .maintenance-card {
+          position: relative;
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          box-shadow: var(--shadow-sm);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          overflow: hidden;
+        }
+        .maintenance-card:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-card);
+        }
+        .maintenance-card::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+        }
+        .priority-Baja::before, .priority-low::before { background-color: var(--color-muted); }
+        .priority-Media::before, .priority-medium::before { background-color: var(--color-primary); }
+        .priority-Alta::before, .priority-high::before { background-color: var(--color-warning); }
+        .priority-Urgente::before, .priority-urgent::before { background-color: var(--color-danger); }
+
+        .card-header-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card-header-icon.wrench {
+          background-color: var(--color-primary-soft);
+          color: var(--color-primary);
+        }
+      `}</style>
+
+      <PageHeader
+        actionType="MAINTENANCE_CREATE"
+        metadata="Mantenimiento preventivo y correctivo"
+        title="Mantenimiento"
+        description="Gestión integral de tickets, asignaciones, avances, evidencias y cierres."
+        action={<PermissionButton actionType="MAINTENANCE_CREATE" className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16} style={{marginRight: '6px'}} />Nuevo ticket</PermissionButton>}
+      />
+
+      <MetricStrip items={[
+        { label: 'Pendientes de cierre', value: state.maintenanceTickets.filter((item) => item.status !== 'Cerrado').length },
+        { label: 'En reparación', value: state.maintenanceTickets.filter((item) => item.status === 'En reparación' || item.status === 'En reparacion').length },
+        { label: 'Urgentes', value: state.maintenanceTickets.filter((item) => item.priority === 'Urgente' || item.priority === 'urgent').length },
+        { label: 'Cerrados', value: state.maintenanceTickets.filter((item) => item.status === 'Cerrado').length }
+      ]} />
+
+      <div className="custom-filter-bar">
+        <label>
+          Búsqueda por Habitación
+          <input
+            type="text"
+            placeholder="Ej. 101, 204..."
+            value={roomQuery}
+            onChange={(e) => setRoomQuery(e.target.value)}
+          />
+        </label>
+        <label>
+          Filtrar por Estado
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="Todos">Todos los estados</option>
+            {MAINTENANCE_STATUS_STEPS.map((step) => <option key={step} value={step}>{step}</option>)}
+          </select>
+        </label>
+        <label>
+          Filtrar por Prioridad
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+            <option value="Todos">Todas las prioridades</option>
+            {['Baja', 'Media', 'Alta', 'Urgente'].map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {filteredTickets.length > 0 ? (
+        <div className="maintenance-grid">
+          {filteredTickets.map((ticket) => {
+            const incident = state.incidents.find((item) => item.referenceId === ticket.id);
+            const room = state.rooms.find((item) => item.id === ticket.roomId);
+            const pClass = `priority-${ticket.priority}`;
+
+            return (
+              <article className={`maintenance-card ${pClass}`} key={ticket.id}>
+                <div>
+                  <div className="row-between" style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div className="card-header-icon wrench">
+                        <Wrench size={18} />
+                      </div>
+                      <div>
+                        <span className="eyebrow" style={{ display: 'block', fontSize: '11px' }}>{ticket.id} — Hab. {ticket.roomId || 'N/A'}</span>
+                        <h3 style={{ fontSize: '15px', fontWeight: '700', marginTop: '2px' }}>{ticket.description.replace(/^\[.*?\]\s*/, '')}</h3>
+                      </div>
+                    </div>
+                    <StatusBadge>{ticket.status}</StatusBadge>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                    <PriorityTag priority={ticket.priority} />
+                    {ticket.blocksRoom ? (
+                      <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Lock size={10} /> Bloquea Hab.
+                      </span>
+                    ) : (
+                      <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Unlock size={10} /> Sin Bloqueo
+                      </span>
+                    )}
+                  </div>
+
+                  <DetailGrid compact items={[
+                    { label: 'Responsable', value: ticket.assignedTo },
+                    { label: 'Incidencia', value: incident?.id || 'Ninguna', detail: incident?.status },
+                    { label: 'Habitación', value: room ? `${room.id} (${room.status})` : 'N/A' },
+                    { label: 'Evidencias', value: ticket.evidence?.length || 0 },
+                    { label: 'Solución', value: ticket.solution || 'Pendiente' }
+                  ]} />
+                </div>
+
+                <div>
+                  <StatusStepper currentStatus={ticket.status} steps={MAINTENANCE_STATUS_STEPS} />
+
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                    {(canUpdateMaintenance || (ticket.status === 'Cerrado' ? canReopenMaintenance : canProgressMaintenance)) ? (
+                      <button className="btn btn-outline btn-sm" style={{ width: '100%' }} onClick={() => setSelectedId(ticket.id)}>
+                        Gestionar Ticket
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState title="Sin tickets de mantenimiento" description="No se encontraron tickets con los filtros aplicados." />
+      )}
+
+      <Dialog open={open} onClose={() => setOpen(false)} title="Nuevo ticket de mantenimiento" wide>
+        <MaintenanceCreateForm onClose={() => setOpen(false)} notify={notify} />
+      </Dialog>
+
+      <Dialog open={Boolean(selected)} onClose={() => setSelectedId(null)} title={selected ? `Gestionar ${selected.id}` : 'Gestionar ticket'} wide>
+        {selected ? <MaintenanceManager ticket={selected} onClose={() => setSelectedId(null)} notify={notify} /> : null}
+      </Dialog>
+    </div>
+  );
 }
 
 function OrderEditor({ order, sourceFilter, onClose, notify }) {
@@ -200,31 +597,75 @@ export function OperationalInventoryView({ notify }) {
 }
 
 function CashOpenForm({ onClose, notify }) {
-  const { execute } = useHotel();
+  const { cashCommands } = useHotel();
   const allowed = useActionPermission('CASH_OPEN');
   const [form, setForm] = useState({ responsible: '', shift: 'Mañana', openingAmount: 0, notes: '' });
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = (event) => { event.preventDefault(); if (run(execute, { type: 'CASH_OPEN', payload: form }, notify, 'Caja abierta', 'El turno quedó disponible para registrar movimientos.')) onClose(); };
+  const submit = async (event) => {
+    event.preventDefault();
+    if (cashCommands) {
+      try {
+        await cashCommands.open(form);
+        notify('Caja abierta', 'El turno quedó disponible para registrar movimientos.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al abrir caja', error.message, 'error');
+      }
+    }
+  };
   if (!allowed) return null;
   return <form className="form-grid" onSubmit={submit}><label className="span-2">Responsable<input required value={form.responsible} onChange={(event) => set('responsible', event.target.value)} /></label><label>Turno<select value={form.shift} onChange={(event) => set('shift', event.target.value)}><option>Mañana</option><option>Tarde</option><option>Noche</option></select></label><label>Fondo inicial<input type="number" min="0" step="any" value={form.openingAmount} onChange={(event) => set('openingAmount', event.target.value)} /></label><label className="span-2">Notas<textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Abrir caja</button></div></form>;
 }
 
 function CashMovementForm({ onClose, notify }) {
-  const { execute } = useHotel();
+  const { cashCommands } = useHotel();
   const allowed = useActionPermission('CASH_MOVEMENT');
   const [form, setForm] = useState({ type: 'Ingreso', concept: '', amount: 0, method: 'Efectivo', referenceId: '' });
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = (event) => { event.preventDefault(); if (run(execute, { type: 'CASH_MOVEMENT', payload: form }, notify, 'Movimiento registrado', 'El movimiento quedó asociado a la caja abierta.')) onClose(); };
+  const submit = async (event) => {
+    event.preventDefault();
+    if (cashCommands) {
+      try {
+        await cashCommands.move(form);
+        notify('Movimiento registrado', 'El movimiento quedó asociado a la caja abierta.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al registrar movimiento', error.message, 'error');
+      }
+    }
+  };
   if (!allowed) return null;
-  return <form className="form-grid" onSubmit={submit}><label>Tipo<select value={form.type} onChange={(event) => set('type', event.target.value)}><option>Ingreso</option><option>Egreso</option></select></label><label>Método<select value={form.method} onChange={(event) => set('method', event.target.value)}>{PAYMENT_METHODS.map((item) => <option key={item}>{item}</option>)}</select></label><label className="span-2">Concepto<input required value={form.concept} onChange={(event) => set('concept', event.target.value)} /></label><label>Importe<input type="number" min="0.01" step="any" value={form.amount} onChange={(event) => set('amount', event.target.value)} /></label><label>Referencia<input value={form.referenceId} onChange={(event) => set('referenceId', event.target.value)} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Registrar movimiento</button></div></form>;
+  return <form className="form-grid" onSubmit={submit}><label>Tipo<select value={form.type} onChange={(event) => set('type', event.target.value)}><option>Ingreso</option><option>Egreso</option></select></label><label>Método<select value={form.method} onChange={(event) => set('method', event.target.value)}>{CASH_PAYMENT_METHODS.map((item) => <option key={item}>{item}</option>)}</select></label><label className="span-2">Concepto<input required value={form.concept} onChange={(event) => set('concept', event.target.value)} /></label><label>Importe<input type="number" min="0.01" step="any" value={form.amount} onChange={(event) => set('amount', event.target.value)} /></label><label>Referencia<input value={form.referenceId} onChange={(event) => set('referenceId', event.target.value)} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Registrar movimiento</button></div></form>;
 }
 
 function CashCountForm({ close, expected, onClose, notify }) {
-  const { execute } = useHotel();
+  const { state, cashCommands } = useHotel();
   const allowed = useActionPermission(close ? 'CASH_CLOSE' : 'CASH_COUNT');
   const [countedAmount, setCountedAmount] = useState(expected);
   const [note, setNote] = useState('');
-  const submit = (event) => { event.preventDefault(); const type = close ? 'CASH_CLOSE' : 'CASH_COUNT'; if (run(execute, { type, countedAmount: Number(countedAmount), note }, notify, close ? 'Caja cerrada' : 'Arqueo registrado', close ? 'La sesión quedó cerrada y conserva todo su historial.' : 'Se guardaron esperado, contado y diferencia.')) onClose(); };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (cashCommands) {
+      const openSession = state.cashSessions.find((item) => item.status === 'Abierta');
+      if (!openSession) {
+        notify('Error', 'No hay ninguna sesión de caja abierta activa.', 'error');
+        return;
+      }
+      try {
+        if (close) {
+          await cashCommands.close(openSession.id, { countedAmount, note });
+          notify('Caja cerrada', 'La sesión quedó cerrada y conserva todo su historial.', 'success');
+        } else {
+          await cashCommands.count(openSession.id, { countedAmount, note });
+          notify('Arqueo registrado', 'Se guardaron esperado, contado y diferencia.', 'success');
+        }
+        onClose();
+      } catch (error) {
+        notify('Error al procesar arqueo/cierre', error.message, 'error');
+      }
+    }
+  };
   if (!allowed) return null;
   return <form className="form-grid" onSubmit={submit}><DetailGrid items={[{ label: 'Esperado', value: formatMoney(expected) }, { label: 'Contado', value: formatMoney(Number(countedAmount)) }, { label: 'Diferencia', value: formatMoney(Number(countedAmount) - expected) }]} /><label className="span-2">Monto contado<input type="number" min="0" step="any" value={countedAmount} onChange={(event) => setCountedAmount(event.target.value)} /></label><label className="span-2">Nota<textarea value={note} onChange={(event) => setNote(event.target.value)} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">{close ? 'Cerrar caja' : 'Guardar arqueo'}</button></div></form>;
 }
@@ -256,23 +697,147 @@ export function OperationalCashView({ notify }) {
 }
 
 function IncidentEditor({ incident, onClose, notify }) {
-  const { state, execute } = useHotel();
+  const { state, execute, incidentCommands } = useHotel();
   const canCreate = useActionPermission('INCIDENT_CREATE');
   const canUpdate = useActionPermission('INCIDENT_UPDATE');
   const progressActionType = incident?.status === 'Cerrada' ? 'INCIDENT_REOPEN' : 'INCIDENT_PROGRESS';
   const canProgress = useActionPermission(progressActionType);
   const [form, setForm] = useState(incident ? { responsible: incident.responsible, priority: incident.priority, evidence: '', solution: incident.solution || '', note: '' } : { type: 'Servicio', roomId: '', description: '', priority: 'Media', responsible: 'Por asignar', evidence: '', blocksRoom: false });
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
   if (incident) {
-    const save = () => run(execute, { type: 'INCIDENT_UPDATE', incidentId: incident.id, payload: form }, notify, 'Incidencia actualizada', 'Responsable, prioridad y evidencia quedaron sincronizados.');
-    const advance = () => { if (run(execute, { type: 'INCIDENT_PROGRESS', incidentId: incident.id, expectedStatus: incident.status, note: form.note || form.solution }, notify, 'Incidencia avanzada', 'El origen vinculado y la habitación quedaron sincronizados.')) onClose(); };
-    const reopen = () => { if (run(execute, { type: 'INCIDENT_REOPEN', incidentId: incident.id, reason: form.note }, notify, 'Incidencia reabierta', 'La habitación recuperó su bloqueo cuando correspondía.')) onClose(); };
+    const save = async () => {
+      if (incidentCommands) {
+        try {
+          await incidentCommands.update(incident.id, {
+            responsible: form.responsible,
+            priority: form.priority,
+            solution: form.solution || undefined,
+            evidence: form.evidence || undefined
+          });
+          notify('Incidencia actualizada', 'Responsable, prioridad y evidencia quedaron sincronizados.', 'success');
+        } catch (error) {
+          notify('Error al actualizar incidencia', error.message, 'error');
+        }
+      } else {
+        run(execute, { type: 'INCIDENT_UPDATE', incidentId: incident.id, payload: form }, notify, 'Incidencia actualizada', 'Responsable, prioridad y evidencia quedaron sincronizados.');
+      }
+    };
+
+    const advance = async () => {
+      if (incidentCommands) {
+        try {
+          await incidentCommands.progress(incident.id, incident.status);
+          notify('Incidencia avanzada', 'La incidencia avanzó de estado exitosamente.', 'success');
+          onClose();
+        } catch (error) {
+          notify('Error al avanzar incidencia', error.message, 'error');
+        }
+      } else {
+        if (run(execute, { type: 'INCIDENT_PROGRESS', incidentId: incident.id, expectedStatus: incident.status, note: form.note || form.solution }, notify, 'Incidencia avanzada', 'El origen vinculado y la habitación quedaron sincronizados.')) onClose();
+      }
+    };
+
+    const reopen = async () => {
+      if (incidentCommands) {
+        try {
+          await incidentCommands.progress(incident.id, 'closed');
+          notify('Incidencia reabierta', 'La incidencia volvió a proceso y la habitación recuperó el bloqueo.', 'success');
+          onClose();
+        } catch (error) {
+          notify('Error al reabrir incidencia', error.message, 'error');
+        }
+      } else {
+        if (run(execute, { type: 'INCIDENT_REOPEN', incidentId: incident.id, reason: form.note }, notify, 'Incidencia reabierta', 'La habitación recuperó su bloqueo cuando correspondiera.'));
+      }
+    };
+
     if (!canUpdate && !canProgress) return null;
     return <div className="form-grid"><label>Responsable<input value={form.responsible} onChange={(event) => set('responsible', event.target.value)} /></label><label>Prioridad<select value={form.priority} onChange={(event) => set('priority', event.target.value)}>{['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}</select></label><label className="span-2">Nueva evidencia<input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} /></label><label className="span-2">Solución<textarea value={form.solution} onChange={(event) => set('solution', event.target.value)} /></label><label className="span-2">Nota / motivo<textarea value={form.note} onChange={(event) => set('note', event.target.value)} /></label><div className="form-actions span-2">{canUpdate ? <PermissionButton actionType="INCIDENT_UPDATE" className="btn btn-outline" onClick={save}>Guardar datos</PermissionButton> : null}{canProgress ? incident.status === 'Cerrada' ? <PermissionButton actionType={progressActionType} className="btn btn-primary" onClick={reopen}>Reabrir</PermissionButton> : <PermissionButton actionType={progressActionType} className="btn btn-primary" onClick={advance}>{incident.status === 'Resuelta' ? 'Cerrar y evaluar liberación' : 'Avanzar estado'}</PermissionButton> : null}</div></div>;
   }
+
   if (!canCreate) return null;
-  const submit = (event) => { event.preventDefault(); if (run(execute, { type: 'INCIDENT_CREATE', payload: form }, notify, 'Incidencia creada', 'El registro y el bloqueo operativo quedaron auditados.')) onClose(); };
-  return <form className="form-grid" onSubmit={submit}><label>Tipo<input value={form.type} onChange={(event) => set('type', event.target.value)} /></label><label>Habitación<select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}><option value="">Sin habitación</option>{state.rooms.map((room) => <option key={room.id} value={room.id}>{room.id} · {room.status}</option>)}</select></label><label>Prioridad<select value={form.priority} onChange={(event) => set('priority', event.target.value)}>{['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}</select></label><label>Responsable<input value={form.responsible} onChange={(event) => set('responsible', event.target.value)} /></label><label className="span-2">Descripción<textarea required value={form.description} onChange={(event) => set('description', event.target.value)} /></label><label className="span-2">Evidencia<input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} /></label><label className="toggle-row span-2"><input type="checkbox" disabled={!form.roomId} checked={form.blocksRoom} onChange={(event) => set('blocksRoom', event.target.checked)} /><span>Bloquear operativamente la habitación</span></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Crear incidencia</button></div></form>;
+  const submit = async (event) => {
+    event.preventDefault();
+    if (incidentCommands) {
+      try {
+        await incidentCommands.create({
+          type: form.type,
+          roomId: form.roomId || undefined,
+          description: form.description,
+          priority: form.priority,
+          responsible: form.responsible || undefined,
+          blocksRoom: Boolean(form.blocksRoom),
+          evidence: form.evidence || undefined
+        });
+        notify('Incidencia creada', 'La incidencia quedó registrada exitosamente en el servidor.', 'success');
+        onClose();
+      } catch (error) {
+        notify('Error al crear incidencia', error.message, 'error');
+      }
+    } else {
+      if (run(execute, { type: 'INCIDENT_CREATE', payload: form }, notify, 'Incidencia creada', 'El registro y el bloqueo operativo quedaron auditados.')) onClose();
+    }
+  };
+
+  return (
+    <form className="form-grid" onSubmit={submit}>
+      <label>
+        Tipo de Incidencia
+        <select value={form.type} onChange={(event) => set('type', event.target.value)}>
+          <option value="Limpieza">Limpieza</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+          <option value="Servicio">Servicio</option>
+        </select>
+      </label>
+      <label>
+        Habitación Vincular
+        <select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}>
+          <option value="">Sin habitación (Incidencia General)</option>
+          {state.rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              Habitación {room.number} (Piso {room.floor}) — {room.status}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Prioridad
+        <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
+          {['Baja', 'Media', 'Alta', 'Urgente'].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </label>
+      <label>
+        Responsable Inicial
+        <input value={form.responsible} onChange={(event) => set('responsible', event.target.value)} placeholder="Personal encargado" />
+      </label>
+      <label className="span-2">
+        Descripción del Suceso
+        <textarea required value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Describa la incidencia reportada..." />
+      </label>
+      <label className="span-2">
+        Evidencia de Incidencia
+        <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="URL de imagen u otra evidencia" />
+      </label>
+
+      <label className="toggle-row span-2" style={{ marginTop: '4px' }}>
+        <input type="checkbox" disabled={!form.roomId} checked={form.blocksRoom} onChange={(event) => set('blocksRoom', event.target.checked)} />
+        <span>Bloquear operativamente la habitación seleccionada</span>
+      </label>
+
+      {form.blocksRoom && form.roomId && (
+        <div className="alert-banner alert-banner-warning span-2" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span><strong>Bloqueo Operativo Activado:</strong> La habitación seleccionada cambiará de estado automáticamente a <strong>Bloqueada / Mantenimiento</strong> y no podrá reservarse.</span>
+        </div>
+      )}
+
+      <div className="form-actions span-2">
+        <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary">Crear Incidencia</button>
+      </div>
+    </form>
+  );
 }
 
 export function OperationalIncidentsView({ notify }) {
@@ -280,8 +845,226 @@ export function OperationalIncidentsView({ notify }) {
   const canUpdateIncident = useActionPermission('INCIDENT_UPDATE');
   const canProgressIncident = useActionPermission('INCIDENT_PROGRESS');
   const canReopenIncident = useActionPermission('INCIDENT_REOPEN');
+
   const [editor, setEditor] = useState(undefined);
-  return <div className="view-container"><PageHeader actionType="INCIDENT_CREATE" metadata="Cola coordinada con mantenimiento" title="Incidencias" description="Creación, asignación, avance, cierre, reapertura, evidencia y bloqueo operativo." action={<PermissionButton actionType="INCIDENT_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}>Nueva incidencia</PermissionButton>} /><MetricStrip items={[{ label: 'Pendientes de cierre', value: state.incidents.filter((item) => item.status !== 'Cerrada').length }, { label: 'En proceso', value: state.incidents.filter((item) => item.status === 'En proceso').length }, { label: 'Urgentes', value: state.incidents.filter((item) => item.priority === 'Urgente').length }, { label: 'Cerradas', value: state.incidents.filter((item) => item.status === 'Cerrada').length }]} /><div className="operation-cards">{state.incidents.map((incident) => <article className="card operation-card" key={incident.id}><div className="row-between"><div><span className="eyebrow">{incident.id} · {incident.type}</span><h3>{incident.roomId ? `Habitación ${incident.roomId}` : 'Sin habitación'}</h3></div><StatusBadge>{incident.status}</StatusBadge></div><p>{incident.description}</p><DetailGrid compact items={[{ label: 'Responsable', value: incident.responsible }, { label: 'Prioridad', value: incident.priority }, { label: 'Referencia', value: incident.referenceId || 'Manual' }, { label: 'Evidencias', value: incident.evidence.length }, { label: 'Solución', value: incident.solution || 'Pendiente' }, { label: 'Bloquea habitación', value: incident.blocksRoom ? 'Sí' : 'No' }]} />{(canUpdateIncident || (incident.status === 'Cerrada' ? canReopenIncident : canProgressIncident)) ? <button className="btn btn-outline" onClick={() => setEditor(incident)}>Gestionar incidencia</button> : null}</article>)}</div><Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Gestionar ${editor.id}` : 'Nueva incidencia'} wide><IncidentEditor incident={editor || null} onClose={() => setEditor(undefined)} notify={notify} /></Dialog></div>;
+
+  // Custom filters
+  const [typeFilter, setTypeFilter] = useState('Todos');
+  const [statusFilter, setStatusFilter] = useState('Todos');
+  const [roomQuery, setRoomQuery] = useState('');
+
+  // Filter the incidents
+  const filteredIncidents = state.incidents.filter((incident) => {
+    const matchesType = typeFilter === 'Todos' || incident.type === typeFilter;
+    const matchesStatus = statusFilter === 'Todos' || incident.status === statusFilter;
+    const matchesRoom = !roomQuery || (incident.roomId && String(incident.roomId).toLowerCase().includes(roomQuery.toLowerCase()));
+    return matchesStatus && matchesType && matchesRoom;
+  });
+
+  const INCIDENT_STATUS_STEPS = ['Pendiente', 'Asignada', 'En proceso', 'Resuelta', 'Cerrada'];
+
+  return (
+    <div className="view-container">
+      <style>{`
+        .custom-filter-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          background: var(--color-surface);
+          padding: 16px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--color-border);
+          margin-bottom: 24px;
+          align-items: center;
+          box-shadow: var(--shadow-sm);
+        }
+        .custom-filter-bar label {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-weight: 600;
+          font-size: 12px;
+          color: var(--color-body);
+        }
+        .custom-filter-bar select, .custom-filter-bar input {
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--color-border);
+          background: var(--color-bg);
+          font-size: 13.5px;
+          outline: none;
+          min-width: 160px;
+          transition: border-color 0.2s;
+        }
+        .custom-filter-bar select:focus, .custom-filter-bar input:focus {
+          border-color: var(--color-primary);
+        }
+        .incident-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+          gap: 20px;
+          margin-top: 12px;
+        }
+        .incident-card {
+          position: relative;
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          box-shadow: var(--shadow-sm);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          overflow: hidden;
+        }
+        .incident-card:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-card);
+        }
+        .incident-card::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+        }
+        .priority-Baja::before, .priority-low::before { background-color: var(--color-muted); }
+        .priority-Media::before, .priority-medium::before { background-color: var(--color-primary); }
+        .priority-Alta::before, .priority-high::before { background-color: var(--color-warning); }
+        .priority-Urgente::before, .priority-urgent::before { background-color: var(--color-danger); }
+
+        .card-header-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card-header-icon.cleaning {
+          background-color: var(--color-gold-soft);
+          color: var(--color-gold);
+        }
+        .card-header-icon.maintenance {
+          background-color: var(--color-primary-soft);
+          color: var(--color-primary);
+        }
+      `}</style>
+
+      <PageHeader
+        actionType="INCIDENT_CREATE"
+        metadata="Cola y control de fallas del hotel"
+        title="Incidencias"
+        description="Monitoreo de incidencias de limpieza y mantenimiento con bloqueo operativo de habitaciones."
+        action={<PermissionButton actionType="INCIDENT_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}><Plus size={16} style={{marginRight: '6px'}} />Nueva incidencia</PermissionButton>}
+      />
+
+      <MetricStrip items={[
+        { label: 'Pendientes de cierre', value: state.incidents.filter((item) => item.status !== 'Cerrada').length },
+        { label: 'En proceso', value: state.incidents.filter((item) => item.status === 'En proceso').length },
+        { label: 'Urgentes', value: state.incidents.filter((item) => item.priority === 'Urgente' || item.priority === 'urgent').length },
+        { label: 'Cerradas', value: state.incidents.filter((item) => item.status === 'Cerrada').length }
+      ]} />
+
+      <div className="custom-filter-bar">
+        <label>
+          Búsqueda por Habitación
+          <input
+            type="text"
+            placeholder="Ej. 101, 204..."
+            value={roomQuery}
+            onChange={(e) => setRoomQuery(e.target.value)}
+          />
+        </label>
+        <label>
+          Filtrar por Tipo
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="Todos">Todos los tipos</option>
+            <option value="Limpieza">Limpieza</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+          </select>
+        </label>
+        <label>
+          Filtrar por Estado
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="Todos">Todos los estados</option>
+            {INCIDENT_STATUS_STEPS.map((step) => <option key={step} value={step}>{step}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {filteredIncidents.length > 0 ? (
+        <div className="incident-grid">
+          {filteredIncidents.map((incident) => {
+            const isCln = incident.type === 'Limpieza' || incident.type === 'cleaning';
+            const iconClass = isCln ? 'cleaning' : 'maintenance';
+            const pClass = `priority-${incident.priority}`;
+
+            return (
+              <article className={`incident-card ${pClass}`} key={incident.id}>
+                <div>
+                  <div className="row-between" style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div className={`card-header-icon ${iconClass}`}>
+                        {isCln ? <Hammer size={18} /> : <Wrench size={18} />}
+                      </div>
+                      <div>
+                        <span className="eyebrow" style={{ display: 'block', fontSize: '11px' }}>{incident.id} — {incident.type}</span>
+                        <h3 style={{ fontSize: '15px', fontWeight: '700', marginTop: '2px' }}>{incident.roomId ? `Habitación ${incident.roomId}` : 'General / Sin Hab.'}</h3>
+                      </div>
+                    </div>
+                    <StatusBadge>{incident.status}</StatusBadge>
+                  </div>
+
+                  <p style={{ color: 'var(--color-body)', fontSize: '13px', margin: '8px 0 12px 0' }}>{incident.description}</p>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                    <PriorityTag priority={incident.priority} />
+                    {incident.blocksRoom ? (
+                      <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Lock size={10} /> Bloquea Hab.
+                      </span>
+                    ) : (
+                      <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Unlock size={10} /> Sin Bloqueo
+                      </span>
+                    )}
+                  </div>
+
+                  <DetailGrid compact items={[
+                    { label: 'Responsable', value: incident.responsible },
+                    { label: 'Referencia', value: incident.referenceId || 'Manual' },
+                    { label: 'Evidencias', value: incident.evidence?.length || 0 },
+                    { label: 'Solución', value: incident.solution || 'Pendiente' }
+                  ]} />
+                </div>
+
+                <div>
+                  <StatusStepper currentStatus={incident.status} steps={INCIDENT_STATUS_STEPS} />
+
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                    {(canUpdateIncident || (incident.status === 'Cerrada' ? canReopenIncident : canProgressIncident)) ? (
+                      <button className="btn btn-outline btn-sm" style={{ width: '100%' }} onClick={() => setEditor(incident)}>
+                        Gestionar Incidencia
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState title="Sin incidencias" description="No se encontraron incidencias con los filtros aplicados." />
+      )}
+
+      <Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Gestionar ${editor.id}` : 'Nueva incidencia'} wide>
+        <IncidentEditor incident={editor || null} onClose={() => setEditor(undefined)} notify={notify} />
+      </Dialog>
+    </div>
+  );
 }
 
 function SupplierEditor({ supplier, onClose, notify }) {

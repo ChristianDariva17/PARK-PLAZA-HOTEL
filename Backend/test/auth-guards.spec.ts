@@ -78,4 +78,9 @@ describe('PermissionsGuard', () => {
     const reflector = { getAllAndOverride: vi.fn().mockReturnValue(['reservations.manage']) } as unknown as Reflector;
     expect(() => new PermissionsGuard(reflector).canActivate(executionContext({ auth: account }))).toThrow(ForbiddenException);
   });
+
+  it('fails closed when authenticated authorization context is missing', () => {
+    const reflector = { getAllAndOverride: vi.fn().mockReturnValue(['parking.read']) } as unknown as Reflector;
+    expect(() => new PermissionsGuard(reflector).canActivate(executionContext())).toThrow(ForbiddenException);
+  });
 });

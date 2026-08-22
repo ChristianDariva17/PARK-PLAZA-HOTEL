@@ -11,6 +11,7 @@
     "start:dev": "nest start --watch",
     "migrate": "tsx src/database/migrate.ts",
     "bootstrap:admin": "tsx src/auth/bootstrap-admin.ts",
+    "provision:rooms": "tsx src/database/provision-room-inventory.ts",
     "test": "vitest run --exclude test/database.integration.spec.ts",
     "test:integration": "vitest run test/database.integration.spec.ts"
   },

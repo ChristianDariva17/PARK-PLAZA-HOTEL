@@ -22,8 +22,8 @@ describe('AccountsController property authority', () => {
     const service = { update: vi.fn(), resetPassword: vi.fn() } as unknown as AccountsService;
     const controller = new AccountsController(service);
     const request = { auth: actor, headers: {} };
-    expect(() => controller.update('not-a-uuid', { status: 'active' }, actor, request as never)).toThrow('Invalid request body');
-    expect(() => controller.resetPassword('not-a-uuid', { temporaryPassword: 'temporary password' }, actor, request as never)).toThrow('Invalid request body');
+    expect(() => controller.update('not-a-uuid', { status: 'active' }, actor, request as never)).toThrow('Invalid account ID');
+    expect(() => controller.resetPassword('not-a-uuid', { temporaryPassword: 'temporary password' }, actor, request as never)).toThrow('Invalid account ID');
     expect(service.update).not.toHaveBeenCalled();
     expect(service.resetPassword).not.toHaveBeenCalled();
   });

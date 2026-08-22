@@ -5,6 +5,7 @@ import { PermissionButton, PermissionGate } from '../auth/PermissionButton.jsx';
 import { useActionPermission } from '../auth/useActionPermission.js';
 import { BiometricPanel } from '../biometrics/BiometricPanel.jsx';
 import { Dialog, Drawer, PrototypeNotice } from '../ui/Overlay.jsx';
+import { Search } from 'lucide-react';
 import { DataTable, DetailGrid, MetricStrip, PageHeader, SectionHeader, StatusBadge } from './SharedViewParts.jsx';
 
 const nowIso = () => new Date().toISOString();
@@ -22,7 +23,7 @@ function ReasonDialog({ operation, onClose }) {
 function ReasonForm({ operation, onClose }) {
   const fields = operation.fields || [{ key: 'reason', label: 'Motivo' }];
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((field) => [field.key, ''])));
-  const submit = (event) => { event.preventDefault(); if (operation.onConfirm(values) !== false) onClose(); };
+  const submit = async (event) => { event.preventDefault(); if (await operation.onConfirm(values) !== false) onClose(); };
   return <form className="form-grid" onSubmit={submit}>{fields.map((field) => <label className="span-2" key={field.key}>{field.label}<textarea required value={values[field.key]} onChange={(event) => setValues({ ...values, [field.key]: event.target.value })} /></label>)}<div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Volver</button><button className="btn btn-danger">Confirmar</button></div></form>;
 }
 
@@ -112,19 +113,246 @@ export function P1FinanceView({ notify }) {
 }
 
 export function P1CleaningView({ notify }) {
-  const { state, execute } = useHotel();
+  const { state, execute, cleaningCommands } = useHotel();
   const canUpdate = useActionPermission('CLEANING_UPDATE');
   const canProgress = useActionPermission('CLEANING_PROGRESS');
   const canReportIncident = useActionPermission('CLEANING_INCIDENT');
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState({ assignedTo: '', observation: '', evidence: '', incidentDescription: '' });
+
   const selected = state.cleaningTasks.find((item) => item.id === selectedId);
-  const open = (task) => { setSelectedId(task.id); setForm({ assignedTo: task.assignedTo, observation: task.observation || '', evidence: '', incidentDescription: '' }); };
-  const save = () => run(execute, { type: 'CLEANING_UPDATE', taskId: selected.id, assignedTo: form.assignedTo, observation: form.observation, evidence: form.evidence }, notify, 'Tarea actualizada', 'Asignación, observación y evidencia quedaron auditadas.');
-  const advance = () => run(execute, { type: 'CLEANING_PROGRESS', taskId: selected.id, expectedStatus: selected.status, evidence: form.evidence }, notify, 'Limpieza actualizada', selected.status === 'Completada' ? 'La aprobación recalculó la disponibilidad.' : 'La transición conservó tiempos y evidencia real declarada.');
-  const incident = () => run(execute, { type: 'CLEANING_INCIDENT', taskId: selected.id, description: form.incidentDescription, evidence: form.evidence, responsible: form.assignedTo, blocksRoom: true }, notify, 'Incidencia creada', 'La incidencia quedó vinculada a tarea y habitación.');
-  return <div className="view-container"><PageHeader metadata="Completar exige evidencia declarada" title="Limpieza" description="Asignación, observación, evidencia, incidencia y aprobación que recalcula disponibilidad." /><div className="operation-cards">{state.cleaningTasks.map((task) => <article className="card" key={task.id}><div className="row-between"><h3>{task.id} · Hab. {task.roomId}</h3><StatusBadge>{task.status}</StatusBadge></div><p>{task.assignedTo} · {task.reason}</p>{canUpdate || canProgress || canReportIncident ? <button className="btn btn-outline" onClick={() => open(task)}>Gestionar</button> : null}</article>)}</div><Dialog open={Boolean(selected)} onClose={() => setSelectedId(null)} title={selected ? `Gestionar ${selected.id}` : 'Gestionar limpieza'} wide>{selected ? <div className="form-grid"><label>Responsable<input value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} /></label><label>Referencia de evidencia<input value={form.evidence} onChange={(event) => setForm({ ...form, evidence: event.target.value })} placeholder="Referencia ingresada por el usuario" /></label><label className="span-2">Observación<textarea value={form.observation} onChange={(event) => setForm({ ...form, observation: event.target.value })} /></label><div className="form-actions span-2">{canUpdate ? <button className="btn btn-outline" onClick={save}>Guardar asignación</button> : null}{selected.status !== 'Aprobada' && canProgress ? <button className="btn btn-primary" onClick={advance}>{selected.status === 'Pendiente' ? 'Iniciar' : selected.status === 'En proceso' ? 'Completar' : 'Aprobar'}</button> : null}</div>{canReportIncident ? <><label className="span-2">Nueva incidencia desde limpieza<textarea value={form.incidentDescription} onChange={(event) => setForm({ ...form, incidentDescription: event.target.value })} /></label><button className="btn btn-danger span-2" onClick={incident}>Crear incidencia bloqueante</button></> : null}</div> : null}</Dialog></div>;
+  const selectedRoom = selected ? state.rooms.find((r) => r.id === selected.roomId) : null;
+
+  const open = (task) => {
+    setSelectedId(task.id);
+    setForm({ assignedTo: task.assignedTo || '', observation: task.observation || '', evidence: '', incidentDescription: '' });
+  };
+
+  const save = async () => {
+    if (cleaningCommands) {
+      try {
+        await cleaningCommands.update(selected.id, form.assignedTo, form.observation, form.evidence);
+        notify('Tarea actualizada', 'Asignación, observación y evidencia quedaron auditadas.');
+      } catch (error) {
+        notify('Error al actualizar', error.message, 'error');
+      }
+    } else {
+      run(execute, { type: 'CLEANING_UPDATE', taskId: selected.id, assignedTo: form.assignedTo, observation: form.observation, evidence: form.evidence }, notify, 'Tarea actualizada', 'Asignación, observación y evidencia quedaron auditadas.');
+    }
+  };
+
+  const advance = async () => {
+    if (cleaningCommands) {
+      try {
+        await cleaningCommands.progress(selected.id, selected.status, form.evidence);
+        notify('Limpieza actualizada', selected.status === 'Completada' ? 'La aprobación recalculó la disponibilidad.' : 'La transición conservó tiempos y evidencia real declarada.');
+      } catch (error) {
+        notify('Error al avanzar limpieza', error.message, 'error');
+      }
+    } else {
+      run(execute, { type: 'CLEANING_PROGRESS', taskId: selected.id, expectedStatus: selected.status, evidence: form.evidence }, notify, 'Limpieza actualizada', selected.status === 'Completada' ? 'La aprobación recalculó la disponibilidad.' : 'La transición conservó tiempos y evidencia real declarada.');
+    }
+  };
+
+  const incident = async () => {
+    if (cleaningCommands) {
+      try {
+        await cleaningCommands.reportIncident(selected.id, form.incidentDescription, form.evidence, form.assignedTo, true);
+        notify('Incidencia creada', 'La incidencia quedó vinculada a tarea y habitación.');
+      } catch (error) {
+        notify('Error al crear incidencia', error.message, 'error');
+      }
+    } else {
+      run(execute, { type: 'CLEANING_INCIDENT', taskId: selected.id, description: form.incidentDescription, evidence: form.evidence, responsible: form.assignedTo, blocksRoom: true }, notify, 'Incidencia creada', 'La incidencia quedó vinculada a tarea y habitación.');
+    }
+  };
+
+  const pendingCount = state.cleaningTasks.filter((t) => ['Pendiente', 'pending'].includes(t.status)).length;
+  const inProgressCount = state.cleaningTasks.filter((t) => ['En proceso', 'in_progress'].includes(t.status)).length;
+  const completedCount = state.cleaningTasks.filter((t) => ['Completada', 'completed'].includes(t.status)).length;
+  const approvedCount = state.cleaningTasks.filter((t) => ['Aprobada', 'approved'].includes(t.status)).length;
+
+  return (
+    <div className="view-container">
+      <PageHeader
+        metadata="Gestión de Limpieza y Housekeeping 5★"
+        title="Limpieza y Acondicionamiento"
+        description="Asignación de personal, progresión de tareas, evidencia fotográfica y aprobación para retorno de habitación a disponibilidad."
+      />
+
+      <MetricStrip
+        items={[
+          { label: 'Pendientes', value: pendingCount },
+          { label: 'En Proceso', value: inProgressCount },
+          { label: 'Completadas', value: completedCount },
+          { label: 'Aprobadas', value: approvedCount },
+        ]}
+      />
+
+      <div className="operation-cards">
+        {state.cleaningTasks.map((task) => {
+          const room = state.rooms.find((r) => r.id === task.roomId);
+          const roomLabel = room ? `Habitación ${room.number}` : `Habitación ${task.roomId?.slice?.(0, 8) || task.roomId}`;
+          const shortTaskId = task.id.slice(0, 8);
+
+          return (
+            <article className="card operation-card" key={task.id} style={{ padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
+              <div className="row-between">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #0f172a, #334155)', color: '#e5c997', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', border: '1px solid rgba(229,201,151,0.3)' }}>
+                    🧹
+                  </div>
+                  <div>
+                    <span className="eyebrow" style={{ fontSize: '11px', color: '#64748b' }}>Tarea #{shortTaskId}</span>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>{roomLabel}</h3>
+                  </div>
+                </div>
+                <StatusBadge>{task.status}</StatusBadge>
+              </div>
+
+              <div style={{ margin: '14px 0', fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>👤 <strong>Responsable:</strong> {task.assignedTo || 'Por asignar'}</div>
+                <div>📝 <strong>Motivo:</strong> {task.reason || 'Check-out completado'}</div>
+                {task.observation ? <div>💬 <strong>Observación:</strong> {task.observation}</div> : null}
+              </div>
+
+              {canUpdate || canProgress || canReportIncident ? (
+                <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => open(task)}>
+                  Gestionar Limpieza
+                </button>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+
+      <Dialog
+        open={Boolean(selected)}
+        onClose={() => setSelectedId(null)}
+        title={selected ? `Gestionar Limpieza – ${selectedRoom ? `Hab. ${selectedRoom.number}` : `Tarea #${selected.id.slice(0, 8)}`}` : 'Gestionar limpieza'}
+        wide
+      >
+        {selected ? (
+          <div className="detail-stack">
+            {/* Status Stepper Pipeline */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '8px',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }}>
+              {[
+                { statusKey: 'Pendiente', label: '1. Pendiente', icon: '⏳' },
+                { statusKey: 'En proceso', label: '2. En proceso', icon: '🧽' },
+                { statusKey: 'Completada', label: '3. Completada', icon: '✨' },
+                { statusKey: 'Aprobada', label: '4. Aprobada', icon: '✅' },
+              ].map((step, idx) => {
+                const isCurrent = selected.status === step.statusKey;
+                const isDone = ['Pendiente', 'En proceso', 'Completada', 'Aprobada'].indexOf(selected.status) > idx;
+                return (
+                  <div
+                    key={step.statusKey}
+                    style={{
+                      textAlign: 'center',
+                      padding: '8px 4px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: isCurrent ? '700' : '500',
+                      background: isCurrent ? 'var(--color-navy, #0f172a)' : isDone ? 'rgba(15, 60, 44, 0.1)' : '#ffffff',
+                      color: isCurrent ? '#e5c997' : isDone ? '#0f3c2c' : '#94a3b8',
+                      border: isCurrent ? '1px solid #c5a55f' : '1px solid #e2e8f0',
+                    }}
+                  >
+                    {step.icon} {step.label}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Room Info Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: '#f1f5f9',
+              fontSize: '13px',
+              color: '#334155',
+            }}>
+              <div>🛏️ <strong>{selectedRoom ? `Habitación ${selectedRoom.number} (${selectedRoom.category || ''})` : 'Habitación'}</strong></div>
+              <div>📌 Motivo: <strong>{selected.reason || 'Check-out completado'}</strong></div>
+            </div>
+
+            {/* Form Fields */}
+            <div className="form-grid">
+              <label>Personal Responsable
+                <input value={form.assignedTo} placeholder="Ej: Patricia López" onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} />
+              </label>
+              <label>Referencia de Evidencia
+                <input value={form.evidence} placeholder="Ej: Foto de habitación limpia / Check-out OK" onChange={(event) => setForm({ ...form, evidence: event.target.value })} />
+              </label>
+              <label className="span-2">Observaciones de Limpieza
+                <textarea value={form.observation} placeholder="Ej: Habitación limpia y sanitizada, toallas reemplazadas." onChange={(event) => setForm({ ...form, observation: event.target.value })} />
+              </label>
+            </div>
+
+            {/* Action Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              paddingTop: '12px',
+              borderTop: '1px solid #e2e8f0',
+            }}>
+              {canUpdate ? (
+                <button className="btn btn-outline" type="button" onClick={save}>
+                  💾 Guardar cambios de asignación
+                </button>
+              ) : <div />}
+
+              {selected.status !== 'Aprobada' && canProgress ? (
+                <button className="btn btn-primary" type="button" style={{ padding: '10px 24px', fontSize: '14px', fontWeight: '600' }} onClick={advance}>
+                  {selected.status === 'Pendiente' ? '▶ Iniciar Limpieza' : selected.status === 'En proceso' ? '✔ Completar Limpieza' : '★ Aprobar y Liberar Habitación'}
+                </button>
+              ) : selected.status === 'Aprobada' ? (
+                <span style={{ fontSize: '13px', color: '#166534', fontWeight: '600' }}>
+                  ✅ Habitación Aprobada y Disponible
+                </span>
+              ) : null}
+            </div>
+
+            {/* Optional Incident Reporting Box */}
+            {canReportIncident ? (
+              <details style={{ marginTop: '16px', border: '1px solid #fecaca', borderRadius: '10px', background: '#fff5f5', padding: '12px 16px' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#991b1b', fontSize: '13px' }}>
+                  ⚠️ Reportar Incidencia Bloqueante (opcional si la habitación presenta daños)
+                </summary>
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <textarea
+                    rows={2}
+                    value={form.incidentDescription}
+                    placeholder="Describa la falla o daño (ej: Fuga de agua en lavatorio o cortina dañada)..."
+                    onChange={(event) => setForm({ ...form, incidentDescription: event.target.value })}
+                  />
+                  <button className="btn btn-danger" style={{ alignSelf: 'flex-end' }} type="button" onClick={incident}>
+                    Crear Incidencia Bloqueante
+                  </button>
+                </div>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
+      </Dialog>
+    </div>
+  );
 }
+
+
 
 export function P1EvidenceView({ navigate }) {
   const { state } = useHotel();
@@ -133,42 +361,68 @@ export function P1EvidenceView({ navigate }) {
 }
 
 function ParkingEditor({ vehicle, onClose, notify }) {
-  const { state, execute } = useHotel();
+  const { state, parkingCommands } = useHotel();
   const allowed = useActionPermission(vehicle ? 'PARKING_UPDATE' : 'PARKING_CREATE');
-  const stays = state.stays.filter((item) => item.status === 'Activa');
+  const stays = state.stays.filter((item) => ['Activa', 'active'].includes(item.status)).map((stay) => ({ ...stay, clientId: stay.clientId || state.reservations.find((reservation) => reservation.id === stay.reservationId)?.primaryGuestId }));
   const [form, setForm] = useState(vehicle ? { stayId: vehicle.stayId, type: vehicle.type, brandModel: vehicle.brandModel, plate: vehicle.plate, space: vehicle.space, fee: vehicle.fee } : { stayId: stays[0]?.id || '', type: 'Auto', brandModel: '', plate: '', space: '', fee: 0 });
-  const submit = (event) => { event.preventDefault(); const action = vehicle ? { type: 'PARKING_UPDATE', vehicleId: vehicle.id, payload: form, responsible: 'Administrador demo' } : { type: 'PARKING_CREATE', payload: form, responsible: 'Administrador demo' }; if (run(execute, action, notify, vehicle ? 'Vehículo actualizado' : 'Ingreso registrado', 'Placa, espacio y tarifa manual quedaron validados.')) onClose(); };
+  const submit = async (event) => { event.preventDefault(); const action = vehicle ? { type: 'PARKING_UPDATE', vehicleId: vehicle.id, payload: form, responsible: 'Administrador demo' } : { type: 'PARKING_CREATE', payload: form, responsible: 'Administrador demo' }; try { await parkingCommands.execute(action); notify(vehicle ? 'Vehículo actualizado' : 'Ingreso registrado', 'Placa, espacio y tarifa manual quedaron validados.', 'success'); onClose(); } catch (error) { notify('No se pudo guardar el vehículo', error.message, 'error'); } };
   if (!allowed) return null;
   return <form className="form-grid" onSubmit={submit}><label className="span-2">Estadía activa<select value={form.stayId} disabled={Boolean(vehicle)} onChange={(event) => setForm({ ...form, stayId: event.target.value })}>{stays.map((stay) => <option key={stay.id} value={stay.id}>{stay.id} · Hab. {stay.roomId} · {selectClientName(state, stay.clientId)}</option>)}</select></label><label>Tipo<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}><option>Auto</option><option>Moto</option><option>Motokar</option></select></label><label>Marca y modelo<input value={form.brandModel} onChange={(event) => setForm({ ...form, brandModel: event.target.value })} /></label><label>Placa<input required value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} /></label><label>Espacio<input required value={form.space} onChange={(event) => setForm({ ...form, space: event.target.value })} /></label><label className="span-2">Tarifa manual<input type="number" min="0" value={form.fee} onChange={(event) => setForm({ ...form, fee: event.target.value })} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Guardar</button></div></form>;
 }
 
 export function P1ParkingView({ notify }) {
-  const { state, execute } = useHotel();
+  const { state, parkingCommands } = useHotel();
   const [editor, setEditor] = useState(undefined);
   const [reasonOperation, setReasonOperation] = useState(null);
-  const exit = (vehicle) => run(execute, { type: 'PARKING_EXIT', vehicleId: vehicle.id, responsible: 'Administrador demo', observation: 'Salida confirmada desde cochera' }, notify, 'Salida registrada', 'El cargo se aplicó una sola vez si existía cuenta abierta.');
-  const archive = (vehicle) => setReasonOperation({ actionType: 'PARKING_ARCHIVE', title: 'Archivar registro de cochera', onConfirm: ({ reason }) => run(execute, { type: 'PARKING_ARCHIVE', vehicleId: vehicle.id, reason }, notify, 'Registro archivado', 'El historial de ingreso, salida y cargo permanece visible.') });
-  return <div className="view-container"><PageHeader actionType="PARKING_CREATE" metadata="Tarifa manual · unicidad mientras está dentro" title="Cochera" description="Ingreso, edición, salida auditada y archivo histórico." action={<PermissionButton actionType="PARKING_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}>Registrar ingreso</PermissionButton>} /><DataTable caption="Vehículos" columns={['Placa', 'Estadía', 'Espacio', 'Tarifa', 'Ingreso / salida', 'Estado', 'Acciones']}>{state.vehicles.map((item) => <tr key={item.id}><td>{item.plate}<br /><small>{item.brandModel}</small></td><td>{item.stayId} · Hab. {item.roomId}</td><td>{item.space}</td><td>{formatMoney(item.fee)}</td><td>{formatDateTime(item.entryAt)}<br /><small>{formatDateTime(item.exitAt)}</small></td><td><StatusBadge>{item.status}</StatusBadge></td><td><div className="inline-actions">{item.status === 'Dentro' ? <><PermissionButton actionType="PARKING_UPDATE" className="btn btn-outline" onClick={() => setEditor(item)}>Editar</PermissionButton><PermissionButton actionType="PARKING_EXIT" className="btn btn-primary" onClick={() => exit(item)}>Registrar salida</PermissionButton></> : item.status === 'Fuera' ? <PermissionButton actionType="PARKING_ARCHIVE" className="btn btn-danger" onClick={() => archive(item)}>Archivar</PermissionButton> : null}</div></td></tr>)}</DataTable><Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Editar ${editor.plate}` : 'Registrar ingreso'}><ParkingEditor vehicle={editor || null} onClose={() => setEditor(undefined)} notify={notify} /></Dialog><ReasonDialog operation={reasonOperation} onClose={() => setReasonOperation(null)} /></div>;
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Todos');
+
+  const exit = async (vehicle) => { try { await parkingCommands.execute({ type: 'PARKING_EXIT', vehicleId: vehicle.id, responsible: 'Administrador demo', observation: 'Salida confirmada desde cochera' }); notify('Salida registrada', 'La salida y su referencia de tarifa fueron confirmadas por el servidor.', 'success'); } catch (error) { notify('No se pudo registrar la salida', error.message, 'error'); } };
+  const archive = (vehicle) => setReasonOperation({ actionType: 'PARKING_ARCHIVE', title: 'Archivar registro de cochera', onConfirm: async ({ reason }) => { try { await parkingCommands.execute({ type: 'PARKING_ARCHIVE', vehicleId: vehicle.id, reason }); notify('Registro archivado', 'El historial de ingreso, salida y cargo permanece visible.', 'success'); return true; } catch (error) { notify('No se pudo archivar el registro', error.message, 'error'); return false; } } });
+
+  const records = state.vehicles.filter((item) => `${item.plate} ${item.brandModel} ${item.roomId}`.toLowerCase().includes(query.toLowerCase()) && (statusFilter === 'Todos' || item.status === statusFilter));
+
+  return <div className="view-container">
+    <PageHeader actionType="PARKING_CREATE" metadata="Tarifa manual · unicidad mientras está dentro" title="Cochera" description="Ingreso, edición, salida auditada y archivo histórico." action={<PermissionButton actionType="PARKING_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}>Registrar ingreso</PermissionButton>} />
+    {state.parkingRequest?.status === 'error' ? <div className="alert-banner alert-banner-danger" role="alert"><span>{state.parkingRequest.error}</span> <button className="btn btn-sm btn-outline" onClick={() => parkingCommands.reload()}>Intentar nuevamente</button></div> : null}
+    <MetricStrip items={[
+      { label: 'Dentro', value: state.vehicles.filter((item) => item.status === 'Dentro').length },
+      { label: 'Espacios ocupados', value: new Set(state.vehicles.filter((item) => item.status === 'Dentro').map((item) => item.space)).size },
+      { label: 'Cargos registrados', value: formatMoney(state.vehicles.reduce((sum, item) => sum + item.fee, 0)) }
+    ]} />
+    <div className="filter-bar">
+      <label className="search-label"><Search size={16} /><input aria-label="Buscar cochera" placeholder="Placa, modelo o habitación" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      <label>Estado<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>Todos</option><option>Dentro</option><option>Fuera</option><option>Archivado</option></select></label>
+    </div>
+    <DataTable caption="Vehículos" columns={['Placa', 'Estadía', 'Espacio', 'Tarifa', 'Ingreso / salida', 'Estado', 'Acciones']}>
+      {records.map((item) => <tr key={item.id}><td>{item.plate}<br /><small>{item.brandModel}</small></td><td>{item.stayId} · Hab. {item.roomId}</td><td>{item.space}</td><td>{formatMoney(item.fee)}</td><td>{formatDateTime(item.entryAt)}<br /><small>{formatDateTime(item.exitAt)}</small></td><td><StatusBadge>{item.status}</StatusBadge></td><td><div className="inline-actions">{item.status === 'Dentro' ? <><PermissionButton actionType="PARKING_UPDATE" className="btn btn-outline" onClick={() => setEditor(item)}>Editar</PermissionButton><PermissionButton actionType="PARKING_EXIT" className="btn btn-primary" onClick={() => exit(item)}>Registrar salida</PermissionButton></> : item.status === 'Fuera' ? <PermissionButton actionType="PARKING_ARCHIVE" className="btn btn-danger" onClick={() => archive(item)}>Archivar</PermissionButton> : null}</div></td></tr>)}
+    </DataTable>
+    <Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Editar ${editor.plate}` : 'Registrar ingreso'}><ParkingEditor vehicle={editor || null} onClose={() => setEditor(undefined)} notify={notify} /></Dialog>
+    <ReasonDialog operation={reasonOperation} onClose={() => setReasonOperation(null)} />
+  </div>;
 }
 
 function PetEditor({ pet, onClose, notify }) {
-  const { state, execute } = useHotel();
+  const { state, petCommands } = useHotel();
   const allowed = useActionPermission(pet ? 'PET_UPDATE' : 'PET_CREATE');
   const activeClients = state.clients.filter((item) => item.status !== 'Archivado');
   const [form, setForm] = useState(pet ? { ...pet } : { clientId: activeClients[0]?.id || '', stayId: '', type: 'Perro', name: '', size: 'Mediano', lodgingPlace: '', charge: 0, notes: '' });
   const [requestId] = useState(() => createRequestId('PET'));
-  const applicableStays = state.stays.filter((item) => item.clientId === form.clientId && item.status === 'Activa' && state.accounts.some((account) => account.id === item.accountId && account.status === 'Abierta'));
-  const submit = (event) => { event.preventDefault(); const action = pet ? { type: 'PET_UPDATE', petId: pet.id, payload: form, requestId } : { type: 'PET_CREATE', payload: form, requestId }; const successMessage = pet ? 'Los datos se actualizaron sin duplicar cargos.' : Number(form.charge) > 0 ? 'La mascota y su cargo en cuenta abierta se registraron juntos.' : 'La mascota se registró sin anunciar ni aplicar un cargo.'; if (run(execute, action, notify, pet ? 'Mascota actualizada' : 'Mascota registrada', successMessage)) onClose(); };
+  const applicableStays = state.stays.filter((item) => {
+    const clientId = item.clientId || state.reservations.find((reservation) => reservation.id === item.reservationId)?.primaryGuestId;
+    return clientId === form.clientId && ['Activa', 'active'].includes(item.status);
+  });
+  const submit = async (event) => { event.preventDefault(); const action = pet ? { type: 'PET_UPDATE', petId: pet.id, payload: form, requestId } : { type: 'PET_CREATE', payload: form, requestId }; const successMessage = pet ? 'Los datos se actualizaron sin duplicar referencias de tarifa.' : Number(form.charge) > 0 ? 'La mascota y su tarifa quedaron confirmadas por el servidor.' : 'La mascota se registró sin tarifa.'; try { await petCommands.execute(action); notify(pet ? 'Mascota actualizada' : 'Mascota registrada', successMessage, 'success'); onClose(); } catch (error) { notify('No se pudo guardar la mascota', error.message, 'error'); } };
   if (!allowed) return null;
-  return <form className="form-grid" onSubmit={submit}><label>Propietario<select value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value, stayId: '' })}>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Nombre<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Tipo<input value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} /></label><label>Tamaño<input value={form.size} onChange={(event) => setForm({ ...form, size: event.target.value })} /></label><label>Alojamiento<input value={form.lodgingPlace} onChange={(event) => setForm({ ...form, lodgingPlace: event.target.value })} /></label><label>Cargo<input type="number" min="0" disabled={Boolean(pet)} value={form.charge} onChange={(event) => setForm({ ...form, charge: event.target.value })} /></label><label className="span-2">Cuenta para aplicar el cargo<select value={form.stayId || ''} disabled={Boolean(pet)} onChange={(event) => setForm({ ...form, stayId: event.target.value })}><option value="">Sin estadía: sólo admite cargo cero</option>{applicableStays.map((stay) => <option key={stay.id} value={stay.id}>{stay.id} · Hab. {stay.roomId}</option>)}</select></label><label className="span-2">Notas<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><button className="btn btn-primary span-2">Guardar mascota</button></form>;
+  return <form className="form-grid" onSubmit={submit}><label>Propietario<select value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value, stayId: '' })}>{activeClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Nombre<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Tipo<input value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} /></label><label>Tamaño<input value={form.size} onChange={(event) => setForm({ ...form, size: event.target.value })} /></label><label>Alojamiento<input value={form.lodgingPlace} onChange={(event) => setForm({ ...form, lodgingPlace: event.target.value })} /></label><label>Tarifa<input type="number" min="0" disabled={Boolean(pet)} value={form.charge} onChange={(event) => setForm({ ...form, charge: event.target.value })} /></label><label className="span-2">Estadía vinculada<select value={form.stayId || ''} disabled={Boolean(pet)} onChange={(event) => setForm({ ...form, stayId: event.target.value })}><option value="">Sin estadía: sólo admite tarifa cero</option>{applicableStays.map((stay) => <option key={stay.id} value={stay.id}>{stay.id} · Hab. {stay.roomId}</option>)}</select></label><label className="span-2">Notas<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><button className="btn btn-primary span-2">Guardar mascota</button></form>;
 }
 
 export function P1PetsView({ notify }) {
-  const { state, execute } = useHotel();
+  const { state, petCommands } = useHotel();
   const [editor, setEditor] = useState(undefined);
   const [reasonOperation, setReasonOperation] = useState(null);
-  const transition = (pet, type) => setReasonOperation({ actionType: type, title: type === 'PET_ARCHIVE' ? 'Archivar mascota' : 'Reactivar mascota', onConfirm: ({ reason }) => run(execute, { type, petId: pet.id, reason }, notify, type === 'PET_ARCHIVE' ? 'Mascota archivada' : 'Mascota reactivada', 'El historial permanece visible.') });
-  return <div className="view-container"><PageHeader actionType="PET_CREATE" metadata="Historial conservado" title="Mascotas" description="Registro, actualización, archivo y reactivación." action={<PermissionButton actionType="PET_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}>Registrar mascota</PermissionButton>} /><div className="operation-cards">{state.pets.map((pet) => <article className="card" key={pet.id}><div className="row-between"><h3>{pet.name}</h3><StatusBadge>{pet.status || 'Activa'}</StatusBadge></div><p>{pet.type} · {selectClientName(state, pet.clientId)} · {formatMoney(pet.charge)} · {pet.chargeApplied ? `cargo aplicado (${pet.chargeId})` : 'cargo no aplicado'}</p><div className="inline-actions">{pet.status !== 'Archivada' ? <><PermissionButton actionType="PET_UPDATE" className="btn btn-outline" onClick={() => setEditor(pet)}>Editar</PermissionButton><PermissionButton actionType="PET_ARCHIVE" className="btn btn-danger" onClick={() => transition(pet, 'PET_ARCHIVE')}>Archivar</PermissionButton></> : <PermissionButton actionType="PET_REACTIVATE" className="btn btn-primary" onClick={() => transition(pet, 'PET_REACTIVATE')}>Reactivar</PermissionButton>}</div></article>)}</div><Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Editar ${editor.name}` : 'Registrar mascota'}><PetEditor pet={editor || null} onClose={() => setEditor(undefined)} notify={notify} /></Dialog><ReasonDialog operation={reasonOperation} onClose={() => setReasonOperation(null)} /></div>;
+  const transition = (pet, type) => setReasonOperation({ actionType: type, title: type === 'PET_ARCHIVE' ? 'Archivar mascota' : 'Reactivar mascota', onConfirm: async ({ reason }) => { try { await petCommands.execute({ type, petId: pet.id, reason }); notify(type === 'PET_ARCHIVE' ? 'Mascota archivada' : 'Mascota reactivada', 'El historial permanece visible.', 'success'); return true; } catch (error) { notify('No se pudo cambiar el estado de la mascota', error.message, 'error'); return false; } } });
+  return <div className="view-container"><PageHeader actionType="PET_CREATE" metadata="Historial conservado" title="Mascotas" description="Registro, actualización, archivo y reactivación." action={<PermissionButton actionType="PET_CREATE" className="btn btn-primary" onClick={() => setEditor(null)}>Registrar mascota</PermissionButton>} />{state.petRequest?.status === 'error' ? <div className="alert-banner alert-banner-danger" role="alert"><span>{state.petRequest.error}</span> <button className="btn btn-sm btn-outline" onClick={() => petCommands.reload()}>Intentar nuevamente</button></div> : null}<div className="operation-cards">{state.pets.map((pet) => <article className="card" key={pet.id}><div className="row-between"><h3>{pet.name}</h3><StatusBadge>{pet.status || 'Activa'}</StatusBadge></div><p>{pet.type} · {selectClientName(state, pet.clientId)} · tarifa {formatMoney(pet.charge)}{pet.chargeId ? ` · ref. ${pet.chargeId}` : ''}</p><div className="inline-actions">{pet.status !== 'Archivada' ? <><PermissionButton actionType="PET_UPDATE" className="btn btn-outline" onClick={() => setEditor(pet)}>Editar</PermissionButton><PermissionButton actionType="PET_ARCHIVE" className="btn btn-danger" onClick={() => transition(pet, 'PET_ARCHIVE')}>Archivar</PermissionButton></> : <PermissionButton actionType="PET_REACTIVATE" className="btn btn-primary" onClick={() => transition(pet, 'PET_REACTIVATE')}>Reactivar</PermissionButton>}</div></article>)}</div><Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} title={editor ? `Editar ${editor.name}` : 'Registrar mascota'}><PetEditor pet={editor || null} onClose={() => setEditor(undefined)} notify={notify} /></Dialog><ReasonDialog operation={reasonOperation} onClose={() => setReasonOperation(null)} /></div>;
 }
 
 export function P1RecreationView({ notify }) {

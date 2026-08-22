@@ -18,40 +18,6 @@ export const PENALTIES = [
   { id: 'PEN-03', name: 'Daño de mobiliario', amount: 250, evidenceRequired: true, active: true },
 ];
 
-const floorRooms = { 1: 8, 2: 8, 3: 11, 4: 11 };
-const seededStatuses = {
-  101: 'Ocupada', 103: 'En limpieza', 108: 'En mantenimiento',
-  201: 'Ocupada', 207: 'Bloqueada',
-  309: 'En limpieza', 405: 'Fuera de servicio',
-};
-
-export const createRooms = () => Object.entries(floorRooms).flatMap(([floorValue, count]) => {
-  const floor = Number(floorValue);
-  return Array.from({ length: count }, (_, index) => {
-    const id = floor * 100 + index + 1;
-    const category = ROOM_CATEGORIES[(id + floor) % ROOM_CATEGORIES.length];
-    const capacity = { Simple: 1, Matrimonial: 2, Doble: 2, Triple: 3, Suite: 4 }[category];
-    return {
-      id: String(id),
-      floor,
-      category,
-      status: seededStatuses[id] || 'Disponible',
-      nightlyRate: ROOM_PRICING[category] + (floor >= 3 ? 15 : 0),
-      capacity,
-      beds: category === 'Doble' ? '2 individuales' : category === 'Suite' ? '1 king + sofá cama' : '1 cama',
-      amenities: { airConditioning: id % 4 !== 0, television: true, hotWater: true, wifi: true, minibar: category === 'Suite' },
-      guestId: null,
-      activeStayId: null,
-      checkInAt: null,
-      expectedCheckOut: null,
-      balance: 0,
-      cleaningStatus: seededStatuses[id] === 'En limpieza' ? 'Pendiente' : 'Aprobada',
-      operationalBlock: seededStatuses[id] === 'Bloqueada',
-      incidentIds: [],
-    };
-  });
-});
-
 const isoDate = (offset = 0) => {
   const value = new Date();
   value.setHours(12, 0, 0, 0);
@@ -126,21 +92,20 @@ export const formatMoney = (amount = 0) => new Intl.NumberFormat('es-PE', {
 }).format(amount);
 
 export const getInitialHotelState = () => {
-  const rooms = createRooms().map((room) => {
-    if (room.id === '101') return { ...room, guestId: 'CLI-001', activeStayId: 'EST-001', checkInAt: isoDate(-1), expectedCheckOut: isoDate(1), balance: 350 };
-    if (room.id === '201') return { ...room, guestId: 'CLI-002', activeStayId: 'EST-002', checkInAt: isoDate(-2), expectedCheckOut: isoDate(2), balance: 715 };
-    if (room.id === '108') return { ...room, incidentIds: ['INC-003'] };
-    if (room.id === '405') return { ...room, incidentIds: ['INC-001'] };
-    return room;
-  });
-
   return {
-    rooms,
-    clients: [
-      { id: 'CLI-001', documentType: 'DNI', documentNumber: '72345678', firstName: 'María', lastName: 'González', name: 'María González', phone: '+51 987 654 321', email: 'maria.gonzalez@correo.pe', address: 'Av. Los Pinos 245, Lima', nationality: 'Peruana', birthDate: '1988-04-12', emergencyContact: 'Ana González · +51 955 400 123', notes: 'Prefiere habitaciones silenciosas.', preferences: ['Piso alto', 'Almohada hipoalergénica'], visits: 6, totalSpent: 8420, loyaltyTier: 'Oro', loyaltyPoints: 7550, promoAuth: true, petIds: ['PET-001'], rating: 4.8, status: 'Activo' },
-      { id: 'CLI-002', documentType: 'Pasaporte', documentNumber: 'PA894210', firstName: 'Carlos', lastName: 'Ramírez', name: 'Carlos Ramírez', phone: '+51 922 301 776', email: 'carlos.ramirez@correo.pe', address: 'Miraflores, Lima', nationality: 'Colombiana', birthDate: '1985-09-02', emergencyContact: 'Laura Ramírez · +57 310 555 2040', notes: 'Viaja por trabajo.', preferences: ['Desayuno temprano'], visits: 3, totalSpent: 4350, loyaltyTier: 'Plata', loyaltyPoints: 3200, promoAuth: false, petIds: [], rating: 4.5, status: 'Activo' },
-      { id: 'CLI-003', documentType: 'DNI', documentNumber: '40122887', firstName: 'Ana', lastName: 'Torres', name: 'Ana Torres', phone: '+51 944 112 209', email: 'ana.torres@correo.pe', address: 'San Borja, Lima', nationality: 'Peruana', birthDate: '1992-11-18', emergencyContact: 'Luis Torres · +51 966 212 555', notes: '', preferences: ['Habitación matrimonial'], visits: 1, totalSpent: 780, loyaltyTier: 'Bronce', loyaltyPoints: 780, promoAuth: true, petIds: [], rating: 5, status: 'Activo' },
-    ],
+    rooms: [],
+    roomCategories: [],
+    roomRequest: { status: 'idle', error: null },
+    clients: [],
+    guestRequest: { status: 'idle', error: null },
+    persistentReservations: [],
+    reservationRequest: { status: 'idle', error: null },
+    reservationAvailability: null,
+    reservationAvailabilityRequest: { status: 'idle', error: null },
+    reservationCreateRequest: { status: 'idle', error: null, retryBlocked: false },
+    persistentStays: [],
+    stayRequest: { status: 'idle', error: null },
+    stayCommandRequest: { status: 'idle', error: null, retryBlocked: false },
     reservations: [
       { id: 'RES-000', clientId: 'CLI-001', roomId: '101', category: 'Doble', checkIn: isoDate(-1), checkOut: isoDate(1), nights: 2, guests: 2, extraGuests: 0, petIds: ['PET-001'], services: ['Piscina'], nightlyRate: 145, total: 350, advance: 0, balance: 350, status: 'Cliente presente', contractId: 'HP-2026-000000', arrivalLimit: '20:00', paymentMethod: 'Tarjeta' },
       { id: 'RES-001', clientId: 'CLI-003', roomId: '102', category: 'Triple', checkIn: isoDate(1), checkOut: isoDate(3), nights: 2, guests: 2, extraGuests: 0, petIds: [], services: ['Desayuno'], nightlyRate: 175, total: 370, advance: 185, balance: 185, status: 'Confirmada', contractId: 'HP-2026-000001', arrivalLimit: '20:00', paymentMethod: 'Yape' },

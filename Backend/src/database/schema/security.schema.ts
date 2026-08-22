@@ -46,7 +46,7 @@ export const accounts = pgTable('accounts', {
 export const staff = pgTable('staff', {
   id: uuid().defaultRandom().primaryKey(),
   propertyId: uuid('property_id').notNull().references(() => properties.id, { onDelete: 'restrict' }),
-  accountId: uuid('account_id').unique(),
+  accountId: uuid('account_id').unique('staff_account_id_key'),
   firstName: varchar('first_name', { length: 100 }).notNull(),
   lastName: varchar('last_name', { length: 100 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
