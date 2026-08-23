@@ -5,7 +5,7 @@ export const PERMISSIONS = Object.freeze({
   roomsRead: 'rooms.read', roomsUpdate: 'rooms.update', roomsBlock: 'rooms.block',
   reservationsRead: 'reservations.read', reservationsCreate: 'reservations.create', reservationsUpdate: 'reservations.update', reservationsCancel: 'reservations.cancel',
   contractsRead: 'contracts.read', contractsAmend: 'contracts.amend', contractsVoid: 'contracts.void',
-  staysRead: 'stays.read', staysCheckIn: 'stays.check_in', staysCheckOut: 'stays.check_out',
+  staysRead: 'stays.read', staysCheckIn: 'stays.check_in', staysCheckOut: 'stays.check_out', staysCheckOutOverride: 'stays.check_out_override',
   financeRead: 'finance.read', financeCharge: 'finance.charge', financePayment: 'finance.payment', financeReverse: 'finance.reverse',
   guestsRead: 'guests.read', guestsCreate: 'guests.create', guestsUpdate: 'guests.update', guestsArchive: 'guests.archive', guestsBiometric: 'guests.biometric',
   cleaningRead: 'cleaning.read', cleaningAssign: 'cleaning.assign', cleaningProgress: 'cleaning.progress', cleaningReportIncident: 'cleaning.report_incident',

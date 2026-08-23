@@ -1,4 +1,4 @@
-import { foreignKey, index, numeric, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { foreignKey, index, numeric, pgTable, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { properties } from './hotel.schema.js';
 
 export const cashSessions = pgTable('cash_sessions', {
@@ -35,5 +35,5 @@ export const cashMovements = pgTable('cash_movements', {
 }, (t) => [
   foreignKey({ name: 'cash_movements_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
   foreignKey({ name: 'cash_movements_session_id_fkey', columns: [t.sessionId], foreignColumns: [cashSessions.id] }).onDelete('cascade'),
-  index('cash_movements_session_id_idx').on(t.sessionId),
+  index('cash_movements_session_id_idx').on(t.sessionId), unique('cash_movements_property_reference_unique').on(t.propertyId, t.referenceId),
 ]);

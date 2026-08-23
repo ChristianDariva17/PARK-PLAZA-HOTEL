@@ -5,10 +5,12 @@ import { properties, rooms } from './hotel.schema.js';
 import { reservations } from './reservations.schema.js';
 
 export const stayStatus = pgEnum('stay_status', ['active', 'checked_out']);
+export const folioEntryType = pgEnum('folio_entry_type', ['charge', 'payment', 'reversal']);
+export const folioSettlement = pgEnum('folio_settlement', ['open', 'settled', 'receivable']);
 
 export const stays = pgTable('stays', {
   id: uuid().defaultRandom().primaryKey(), propertyId: uuid('property_id').notNull(), reservationId: uuid('reservation_id').notNull(), roomId: uuid('room_id').notNull(),
-  status: stayStatus().notNull().default('active'), checkInAt: timestamp('check_in_at', { withTimezone: true }).notNull(), checkOutAt: timestamp('check_out_at', { withTimezone: true }),
+  status: stayStatus().notNull().default('active'), settlement: folioSettlement().notNull().default('open'), receivableReason: varchar('receivable_reason', { length: 300 }), receivableAmount: numeric('receivable_amount', { precision: 14, scale: 2 }), checkInAt: timestamp('check_in_at', { withTimezone: true }).notNull(), checkOutAt: timestamp('check_out_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   foreignKey({ name: 'stays_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
@@ -34,9 +36,24 @@ export const folios = pgTable('folios', {
   id: uuid().defaultRandom().primaryKey(), propertyId: uuid('property_id').notNull(), stayId: uuid('stay_id').notNull(),
   openingBalance: numeric('opening_balance', { precision: 14, scale: 2 }).notNull().default('0.00'), createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  unique().on(t.stayId),
+  unique().on(t.stayId), unique('folios_id_property_id_unique').on(t.id, t.propertyId),
   foreignKey({ name: 'folios_stay_property_fkey', columns: [t.stayId, t.propertyId], foreignColumns: [stays.id, stays.propertyId] }).onDelete('cascade'),
   check('folios_zero_opening_balance_check', sql`${t.openingBalance} = 0`),
+]);
+
+export const folioEntries = pgTable('folio_entries', {
+  id: uuid().defaultRandom().primaryKey(), propertyId: uuid('property_id').notNull(), folioId: uuid('folio_id').notNull(), stayId: uuid('stay_id').notNull(),
+  type: folioEntryType().notNull(), amount: numeric('amount', { precision: 14, scale: 2 }).notNull(), paymentMethod: varchar('payment_method', { length: 20 }),
+  sourceType: varchar('source_type', { length: 48 }).notNull(), sourceId: varchar('source_id', { length: 64 }).notNull(), idempotencyKey: uuid('idempotency_key').notNull(), reversalOfEntryId: uuid('reversal_of_entry_id'), reason: varchar('reason', { length: 300 }), actorAccountId: uuid('actor_account_id').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  foreignKey({ name: 'folio_entries_folio_property_fkey', columns: [t.folioId, t.propertyId], foreignColumns: [folios.id, folios.propertyId] }).onDelete('cascade'),
+  foreignKey({ name: 'folio_entries_stay_property_fkey', columns: [t.stayId, t.propertyId], foreignColumns: [stays.id, stays.propertyId] }).onDelete('cascade'),
+  foreignKey({ name: 'folio_entries_reversal_fkey', columns: [t.reversalOfEntryId], foreignColumns: [t.id] }).onDelete('restrict'),
+  check('folio_entries_amount_check', sql`${t.amount} > 0`),
+  check('folio_entries_payment_method_check', sql`${t.paymentMethod} IS NULL OR ${t.paymentMethod} IN ('Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin')`),
+  unique('folio_entries_property_source_unique').on(t.propertyId, t.sourceType, t.sourceId),
+  unique('folio_entries_property_idempotency_unique').on(t.propertyId, t.idempotencyKey),
+  uniqueIndex('folio_entries_one_reversal_idx').on(t.reversalOfEntryId).where(sql`${t.reversalOfEntryId} IS NOT NULL`), index('folio_entries_stay_created_idx').on(t.stayId, t.createdAt),
 ]);
 
 export const stayCommands = pgTable('stay_commands', {

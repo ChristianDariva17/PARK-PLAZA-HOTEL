@@ -78,7 +78,7 @@ async function insertReservationDependencies(client: PoolClient, fixture: Reserv
 
 describe('PostgreSQL readiness', () => {
   it('has the migrated schema and overlap constraint', async () => {
-    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean }>(`select
+    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean; folio_ready: boolean }>(`select
       to_regclass('public.reservations') is not null as schema_ready,
       exists (select 1 from pg_constraint where conname = 'reservations_no_active_overlap') as constraint_ready,
       exists (select 1 from pg_constraint where conname = 'identity_documents_guest_property_fkey' and convalidated and confdeltype = 'c')
@@ -93,8 +93,13 @@ describe('PostgreSQL readiness', () => {
       to_regclass('public.sessions') is not null and to_regclass('public.role_permissions') is not null as security_ready,
       (select count(*) = 2 from pg_trigger where tgname in ('audit_events_append_only', 'audit_events_no_truncate') and not tgisinternal) as audit_guard_ready,
       exists (select 1 from pg_indexes where indexname = 'sessions_one_active_per_account' and indexdef like '%WHERE (revoked_at IS NULL)%') as session_guard_ready,
-      (select array_agg(key order by key) = array['administrator','cleaning','kitchen','receptionist']::varchar[] from roles where is_system) as system_roles_ready`);
-    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true });
+       (select array_agg(key order by key) = array['administrator','cleaning','kitchen','receptionist']::varchar[] from roles where is_system) as system_roles_ready,
+       to_regclass('public.folio_entries') is not null
+         and exists (select 1 from pg_constraint where conname = 'folio_entries_property_source_unique')
+         and exists (select 1 from pg_constraint where conname = 'folio_entries_property_idempotency_unique')
+         and exists (select 1 from pg_indexes where indexname = 'folio_entries_one_reversal_idx')
+         and exists (select 1 from pg_constraint where conname = 'cash_movements_property_reference_unique') as folio_ready`);
+    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true });
   });
 });
 
@@ -698,5 +703,36 @@ describe('PostgreSQL stay invariants', () => {
     await pool.query('DELETE FROM rooms WHERE property_id = $1', [propertyId]);
     await pool.query('DELETE FROM room_categories WHERE property_id = $1', [propertyId]);
     await pool.query('DELETE FROM properties WHERE id = $1', [propertyId]);
+  });
+});
+
+describe('PostgreSQL financial folio invariants', () => {
+  it('keeps entries property-scoped, decimal-safe, and deduplicated by source, key, and reversal', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const suffix = uniqueHex();
+      const fixture: StayFixture = {
+        propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(),
+        propertyCode: `inv-fl-${suffix.slice(0, 25)}`, roomNumber: `fl-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID(),
+      };
+      await insertStayDependencies(client, fixture);
+      const folioId = randomUUID();
+      const chargeId = randomUUID();
+      const sourceId = randomUUID();
+      await client.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [folioId, fixture.propertyId, fixture.stayId]);
+      await client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id)
+        VALUES ($1, $2, $3, $4, 'charge', '12.50', 'manual_charge', $5, $6, $7)`, [chargeId, fixture.propertyId, folioId, fixture.stayId, sourceId, randomUUID(), randomUUID()]);
+
+      const invalidMethod = await captureViolation(client, () => client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, payment_method, source_type, source_id, idempotency_key, actor_account_id)
+        VALUES ($1, $2, $3, $4, 'payment', '1.00', 'Crypto', 'manual_payment', $5, $6, $7)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), randomUUID()]));
+      expectPostgresViolation(invalidMethod, '23514', 'folio_entries_payment_method_check');
+      const duplicateSource = await captureViolation(client, () => client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id)
+        VALUES ($1, $2, $3, $4, 'charge', '12.50', 'manual_charge', $5, $6, $7)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, sourceId, randomUUID(), randomUUID()]));
+      expectPostgresViolation(duplicateSource, '23505', 'folio_entries_property_source_unique');
+      await client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, reversal_of_entry_id, actor_account_id)
+        VALUES ($1, $2, $3, $4, 'reversal', '12.50', 'manual_reversal', $5, $6, $7, $8)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), chargeId, randomUUID()]);
+      const duplicateReversal = await captureViolation(client, () => client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, reversal_of_entry_id, actor_account_id)
+        VALUES ($1, $2, $3, $4, 'reversal', '12.50', 'manual_reversal', $5, $6, $7, $8)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), chargeId, randomUUID()]));
+      expectPostgresViolation(duplicateReversal, '23505', 'folio_entries_one_reversal_idx');
+    });
   });
 });

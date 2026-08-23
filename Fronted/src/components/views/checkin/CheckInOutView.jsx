@@ -3,6 +3,8 @@ import { usePermissions } from '../../../auth/authContext';
 import { PERMISSIONS } from '../../../auth/permissions';
 import { formatReservationInstant, reservationStatusToLabel } from '../../../reservations/reservationModel';
 import { useHotel } from '../../../state/hotelContext';
+import FolioPanel from '../../../folios/FolioPanel';
+import { canOverrideCheckout, checkoutDebtMessage } from '../../../folios/folioModel';
 import { Dialog, TabPanel, Tabs } from '../../ui/Overlay';
 import { DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
 
@@ -44,13 +46,17 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
 
 function CheckOutDialog({ stay, reservation, room, onClose, notify }) {
   const { state, stayCommands } = useHotel();
+  const { can } = usePermissions();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [folio, setFolio] = useState(null);
 
   const submit = async () => {
     setBusy(true); setError('');
     try {
-      await stayCommands.checkOut(stay.id);
+      if (Number(folio?.balance || 0) > 0 && (!canOverrideCheckout([PERMISSIONS.staysCheckOut, ...(can(PERMISSIONS.staysCheckOutOverride) ? [PERMISSIONS.staysCheckOutOverride] : [])], folio) || !overrideReason.trim())) throw new Error('El saldo pendiente requiere el permiso de cuenta por cobrar y un motivo.');
+      await stayCommands.checkOut(stay.id, overrideReason.trim() ? { overrideReason: overrideReason.trim() } : {});
       notify('Check-out completado', 'La estadía fue cerrada y la habitación pasó a tareas de limpieza.', 'success');
       onClose();
     } catch (failure) { setError(failure.message || 'No se pudo completar el check-out.'); } finally { setBusy(false); }
@@ -66,6 +72,9 @@ function CheckOutDialog({ stay, reservation, room, onClose, notify }) {
     <div className="alert-banner alert-banner-warning">
       ⚠️ Al confirmar el Check-out se cerrará la estadía y la habitación pasará automáticamente a estado <strong>En Limpieza</strong> para la generación de la tarea correspondiente.
     </div>
+    <FolioPanel stayId={stay.id} canCharge={can(PERMISSIONS.financeCharge)} canPay={can(PERMISSIONS.financePayment)} canReverse={can(PERMISSIONS.financeReverse)} onFolioChange={setFolio} />
+    {checkoutDebtMessage(folio) ? <div className="alert-banner alert-banner-warning">{checkoutDebtMessage(folio)} El check-out queda bloqueado hasta pagar o registrar una cuenta por cobrar autorizada.</div> : null}
+    {can(PERMISSIONS.staysCheckOutOverride) ? <label className="form-field">Motivo de cuenta por cobrar (solo si el servidor informa saldo pendiente)<textarea value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} maxLength={300} /></label> : null}
     {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
     {state.stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{state.stayCommandRequest.error}</div> : null}
     <div className="form-actions">

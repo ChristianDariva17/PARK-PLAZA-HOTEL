@@ -854,7 +854,7 @@ export function HotelProvider({ children }) {
   }, [cancelStayCommand, commitInternal, reloadReservations, reloadRooms, reloadStays]);
 
   const checkInStayCommand = useCallback((reservationId, input = {}) => runStayCommand(hasStayCheckInAccess, (key, signal) => checkInReservation(reservationId, input, key, signal)), [runStayCommand]);
-  const checkOutStayCommand = useCallback((stayId) => runStayCommand(hasStayCheckOutAccess, (key, signal) => checkOutStay(stayId, key, signal)), [runStayCommand]);
+  const checkOutStayCommand = useCallback((stayId, body = {}) => runStayCommand(hasStayCheckOutAccess, (key, signal) => checkOutStay(stayId, key, signal, body)), [runStayCommand]);
 
   const runCleaningCommand = useCallback(async (permission, request) => {
     if (authRef.current.authStatus !== 'authenticated' || !authRef.current.permissions.includes(permission)) throw new CleaningRequestError('No cuenta con permiso para esta operación de limpieza.', 403);

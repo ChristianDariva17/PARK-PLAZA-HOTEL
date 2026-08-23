@@ -78,6 +78,13 @@
       "when": 1787149078732,
       "tag": "0010_ambitious_warpath",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787152670000,
+      "tag": "0011_hotel_financial_folios",
+      "breakpoints": true
     }
   ]
 }

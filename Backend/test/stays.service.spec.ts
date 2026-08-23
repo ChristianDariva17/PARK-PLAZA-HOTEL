@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuditService } from '../src/audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../src/auth/auth.types.js';
 import type { Database } from '../src/database/database.module.js';
+import type { FolioService } from '../src/folios/folio.service.js';
 import { StaysService, type StayCommandResponse } from '../src/stays/stays.service.js';
 
 const actor = {
@@ -53,7 +54,8 @@ function lifecycleService(selections: unknown[][], insertReturns: unknown[] = []
   };
   const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
-  return { service: new StaysService(database, audit as unknown as AuditService), tx, audit, insertedValues, updateValues };
+  const foliosService = { read: vi.fn().mockResolvedValue({ balance: '0.00', settlement: 'open' }) };
+  return { service: new StaysService(database, audit as unknown as AuditService, foliosService as unknown as FolioService), tx, audit, foliosService, insertedValues, updateValues };
 }
 
 describe('StaysService lifecycle', () => {
@@ -101,7 +103,7 @@ describe('StaysService lifecycle', () => {
     const database = {
       transaction: vi.fn().mockRejectedValue({ code: '23505', constraint: 'stays_one_active_per_reservation_idx' }),
     } as unknown as Database;
-    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService);
+    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService, { read: vi.fn() } as unknown as FolioService);
 
     await expect(service.checkIn(actor, reservation.id, {}, 'key', context)).rejects.toBeInstanceOf(ConflictException);
   });
@@ -131,7 +133,7 @@ describe('StaysService lifecycle', () => {
     const activeStay = { id: 'stay-id', reservationId: reservation.id, roomId: availableRoom.id, status: 'active' as const, checkInAt };
     const setup = lifecycleService([[], [policy], [activeStay], [{ id: availableRoom.id, status: 'occupied' }], [{ id: reservation.id, checkInAt, checkOutAt }], [folio]], [undefined]);
 
-    const result = await setup.service.checkOut(actor, activeStay.id, 'key', context);
+    const result = await setup.service.checkOut(actor, activeStay.id, {}, 'key', context);
 
     expect(result.stay.status).toBe('checked_out');
     expect(result.reservation.status).toBe('completed');
@@ -142,6 +144,35 @@ describe('StaysService lifecycle', () => {
       { status: 'cleaning' },
     ]));
     expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'stay.checked_out' }), setup.tx);
+  });
+
+  it('independently rejects debt checkout when the override permission or non-empty reason is absent', async () => {
+    const activeStay = { id: 'stay-id', reservationId: reservation.id, roomId: availableRoom.id, status: 'active' as const, checkInAt };
+    const withoutPermission = lifecycleService([[], [policy], [activeStay]]);
+    withoutPermission.foliosService.read.mockResolvedValue({ balance: '12.50', settlement: 'open' });
+    const withoutReason = lifecycleService([[], [policy], [activeStay]]);
+    withoutReason.foliosService.read.mockResolvedValue({ balance: '12.50', settlement: 'open' });
+    const overrideActor = { ...actor, permissions: [...actor.permissions, 'stays.check_out_override'] };
+
+    await expect(withoutPermission.service.checkOut(actor, activeStay.id, { overrideReason: 'Billing' }, 'key', context)).rejects.toBeInstanceOf(ConflictException);
+    await expect(withoutReason.service.checkOut(overrideActor, activeStay.id, { overrideReason: '   ' }, 'key', context)).rejects.toBeInstanceOf(ConflictException);
+
+    for (const setup of [withoutPermission, withoutReason]) {
+      expect(setup.tx.update).not.toHaveBeenCalled(); expect(setup.tx.insert).not.toHaveBeenCalled(); expect(setup.audit.record).not.toHaveBeenCalled();
+    }
+  });
+
+  it('checks out a debt as receivable only with both permissions and records no balancing folio entry', async () => {
+    const activeStay = { id: 'stay-id', reservationId: reservation.id, roomId: availableRoom.id, status: 'active' as const, checkInAt };
+    const setup = lifecycleService([[], [policy], [activeStay], [{ id: availableRoom.id, status: 'occupied' }], [{ id: reservation.id, checkInAt, checkOutAt }], [folio]]);
+    setup.foliosService.read.mockResolvedValue({ balance: '12.50', settlement: 'open' });
+    const overrideActor = { ...actor, permissions: [...actor.permissions, 'stays.check_out_override'] };
+
+    await setup.service.checkOut(overrideActor, activeStay.id, { overrideReason: 'Corporate billing' }, 'override-key', context);
+
+    expect(setup.updateValues).toContainEqual(expect.objectContaining({ status: 'checked_out', settlement: 'receivable', receivableAmount: '12.50', receivableReason: 'Corporate billing' }));
+    expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'stay.checked_out_receivable' }), setup.tx);
+    expect(setup.insertedValues).not.toContainEqual(expect.objectContaining({ type: expect.any(String) }));
   });
 
   it('requires cleaning completion before returning a checked-out room to available', async () => {

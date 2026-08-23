@@ -18,6 +18,6 @@ async function request(url, options) {
 const command = (url, { body, key, signal } = {}) => request(url, { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}), headers: { 'Idempotency-Key': key }, signal });
 export const getPersistentStays = (signal) => request('/api/stays', { signal });
 export const checkInReservation = (reservationId, body, key, signal) => command(`/api/stays/reservation/${reservationId}/check-in`, { body, key, signal });
-export const checkOutStay = (stayId, key, signal) => command(`/api/stays/${stayId}/check-out`, { key, signal });
+export const checkOutStay = (stayId, key, signal, body = {}) => command(`/api/stays/${stayId}/check-out`, { body, key, signal });
 export const createWalkIn = (body, key, signal) => command('/api/stays/walk-in', { body, key, signal });
 export const completeRoomCleaning = (roomId, key, signal) => command(`/api/stays/rooms/${roomId}/cleaning-complete`, { key, signal });

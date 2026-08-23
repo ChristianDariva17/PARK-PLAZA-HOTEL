@@ -7,7 +7,8 @@ import { getPostgresErrorFields } from '../database/postgres-error.js';
 import { cleaningTasks, folios, guests, identityDocuments, properties, reservationGuests, reservations, roomCategories, rooms, stayCommands, stayGuests, stays } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import { assertEligibleEarlyCheckIn, assertInterval, proratedAmount, type PropertyIntervalPolicy } from '../reservations/interval-policy.js';
-import type { CheckInDto, WalkInDto } from './stays.dto.js';
+import type { CheckInDto, CheckOutDto, WalkInDto } from './stays.dto.js';
+import { FolioService } from '../folios/folio.service.js';
 
 export interface StayCommandResponse extends Record<string, unknown> {
   stay: { id: string; reservationId: string; roomId: string; status: 'active' | 'checked_out'; checkInAt: string; checkOutAt: string | null };
@@ -23,7 +24,7 @@ const propertySelection = { timezone: properties.timezone, dayUseStart: properti
 
 @Injectable()
 export class StaysService {
-  constructor(@Inject(DATABASE) private readonly database: Database, private readonly audit: AuditService) {}
+  constructor(@Inject(DATABASE) private readonly database: Database, private readonly audit: AuditService, private readonly foliosService: FolioService) {}
 
   async list(propertyId: string): Promise<PersistentStayResponse[]> {
     const rows = await this.database.select({ id: stays.id, reservationId: stays.reservationId, roomId: stays.roomId, status: stays.status, checkInAt: stays.checkInAt, checkOutAt: stays.checkOutAt })
@@ -70,12 +71,15 @@ export class StaysService {
     });
   }
 
-  checkOut(actor: AuthenticatedAccount, stayId: string, key: string, context: RequestContext): Promise<StayCommandResponse> {
+  checkOut(actor: AuthenticatedAccount, stayId: string, input: CheckOutDto, key: string, context: RequestContext): Promise<StayCommandResponse> {
     return this.command(actor, 'check_out', key, context, async (tx) => {
       const rows = await tx.select().from(stays).where(and(eq(stays.id, stayId), eq(stays.propertyId, actor.propertyId))).limit(1).for('update', { of: stays });
       const stay = rows[0];
       if (!stay) throw new NotFoundException('Stay not found');
       if (stay.status !== 'active') throw new ConflictException('Stay is already checked out');
+      const folioState = await this.foliosService.read(tx, actor.propertyId, stayId, true);
+      const hasDebt = BigInt(folioState.balance.replace('.', '')) > 0n;
+      if (hasDebt && (!actor.permissions.includes('stays.check_out') || !actor.permissions.includes('stays.check_out_override') || !input.overrideReason?.trim())) throw new ConflictException('Outstanding folio balance requires an authorized receivable override');
       const roomRows = await tx.select({ id: rooms.id, status: rooms.status }).from(rooms).where(and(eq(rooms.id, stay.roomId), eq(rooms.propertyId, actor.propertyId))).limit(1).for('update', { of: rooms });
       const room = roomRows[0];
       if (!room || room.status !== 'occupied') throw new ConflictException('Room state does not permit check-out');
@@ -83,7 +87,7 @@ export class StaysService {
       const reservation = reservationRows[0];
       if (!reservation) throw new ConflictException('Stay reservation is unavailable');
       const now = new Date();
-      await tx.update(stays).set({ status: 'checked_out', checkOutAt: now, updatedAt: now }).where(eq(stays.id, stay.id));
+      await tx.update(stays).set({ status: 'checked_out', settlement: hasDebt ? 'receivable' : 'settled', ...(hasDebt ? { receivableAmount: folioState.balance, receivableReason: input.overrideReason } : {}), checkOutAt: now, updatedAt: now }).where(eq(stays.id, stay.id));
       await tx.update(reservations).set({ status: 'completed', updatedAt: now }).where(eq(reservations.id, reservation.id));
       await tx.update(rooms).set({ status: 'cleaning' }).where(eq(rooms.id, room.id));
       await tx.insert(cleaningTasks).values({
@@ -99,7 +103,7 @@ export class StaysService {
         stay: { id: stay.id, reservationId: stay.reservationId, roomId: stay.roomId, status: 'checked_out', checkInAt: stay.checkInAt.toISOString(), checkOutAt: now.toISOString() },
         folio, reservation: { id: reservation.id, status: 'completed', checkInAt: reservation.checkInAt.toISOString(), checkOutAt: reservation.checkOutAt.toISOString() }, room: { id: room.id, status: 'cleaning' },
       };
-      await this.audit.record({ ...this.auditBase(actor, context), eventType: 'stay.checked_out', subjectType: 'stay', subjectId: stay.id, metadata: { reservationId: stay.reservationId, roomId: room.id, status: 'checked_out', roomStatus: 'cleaning' } }, tx);
+      await this.audit.record({ ...this.auditBase(actor, context), eventType: hasDebt ? 'stay.checked_out_receivable' : 'stay.checked_out', subjectType: 'stay', subjectId: stay.id, metadata: { reservationId: stay.reservationId, roomId: room.id, status: 'checked_out', roomStatus: 'cleaning', balance: folioState.balance, overrideReason: input.overrideReason ?? null } }, tx);
       return response;
     });
   }

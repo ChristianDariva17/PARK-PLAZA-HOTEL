@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { AuthenticatedAccount } from '../auth/auth.types.js';
+import type { RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
 import {
   inventoryItems,
@@ -9,7 +10,10 @@ import {
   menuItems,
   orderItems,
   orders,
+  stays,
 } from '../database/schema/index.js';
+
+import { FolioService } from '../folios/folio.service.js';
 
 import { Inject } from '@nestjs/common';
 import type {
@@ -33,7 +37,7 @@ const ORDER_FLOW = [
 
 @Injectable()
 export class RestaurantService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(@Inject(DATABASE) private readonly db: Database, private readonly folios: FolioService) {}
 
   // ─── Menu ────────────────────────────────────────────────────────────────────
   async listMenu(propertyId: string) {
@@ -218,7 +222,7 @@ export class RestaurantService {
     });
   }
 
-  async advanceOrder(actor: AuthenticatedAccount, orderId: string, dto: AdvanceOrderDto, _ctx: unknown) {
+  async advanceOrder(actor: AuthenticatedAccount, orderId: string, dto: AdvanceOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
       if (!order) throw new NotFoundException('Pedido no encontrado.');
@@ -227,6 +231,7 @@ export class RestaurantService {
       const currentIndex = ORDER_FLOW.indexOf(order.status as (typeof ORDER_FLOW)[number]);
       if (currentIndex < 0 || currentIndex >= ORDER_FLOW.length - 1) throw new BadRequestException('El pedido no puede avanzar mas.');
       const nextStatus = ORDER_FLOW[currentIndex + 1];
+      if (order.stayId && order.status === 'Entregado') throw new BadRequestException('Stay-linked delivered orders are financially terminal.');
 
       let inventoryStage = order.inventoryStage;
       const lines = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
@@ -272,17 +277,23 @@ export class RestaurantService {
         inventoryStage = 'Consumido';
       }
 
+      if (order.stayId && order.status === 'Listo' && nextStatus === 'Entregado') {
+        const stay = (await tx.select({ id: stays.id }).from(stays).where(and(eq(stays.id, order.stayId), eq(stays.propertyId, actor.propertyId), eq(stays.status, 'active'))).limit(1).for('update', { of: stays }))[0];
+        if (!stay) throw new ConflictException('The linked stay is not active in this property.');
+        await this.folios.postRestaurantCharge(tx, actor, stay.id, order.id, order.total, context);
+      }
       const accountingStage = nextStatus === 'Pagado' ? 'Pagado' : order.accountingStage;
       const [updated] = await tx.update(orders).set({ status: nextStatus, inventoryStage, accountingStage, updatedAt: new Date() }).where(eq(orders.id, orderId)).returning();
       return updated;
     });
   }
 
-  async cancelOrder(actor: AuthenticatedAccount, orderId: string, dto: CancelOrderDto, _ctx: unknown) {
+  async cancelOrder(actor: AuthenticatedAccount, orderId: string, dto: CancelOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
       if (!order) throw new NotFoundException('Pedido no encontrado.');
       if (['Pagado', 'Cancelado'].includes(order.status)) throw new BadRequestException('El pedido no se puede cancelar.');
+      if (order.stayId && order.status === 'Entregado') await this.folios.reverseRestaurantCharge(tx, actor, order.stayId, order.id, dto.reason, context);
 
       // Revertir reservas si aplica
       if (order.inventoryStage === 'Reservado') {

@@ -17,6 +17,7 @@ import { CashModule } from './cash/cash.module.js';
 import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ParkingModule } from './parking/parking.module.js';
 import { PetsModule } from './pets/pets.module.js';
+import { FolioModule } from './folios/folio.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { PetsModule } from './pets/pets.module.js';
     RestaurantModule,
     ParkingModule,
     PetsModule,
+    FolioModule,
   ],
   controllers: [HealthController],
 })

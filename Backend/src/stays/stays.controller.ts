@@ -3,7 +3,7 @@ import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.ty
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { getRequestContext } from '../auth/request-context.js';
-import { parseCheckInDto, parseIdempotencyKey, parseStayId, parseWalkInDto } from './stays.dto.js';
+import { parseCheckInDto, parseCheckOutDto, parseIdempotencyKey, parseStayId, parseWalkInDto } from './stays.dto.js';
 import { StaysService } from './stays.service.js';
 
 @Controller('stays')
@@ -24,8 +24,8 @@ export class StaysController {
   }
 
   @Post(':id/check-out') @RequirePermissions('stays.check_out')
-  checkOut(@Param('id') stayId: string, @Headers('idempotency-key') key: unknown, @CurrentAccount() actor: AuthenticatedAccount, @Req() request: AuthenticatedRequest) {
-    return this.stays.checkOut(actor, parseStayId(stayId), parseIdempotencyKey(key), getRequestContext(request));
+  checkOut(@Param('id') stayId: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown, @CurrentAccount() actor: AuthenticatedAccount, @Req() request: AuthenticatedRequest) {
+    return this.stays.checkOut(actor, parseStayId(stayId), parseCheckOutDto(body ?? {}), parseIdempotencyKey(key), getRequestContext(request));
   }
 
 
