@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { getPostgresErrorFields } from '../database/postgres-error.js';
-import { cleaningTasks, folios, guests, identityDocuments, properties, reservationGuests, reservations, roomCategories, rooms, stayCommands, stayGuests, stays } from '../database/schema/index.js';
+import { cleaningTasks, folios, guests, identityDocuments, properties, receivables, reservationGuests, reservations, roomCategories, rooms, stayCommands, stayGuests, stays } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import { assertEligibleEarlyCheckIn, assertInterval, proratedAmount, type PropertyIntervalPolicy } from '../reservations/interval-policy.js';
 import type { CheckInDto, CheckOutDto, WalkInDto } from './stays.dto.js';
@@ -83,7 +83,7 @@ export class StaysService {
       const roomRows = await tx.select({ id: rooms.id, status: rooms.status }).from(rooms).where(and(eq(rooms.id, stay.roomId), eq(rooms.propertyId, actor.propertyId))).limit(1).for('update', { of: rooms });
       const room = roomRows[0];
       if (!room || room.status !== 'occupied') throw new ConflictException('Room state does not permit check-out');
-      const reservationRows = await tx.select({ id: reservations.id, checkInAt: reservations.checkInAt, checkOutAt: reservations.checkOutAt }).from(reservations).where(and(eq(reservations.id, stay.reservationId), eq(reservations.propertyId, actor.propertyId))).limit(1);
+      const reservationRows = await tx.select({ id: reservations.id, primaryGuestId: reservations.primaryGuestId, checkInAt: reservations.checkInAt, checkOutAt: reservations.checkOutAt }).from(reservations).where(and(eq(reservations.id, stay.reservationId), eq(reservations.propertyId, actor.propertyId))).limit(1);
       const reservation = reservationRows[0];
       if (!reservation) throw new ConflictException('Stay reservation is unavailable');
       const now = new Date();
@@ -99,6 +99,11 @@ export class StaysService {
         evidence: [],
       });
       const folio = await this.findFolio(tx, stay.id, actor.propertyId);
+      if (hasDebt) {
+        const primaryGuestId = reservation.primaryGuestId;
+        if (!primaryGuestId) throw new ConflictException('Stay reservation guest is unavailable');
+        await tx.insert(receivables).values({ propertyId: actor.propertyId, stayId: stay.id, reservationId: stay.reservationId, primaryGuestId, folioId: folio.id, status: 'open', originalAmount: folioState.balance, outstandingAmount: folioState.balance, reason: input.overrideReason!.trim(), openedAt: now }).onConflictDoUpdate({ target: receivables.stayId, set: { outstandingAmount: folioState.balance, updatedAt: now } });
+      }
       const response: StayCommandResponse = {
         stay: { id: stay.id, reservationId: stay.reservationId, roomId: stay.roomId, status: 'checked_out', checkInAt: stay.checkInAt.toISOString(), checkOutAt: now.toISOString() },
         folio, reservation: { id: reservation.id, status: 'completed', checkInAt: reservation.checkInAt.toISOString(), checkOutAt: reservation.checkOutAt.toISOString() }, room: { id: room.id, status: 'cleaning' },

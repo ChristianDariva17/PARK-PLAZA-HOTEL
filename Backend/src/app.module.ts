@@ -18,6 +18,7 @@ import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ParkingModule } from './parking/parking.module.js';
 import { PetsModule } from './pets/pets.module.js';
 import { FolioModule } from './folios/folio.module.js';
+import { ReceivablesModule } from './receivables/receivables.module.js';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { FolioModule } from './folios/folio.module.js';
     ParkingModule,
     PetsModule,
     FolioModule,
+    ReceivablesModule,
   ],
   controllers: [HealthController],
 })

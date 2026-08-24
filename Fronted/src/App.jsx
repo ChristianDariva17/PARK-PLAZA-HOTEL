@@ -23,6 +23,7 @@ const AuditView = named(() => import('./components/views/ExtendedViews'), 'Audit
 const RolesView = named(() => import('./components/views/ExtendedViews'), 'RolesView');
 const SettingsView = named(() => import('./components/views/ExtendedViews'), 'SettingsView');
 const AccessAccountsView = lazy(() => import('./components/views/AccessAccountsView'));
+const ReceivablesView = lazy(() => import('./receivables/ReceivablesView'));
 const P1 = (name) => named(() => import('./components/views/P1Views'), name);
 const Operational = (name) => named(() => import('./components/views/OperationalViews'), name);
 
@@ -32,7 +33,7 @@ const VIEW_COMPONENTS = {
   reservas: ReservationsView,
   contratos: P1('P1ContractsView'),
   'checkin-checkout': CheckInOutView,
-  finanzas: P1('P1FinanceView'),
+  finanzas: ReceivablesView,
   clientes: CustomersView,
   limpieza: P1('P1CleaningView'),
   mantenimiento: Operational('OperationalMaintenanceView'),

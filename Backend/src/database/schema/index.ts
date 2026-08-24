@@ -7,6 +7,7 @@ export * from './cleaning.schema.js';
 export * from './incidents.schema.js';
 
 export * from './cash.schema.js';
+export * from './receivables.schema.js';
 export * from './restaurant.schema.js';
 export * from './parking.schema.js';
 export * from './pets.schema.js';

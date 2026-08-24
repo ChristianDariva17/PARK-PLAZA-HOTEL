@@ -1,9 +1,11 @@
 import { foreignKey, index, numeric, pgTable, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { properties } from './hotel.schema.js';
+import { accounts } from './security.schema.js';
 
 export const cashSessions = pgTable('cash_sessions', {
   id: uuid().defaultRandom().primaryKey(),
   propertyId: uuid('property_id').notNull(),
+  openedByAccountId: uuid('opened_by_account_id'),
   openedAt: timestamp('opened_at', { withTimezone: true }).defaultNow().notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
   openingAmount: numeric('opening_amount', { precision: 14, scale: 2 }).notNull(),
@@ -18,6 +20,7 @@ export const cashSessions = pgTable('cash_sessions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   foreignKey({ name: 'cash_sessions_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
+  foreignKey({ name: 'cash_sessions_owner_property_fkey', columns: [t.openedByAccountId, t.propertyId], foreignColumns: [accounts.id, accounts.propertyId] }).onDelete('restrict'),
   index('cash_sessions_property_created_idx').on(t.propertyId, t.createdAt),
 ]);
 

@@ -14,7 +14,7 @@ const context: RequestContext = { requestId: 'request-id' };
 const checkInAt = new Date('2028-02-28T15:00:00.000Z');
 const checkOutAt = new Date('2028-03-01T11:00:00.000Z');
 const policy = { timezone: 'America/Lima', dayUseStart: '09:00', dayUseEnd: '18:00', dayUseMinimumMinutes: 180, reservationIntervalMinutes: 30 };
-const reservation = { id: 'reservation-id', roomId: 'room-id', status: 'confirmed' as const, checkInAt, checkOutAt };
+const reservation = { id: 'reservation-id', roomId: 'room-id', primaryGuestId: 'guest-id', status: 'confirmed' as const, checkInAt, checkOutAt };
 const availableRoom = { id: 'room-id', status: 'available' as const, capacity: 2, nightlyRate: '100.00' };
 const identifiedGuest = { id: 'guest-id', status: 'active' as const };
 const folio = { id: 'folio-id', stayId: 'stay-id', openingBalance: '0.00' };
@@ -34,10 +34,14 @@ function lifecycleService(selections: unknown[][], insertReturns: unknown[] = []
     select: vi.fn(() => queryResult(selections.shift() ?? [])),
     insert: vi.fn(() => {
       const returningValue = insertReturns.shift();
+      const insertQuery = {
+        returning: vi.fn().mockResolvedValue(returningValue),
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      };
       return {
         values: vi.fn((values: unknown) => {
           insertedValues.push(values);
-          return returningValue === undefined ? Promise.resolve() : { returning: vi.fn().mockResolvedValue(returningValue) };
+          return insertQuery;
         }),
       };
     }),
@@ -162,15 +166,16 @@ describe('StaysService lifecycle', () => {
     }
   });
 
-  it('checks out a debt as receivable only with both permissions and records no balancing folio entry', async () => {
+  it('scenario: Checkout creation creates one receivable for eligible debt without a balancing folio entry', async () => {
     const activeStay = { id: 'stay-id', reservationId: reservation.id, roomId: availableRoom.id, status: 'active' as const, checkInAt };
-    const setup = lifecycleService([[], [policy], [activeStay], [{ id: availableRoom.id, status: 'occupied' }], [{ id: reservation.id, checkInAt, checkOutAt }], [folio]]);
+    const setup = lifecycleService([[], [policy], [activeStay], [{ id: availableRoom.id, status: 'occupied' }], [{ id: reservation.id, primaryGuestId: reservation.primaryGuestId, checkInAt, checkOutAt }], [folio]]);
     setup.foliosService.read.mockResolvedValue({ balance: '12.50', settlement: 'open' });
     const overrideActor = { ...actor, permissions: [...actor.permissions, 'stays.check_out_override'] };
 
     await setup.service.checkOut(overrideActor, activeStay.id, { overrideReason: 'Corporate billing' }, 'override-key', context);
 
     expect(setup.updateValues).toContainEqual(expect.objectContaining({ status: 'checked_out', settlement: 'receivable', receivableAmount: '12.50', receivableReason: 'Corporate billing' }));
+    expect(setup.insertedValues).toContainEqual(expect.objectContaining({ propertyId: actor.propertyId, stayId: activeStay.id, folioId: folio.id, originalAmount: '12.50', outstandingAmount: '12.50', status: 'open' }));
     expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'stay.checked_out_receivable' }), setup.tx);
     expect(setup.insertedValues).not.toContainEqual(expect.objectContaining({ type: expect.any(String) }));
   });

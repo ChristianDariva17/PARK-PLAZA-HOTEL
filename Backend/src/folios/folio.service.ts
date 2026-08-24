@@ -69,6 +69,13 @@ export class FolioService {
     if (prior) return prior;
     return this.insert(tx, actor, stayId, { type: 'reversal', amount: original.amount, sourceType: 'restaurant_cancellation', sourceId: orderId, idempotencyKey: original.id, reversalOfEntryId: original.id, reason }, context);
   }
+  /** Internal-only append for a receivable already locked and validated by ReceivablesService. Generic folio commands remain closed after checkout. */
+  async appendLockedReceivableEntry(tx: any, actor: AuthenticatedAccount, input: { folioId: string; stayId: string; type: 'payment' | 'reversal'; amount: string; paymentMethod?: string; sourceType: 'receivable_collection' | 'receivable_reversal'; sourceId: string; idempotencyKey: string; reversalOfEntryId?: string; reason?: string }, context: RequestContext) {
+    const [entry] = await tx.insert(folioEntries).values({ propertyId: actor.propertyId, folioId: input.folioId, stayId: input.stayId, type: input.type, amount: input.amount, paymentMethod: input.paymentMethod ?? null, sourceType: input.sourceType, sourceId: input.sourceId, idempotencyKey: input.idempotencyKey, reversalOfEntryId: input.reversalOfEntryId ?? null, reason: input.reason ?? null, actorAccountId: actor.accountId }).returning();
+    if (!entry) throw new Error('Locked receivable folio entry did not return');
+    await this.audit.record({ actorAccountId: actor.accountId, propertyId: actor.propertyId, ...(context.requestId ? { requestId: context.requestId } : {}), eventType: `folio.${input.type}`, subjectType: 'folio_entry', subjectId: entry.id, metadata: { stayId: input.stayId, amount: input.amount, sourceType: input.sourceType, reason: input.reason ?? null } }, tx);
+    return entry;
+  }
 
   async read(tx: any, propertyId: string, stayId: string, lock = false): Promise<any> {
     let query = tx.select().from(stays).where(and(eq(stays.id, stayId), eq(stays.propertyId, propertyId))).limit(1);

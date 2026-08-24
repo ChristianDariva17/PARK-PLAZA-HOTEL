@@ -98,6 +98,7 @@ export class CashService {
         .insert(cashSessions)
         .values({
           propertyId: actor.propertyId,
+          openedByAccountId: actor.accountId,
           openingAmount: dto.openingAmount,
           responsible: dto.responsible,
           shift: dto.shift,

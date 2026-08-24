@@ -1,8 +1,14 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
+import type { AuthenticatedAccount } from '../src/auth/auth.types.js';
+import { FolioService } from '../src/folios/folio.service.js';
+import { ReceivablesService } from '../src/receivables/receivables.service.js';
 import { databaseUrlFromEnv, validateEnv } from '../src/config/environment.js';
+import * as schema from '../src/database/schema/index.js';
 
 const env = validateEnv({ ...process.env, DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5433' });
 const pool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 1 });
@@ -734,5 +740,84 @@ describe('PostgreSQL financial folio invariants', () => {
         VALUES ($1, $2, $3, $4, 'reversal', '12.50', 'manual_reversal', $5, $6, $7, $8)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), chargeId, randomUUID()]));
       expectPostgresViolation(duplicateReversal, '23505', 'folio_entries_one_reversal_idx');
     });
+  });
+
+  it('scenario: Reconciliation corrects divergent projections without changing another property', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const suffix = uniqueHex();
+      const fixture: StayFixture = { propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(), propertyCode: `inv-rv-${suffix.slice(0, 25)}`, roomNumber: `rv-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID() };
+      const other: StayFixture = { propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(), propertyCode: `inv-ro-${suffix.slice(0, 25)}`, roomNumber: `ro-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID() };
+      const folioId = randomUUID(); const otherFolioId = randomUUID();
+      await insertStayDependencies(client, fixture);
+      await insertStayDependencies(client, other);
+      await client.query(`UPDATE stays SET status = 'checked_out', settlement = 'receivable', check_out_at = now() WHERE id = $1`, [fixture.stayId]);
+      await client.query(`UPDATE stays SET status = 'checked_out', settlement = 'receivable', check_out_at = now() WHERE id = $1`, [other.stayId]);
+      await client.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [folioId, fixture.propertyId, fixture.stayId]);
+      await client.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [otherFolioId, other.propertyId, other.stayId]);
+      await client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id) VALUES ($1, $2, $3, $4, 'charge', '12.50', 'manual_charge', $5, $6, $7)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), randomUUID()]);
+      await client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id) VALUES ($1, $2, $3, $4, 'charge', '7.00', 'manual_charge', $5, $6, $7)`, [randomUUID(), other.propertyId, otherFolioId, other.stayId, randomUUID(), randomUUID(), randomUUID()]);
+      await client.query(`INSERT INTO receivables (property_id, stay_id, reservation_id, primary_guest_id, folio_id, status, original_amount, outstanding_amount, reason, opened_at, settled_at) VALUES ($1, $2, $3, $4, $5, 'settled', '12.50', '0.00', 'divergent', now(), now()), ($6, $7, $8, $9, $10, 'open', '7.00', '7.00', 'other', now(), null)`, [fixture.propertyId, fixture.stayId, fixture.reservationId, fixture.primaryGuestId, folioId, other.propertyId, other.stayId, other.reservationId, other.primaryGuestId, otherFolioId]);
+      await client.query(await readFile(new URL('../drizzle/0013_reconcile_receivables.sql', import.meta.url), 'utf8'));
+      const projection = await client.query<{ property_id: string; outstanding_amount: string; status: string; settled_at: Date | null }>('SELECT property_id, outstanding_amount, status, settled_at FROM receivables WHERE stay_id = ANY($1::uuid[]) ORDER BY property_id', [[fixture.stayId, other.stayId]]);
+      expect(projection.rows).toHaveLength(2);
+      expect(projection.rows).toEqual(expect.arrayContaining([{ property_id: fixture.propertyId, outstanding_amount: '12.50', status: 'open', settled_at: null }, { property_id: other.propertyId, outstanding_amount: '7.00', status: 'open', settled_at: null }]));
+      const commandKey = randomUUID();
+      await client.query(`INSERT INTO receivable_commands (property_id, operation, idempotency_key, response) VALUES ($1, 'collection', $2, '{}'::jsonb)`, [fixture.propertyId, commandKey]);
+      const duplicate = await captureViolation(client, () => client.query(`INSERT INTO receivable_commands (property_id, operation, idempotency_key, response) VALUES ($1, 'collection', $2, '{}'::jsonb)`, [fixture.propertyId, commandKey]));
+      expectPostgresViolation(duplicate, '23505', 'receivable_commands_property_operation_idempotency_key_unique');
+    });
+  });
+
+  it('scenario: Concurrent collection admits one payment and preserves the receivable balance', async () => {
+    const suffix = uniqueHex();
+    const fixture: StayFixture = { propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(), propertyCode: `inv-rc-${suffix.slice(0, 25)}`, roomNumber: `rc-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID() };
+    const folioId = randomUUID(); const receivableId = randomUUID();
+    const setup = await pool.connect();
+    try {
+      await setup.query('BEGIN');
+      await insertStayDependencies(setup, fixture);
+      await setup.query(`UPDATE stays SET status = 'checked_out', settlement = 'receivable', check_out_at = now() WHERE id = $1`, [fixture.stayId]);
+      await setup.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [folioId, fixture.propertyId, fixture.stayId]);
+      await setup.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id) VALUES ($1, $2, $3, $4, 'charge', '12.50', 'manual_charge', $5, $6, $7)`, [randomUUID(), fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), randomUUID()]);
+      await setup.query(`INSERT INTO receivables (id, property_id, stay_id, reservation_id, primary_guest_id, folio_id, status, original_amount, outstanding_amount, reason, opened_at) VALUES ($1, $2, $3, $4, $5, $6, 'open', '12.50', '12.50', 'race', now())`, [receivableId, fixture.propertyId, fixture.stayId, fixture.reservationId, fixture.primaryGuestId, folioId]);
+      await setup.query('COMMIT');
+    } finally {
+      setup.release();
+    }
+
+    const actor: AuthenticatedAccount = { accountId: randomUUID(), propertyId: fixture.propertyId, roleKey: 'administrator', email: 'race@example.invalid', permissions: [], sessionId: randomUUID(), passwordChangeRequired: false };
+    const racePool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 2 });
+    const clientA = await racePool.connect(); const clientB = await racePool.connect();
+    const serviceFor = (client: PoolClient) => {
+      const database = drizzle(client, { schema }); const audit = { record: async () => undefined };
+      return new ReceivablesService(database, audit as never, new FolioService(database, audit as never));
+    };
+    try {
+      const keyA = randomUUID(); const keyB = randomUUID();
+      const results = await Promise.allSettled([
+        serviceFor(clientA).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, keyA, { requestId: 'race-a' }),
+        serviceFor(clientB).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, keyB, { requestId: 'race-b' }),
+      ]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      const accepted = results.find((result) => result.status === 'fulfilled');
+      if (!accepted || accepted.status !== 'fulfilled') throw new Error('Expected one accepted collection');
+      const acceptedKey = accepted === results[0] ? keyA : keyB;
+      await expect(serviceFor(clientA).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, acceptedKey, { requestId: 'race-retry' })).resolves.toEqual(accepted.value);
+      const persisted = await pool.query<{ outstanding_amount: string; status: string; payments: number }>(`SELECT r.outstanding_amount, r.status, count(e.id) FILTER (WHERE e.source_type = 'receivable_collection')::integer AS payments FROM receivables r LEFT JOIN folio_entries e ON e.folio_id = r.folio_id AND e.property_id = r.property_id WHERE r.id = $1 GROUP BY r.id`, [receivableId]);
+      expect(persisted.rows).toEqual([{ outstanding_amount: '0.00', status: 'settled', payments: 1 }]);
+    } finally {
+      clientA.release(); clientB.release(); await racePool.end();
+      await pool.query('DELETE FROM folio_entries WHERE stay_id = $1', [fixture.stayId]);
+      await pool.query('DELETE FROM receivable_commands WHERE property_id = $1', [fixture.propertyId]);
+      await pool.query('DELETE FROM receivables WHERE stay_id = $1', [fixture.stayId]);
+      await pool.query('DELETE FROM folios WHERE stay_id = $1', [fixture.stayId]);
+      await pool.query('DELETE FROM stays WHERE id = $1', [fixture.stayId]);
+      await pool.query('DELETE FROM reservations WHERE id = $1', [fixture.reservationId]);
+      await pool.query('DELETE FROM guests WHERE property_id = $1', [fixture.propertyId]);
+      await pool.query('DELETE FROM rooms WHERE id = $1', [fixture.roomId]);
+      await pool.query('DELETE FROM room_categories WHERE id = $1', [fixture.categoryId]);
+      await pool.query('DELETE FROM properties WHERE id = $1', [fixture.propertyId]);
+    }
   });
 });
