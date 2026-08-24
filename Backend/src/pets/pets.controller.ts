@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import type { AuthenticatedAccount } from '../auth/auth.types.js';
+import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
+import { getRequestContext } from '../auth/request-context.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { parseCreatePetDto, parseTransitionPetDto, parseUpdatePetDto } from './pets.dto.js';
@@ -17,8 +18,8 @@ export class PetsController {
 
   @Post()
   @RequirePermissions('pets.create')
-  create(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount) {
-    return this.petsService.create(actor.propertyId, parseCreatePetDto(body));
+  create(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount, @Req() request: AuthenticatedRequest) {
+    return this.petsService.create(actor, parseCreatePetDto(body), getRequestContext(request));
   }
 
   @Patch(':id')

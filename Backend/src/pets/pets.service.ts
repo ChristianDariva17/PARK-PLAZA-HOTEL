@@ -1,14 +1,17 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, and } from 'drizzle-orm';
 import { Database, DATABASE } from '../database/database.module.js';
 import { guests } from '../database/schema/guests.schema.js';
 import { pets } from '../database/schema/pets.schema.js';
 import { stayGuests, stays } from '../database/schema/stays.schema.js';
 import type { CreatePetDto, UpdatePetDto } from './pets.dto.js';
+import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
+import { FolioService } from '../folios/folio.service.js';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 @Injectable()
 export class PetsService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(@Inject(DATABASE) private readonly db: Database, private readonly folios: FolioService) {}
 
   async findAll(propertyId: string) {
     return this.db.query.pets.findMany({
@@ -17,29 +20,42 @@ export class PetsService {
     });
   }
 
-  async create(propertyId: string, data: CreatePetDto) {
-    await this.assertLinks(this.db, propertyId, data.clientId, data.stayId);
-    const chargeApplied = data.charge > 0;
-    const chargeId = chargeApplied ? `CAR-${data.id}` : null;
-
-    const [pet] = await this.db.insert(pets).values({
+  async create(actor: AuthenticatedAccount, data: CreatePetDto, context: RequestContext) {
+    return this.db.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      await this.assertLinks(tx, actor.propertyId, data.clientId, data.stayId);
+      const existing = (await tx.select().from(pets).where(and(eq(pets.id, data.id), eq(pets.propertyId, actor.propertyId))).limit(1).for('update', { of: pets }))[0];
+      if (existing) {
+        const shouldBeCharged = data.stayId !== null && data.charge > 0;
+        if (existing.stayId === data.stayId && existing.clientId === data.clientId && existing.charge === data.charge.toFixed(2) && existing.chargeApplied === shouldBeCharged) {
+          if (shouldBeCharged && existing.chargeId) {
+            await this.folios.assertAncillaryChargeReference(tx, actor, { stayId: data.stayId!, sourceType: 'pet_charge', sourceId: data.id, amount: data.charge.toFixed(2), chargeId: existing.chargeId });
+            return existing;
+          }
+          if (!shouldBeCharged && !existing.chargeId) return existing;
+        }
+        throw new ConflictException('Pet creation replay conflicts with the recorded pet');
+      }
+      const chargeApplied = data.stayId !== null && data.charge > 0;
+      const chargeId = chargeApplied ? (await this.folios.appendAncillaryChargeLocked(tx, actor, { stayId: data.stayId!, sourceType: 'pet_charge', sourceId: data.id, amount: data.charge.toFixed(2), reason: 'Pet lodging charge' }, context)).id : null;
+      const [pet] = await tx.insert(pets).values({
       id: data.id,
-      propertyId,
+      propertyId: actor.propertyId,
       stayId: data.stayId || null,
       clientId: data.clientId,
       name: data.name,
       type: data.type,
       size: data.size,
       lodgingPlace: data.lodgingPlace,
-      charge: data.charge.toString(),
+      charge: data.charge.toFixed(2),
       chargeId,
       chargeApplied,
       notes: data.notes || null,
       damageIncidentId: data.damageIncidentId || null,
       status: 'Activa',
     }).returning();
-
-    return pet;
+      return pet;
+    });
   }
 
   async update(id: string, propertyId: string, payload: UpdatePetDto) {
@@ -48,15 +64,10 @@ export class PetsService {
     });
     if (!current) throw new NotFoundException('Mascota no encontrada');
     await this.assertLinks(this.db, propertyId, payload.clientId ?? current.clientId, payload.stayId === undefined ? current.stayId : payload.stayId);
-    const chargeApplied = payload.charge !== undefined ? payload.charge > 0 : undefined;
-    const chargeId = chargeApplied ? `CAR-${id}` : undefined;
-
     const [updated] = await this.db.update(pets)
       .set({
         ...payload,
-        charge: payload.charge !== undefined ? payload.charge.toString() : undefined,
-        chargeId: chargeId !== undefined ? chargeId : undefined,
-        chargeApplied: chargeApplied !== undefined ? chargeApplied : undefined,
+        charge: payload.charge !== undefined ? payload.charge.toFixed(2) : undefined,
         updatedAt: new Date(),
       })
       .where(and(eq(pets.id, id), eq(pets.propertyId, propertyId)))

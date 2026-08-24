@@ -166,7 +166,7 @@ describe('StaysService lifecycle', () => {
     }
   });
 
-  it('scenario: Checkout creation creates one receivable for eligible debt without a balancing folio entry', async () => {
+  it('scenario: Checkout and receivable projection uses the authoritative outstanding folio balance without a balancing entry', async () => {
     const activeStay = { id: 'stay-id', reservationId: reservation.id, roomId: availableRoom.id, status: 'active' as const, checkInAt };
     const setup = lifecycleService([[], [policy], [activeStay], [{ id: availableRoom.id, status: 'occupied' }], [{ id: reservation.id, primaryGuestId: reservation.primaryGuestId, checkInAt, checkOutAt }], [folio]]);
     setup.foliosService.read.mockResolvedValue({ balance: '12.50', settlement: 'open' });

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import type { AuthenticatedAccount } from '../auth/auth.types.js';
+import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
+import { getRequestContext } from '../auth/request-context.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { parseArchiveParkingDto, parseCreateParkingDto, parseExitParkingDto, parseUpdateParkingDto } from './parking.dto.js';
@@ -29,8 +30,8 @@ export class ParkingController {
 
   @Post(':id/exit')
   @RequirePermissions('parking.exit')
-  exit(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount) {
-    return this.parkingService.exit(id, actor.propertyId, parseExitParkingDto(body));
+  exit(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount, @Req() request: AuthenticatedRequest) {
+    return this.parkingService.exit(id, actor, parseExitParkingDto(body), getRequestContext(request));
   }
 
   @Post(':id/archive')

@@ -713,6 +713,27 @@ describe('PostgreSQL stay invariants', () => {
 });
 
 describe('PostgreSQL financial folio invariants', () => {
+  it('posts one real UUID ancillary entry for a deterministic parking-exit replay', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const suffix = uniqueHex();
+      const fixture: StayFixture = { propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(), propertyCode: `inv-af-${suffix.slice(0, 25)}`, roomNumber: `af-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID() };
+      const roleId = randomUUID(); const accountId = randomUUID(); const folioId = randomUUID();
+      await insertStayDependencies(client, fixture);
+      await client.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3)', [roleId, `ancillary_${suffix}`, 'Ancillary Test Role']);
+      await client.query('INSERT INTO accounts (id, property_id, role_id, email, password_hash) VALUES ($1, $2, $3, $4, $5)', [accountId, fixture.propertyId, roleId, `ancillary-${suffix}@example.invalid`, 'integration-test-only']);
+      await client.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [folioId, fixture.propertyId, fixture.stayId]);
+      const database = drizzle(client, { schema });
+      const folios = new FolioService(database, { record: async () => undefined } as never);
+      const actor: AuthenticatedAccount = { accountId, propertyId: fixture.propertyId, roleKey: 'test', email: `ancillary-${suffix}@example.invalid`, permissions: [], sessionId: 'test', passwordChangeRequired: false };
+      const first = await folios.appendAncillaryChargeLocked(database, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50', reason: 'Parking exit' }, { requestId: 'ancillary-test' });
+      const replay = await folios.appendAncillaryChargeLocked(database, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50', reason: 'Parking exit' }, { requestId: 'ancillary-test' });
+      expect(first.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(replay).toEqual(first);
+      const entries = await client.query<{ id: string }>('SELECT id FROM folio_entries WHERE property_id = $1 AND source_type = $2 AND source_id = $3', [fixture.propertyId, 'parking_exit', 'VEH-TEST']);
+      expect(entries.rows).toEqual([{ id: first.id }]);
+    });
+  });
+
   it('keeps entries property-scoped, decimal-safe, and deduplicated by source, key, and reversal', async () => {
     await inRolledBackTransaction(async (client) => {
       const suffix = uniqueHex();

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
@@ -69,6 +70,25 @@ export class FolioService {
     if (prior) return prior;
     return this.insert(tx, actor, stayId, { type: 'reversal', amount: original.amount, sourceType: 'restaurant_cancellation', sourceId: orderId, idempotencyKey: original.id, reversalOfEntryId: original.id, reason }, context);
   }
+  /** Internal-only: callers hold their ancillary row and property transaction lock. */
+  async appendAncillaryChargeLocked(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; reason: string }, context: RequestContext): Promise<{ id: string }> {
+    if (cents(input.amount) <= 0n) throw new BadRequestException('Ancillary charges must be positive');
+    const idempotencyKey = ancillaryKey(input.sourceType, input.sourceId);
+    const source = (await tx.select().from(folioEntries).where(and(eq(folioEntries.propertyId, actor.propertyId), eq(folioEntries.sourceType, input.sourceType), eq(folioEntries.sourceId, input.sourceId))).limit(1))[0];
+    const keyed = (await tx.select().from(folioEntries).where(and(eq(folioEntries.propertyId, actor.propertyId), eq(folioEntries.idempotencyKey, idempotencyKey))).limit(1))[0];
+    if (source || keyed) {
+      if (!source || !keyed || source.id !== keyed.id || !this.isCompatibleAncillaryEntry(source, input, idempotencyKey)) throw new ConflictException('Ancillary charge replay conflicts with the recorded entry');
+      return { id: source.id };
+    }
+    const entry = await this.insert(tx, actor, input.stayId, { type: 'charge', amount: input.amount, sourceType: input.sourceType, sourceId: input.sourceId, idempotencyKey, reason: input.reason }, context);
+    return { id: entry.id };
+  }
+
+  async assertAncillaryChargeReference(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; chargeId: string }) {
+    const entry = (await tx.select().from(folioEntries).where(and(eq(folioEntries.id, input.chargeId), eq(folioEntries.propertyId, actor.propertyId))).limit(1))[0];
+    if (!entry || !this.isCompatibleAncillaryEntry(entry, input, ancillaryKey(input.sourceType, input.sourceId))) throw new ConflictException('Ancillary charge reference is not canonical');
+    return entry;
+  }
   /** Internal-only append for a receivable already locked and validated by ReceivablesService. Generic folio commands remain closed after checkout. */
   async appendLockedReceivableEntry(tx: any, actor: AuthenticatedAccount, input: { folioId: string; stayId: string; type: 'payment' | 'reversal'; amount: string; paymentMethod?: string; sourceType: 'receivable_collection' | 'receivable_reversal'; sourceId: string; idempotencyKey: string; reversalOfEntryId?: string; reason?: string }, context: RequestContext) {
     const [entry] = await tx.insert(folioEntries).values({ propertyId: actor.propertyId, folioId: input.folioId, stayId: input.stayId, type: input.type, amount: input.amount, paymentMethod: input.paymentMethod ?? null, sourceType: input.sourceType, sourceId: input.sourceId, idempotencyKey: input.idempotencyKey, reversalOfEntryId: input.reversalOfEntryId ?? null, reason: input.reason ?? null, actorAccountId: actor.accountId }).returning();
@@ -99,9 +119,17 @@ export class FolioService {
     await this.audit.record({ actorAccountId: actor.accountId, propertyId: actor.propertyId, ...(context.requestId ? { requestId: context.requestId } : {}), eventType: `folio.${input.type}`, subjectType: 'folio_entry', subjectId: entry.id, metadata: { stayId, amount: input.amount, sourceType: input.sourceType, reason: input.reason ?? null } }, tx);
     return entry;
   }
+  private isCompatibleAncillaryEntry(entry: any, input: { stayId: string; sourceType: string; sourceId: string; amount: string }, idempotencyKey: string) {
+    return entry.type === 'charge' && entry.stayId === input.stayId && entry.sourceType === input.sourceType && entry.sourceId === input.sourceId && entry.amount === input.amount && entry.idempotencyKey === idempotencyKey;
+  }
   private async findByIdempotencyKey(tx: any, propertyId: string, key: string) {
     return (await tx.select({ id: folioEntries.id }).from(folioEntries).where(and(eq(folioEntries.propertyId, propertyId), eq(folioEntries.idempotencyKey, key))).limit(1))[0];
   }
   private async assertOpenCashSession(tx: any, propertyId: string) { const session = (await tx.select().from(cashSessions).where(and(eq(cashSessions.propertyId, propertyId), eq(cashSessions.status, 'open'))).limit(1).for('update', { of: cashSessions }))[0]; if (!session) throw new ConflictException('An open cash session is required for Efectivo'); return session; }
   private async cashMovement(tx: any, actor: AuthenticatedAccount, entry: any, type: 'Ingreso' | 'Egreso') { const session = await this.assertOpenCashSession(tx, actor.propertyId); await tx.insert(cashMovements).values({ propertyId: actor.propertyId, sessionId: session.id, type, concept: `Folio ${entry.type}`, referenceId: entry.id, amount: entry.amount, method: 'Efectivo', responsible: actor.email }); }
+}
+
+function ancillaryKey(sourceType: string, sourceId: string): string {
+  const hash = createHash('sha256').update(`${sourceType}:${sourceId}`).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${((Number.parseInt(hash.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hash.slice(18, 20)}-${hash.slice(20, 32)}`;
 }

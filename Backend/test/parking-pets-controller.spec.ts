@@ -28,7 +28,7 @@ describe('parking and pets controller property authority', () => {
     const parking = { create: vi.fn() } as unknown as ParkingService;
     const pets = { create: vi.fn() } as unknown as PetsService;
     expect(() => new ParkingController(parking).create({ id: 'VEH-001', ...linked, plate: 'ABC-123', space: 'A1', fee: 10, vehicleType: 'Auto', brandModel: 'Sedan', entryResponsible: 'Ana', propertyId: 'other' }, actor)).toThrow('Invalid request body');
-    expect(() => new PetsController(pets).create({ id: 'PET-001', stayId: linked.stayId, clientId: linked.clientId, name: 'Milo', type: 'Perro', size: 'Mediano', lodgingPlace: 'Habitación', charge: 0, propertyId: 'other' }, actor)).toThrow('Invalid request body');
+    expect(() => new PetsController(pets).create({ id: 'PET-001', stayId: linked.stayId, clientId: linked.clientId, name: 'Milo', type: 'Perro', size: 'Mediano', lodgingPlace: 'Habitación', charge: 0, propertyId: 'other' }, actor, {} as any)).toThrow('Invalid request body');
     expect(parking.create).not.toHaveBeenCalled();
     expect(pets.create).not.toHaveBeenCalled();
   });
@@ -40,19 +40,25 @@ describe('parking and pets controller property authority', () => {
     expect(vi.mocked(parking.create).mock.calls[0]![1]).not.toHaveProperty('propertyId');
   });
 
+  it('passes the authenticated actor and request context to ancillary posting routes', async () => {
+    const pets = { create: vi.fn().mockResolvedValue({ id: 'PET-001' }) } as unknown as PetsService;
+    await new PetsController(pets).create({ id: 'PET-001', stayId: linked.stayId, clientId: linked.clientId, name: 'Milo', type: 'Perro', size: 'Mediano', lodgingPlace: 'Habitación', charge: 5 }, actor, { id: 'request-1', headers: { 'user-agent': 'vitest' }, ip: '127.0.0.1' } as any);
+    expect(pets.create).toHaveBeenCalledWith(actor, expect.objectContaining({ id: 'PET-001', charge: 5 }), { requestId: 'request-1', ipAddress: '127.0.0.1', userAgent: 'vitest' });
+  });
+
   it('derives mutation scope from the authenticated account for every route', async () => {
     const parking = { update: vi.fn(), exit: vi.fn(), archive: vi.fn() } as unknown as ParkingService;
     const pets = { update: vi.fn(), archive: vi.fn(), reactivate: vi.fn() } as unknown as PetsService;
     const parkingController = new ParkingController(parking);
     const petsController = new PetsController(pets);
     await parkingController.update('VEH-001', { plate: 'abc-123' }, actor);
-    await parkingController.exit('VEH-001', { exitResponsible: 'Ana' }, actor);
+    await parkingController.exit('VEH-001', { exitResponsible: 'Ana' }, actor, { headers: {}, ip: '127.0.0.1' } as any);
     await parkingController.archive('VEH-001', { reason: 'History' }, actor);
     await petsController.update('PET-001', { name: 'Milo' }, actor);
     await petsController.archive('PET-001', { reason: 'History' }, actor);
     await petsController.reactivate('PET-001', { reason: 'Return' }, actor);
     expect(parking.update).toHaveBeenCalledWith('VEH-001', propertyId, { plate: 'ABC-123' });
-    expect(parking.exit).toHaveBeenCalledWith('VEH-001', propertyId, { exitResponsible: 'Ana' });
+    expect(parking.exit).toHaveBeenCalledWith('VEH-001', actor, { exitResponsible: 'Ana' }, expect.objectContaining({ ipAddress: '127.0.0.1' }));
     expect(parking.archive).toHaveBeenCalledWith('VEH-001', propertyId, 'History');
     expect(pets.update).toHaveBeenCalledWith('PET-001', propertyId, { name: 'Milo' });
     expect(pets.archive).toHaveBeenCalledWith('PET-001', propertyId, 'History');

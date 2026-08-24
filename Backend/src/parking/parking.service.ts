@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { eq, desc, and, or } from 'drizzle-orm';
 import { Database, DATABASE } from '../database/database.module.js';
 import { vehicleRegistrations } from '../database/schema/parking.schema.js';
@@ -6,10 +6,13 @@ import { guests } from '../database/schema/guests.schema.js';
 import { rooms } from '../database/schema/hotel.schema.js';
 import { stayGuests, stays } from '../database/schema/stays.schema.js';
 import type { CreateParkingDto, ExitParkingDto, UpdateParkingDto } from './parking.dto.js';
+import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
+import { FolioService } from '../folios/folio.service.js';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 @Injectable()
 export class ParkingService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(@Inject(DATABASE) private readonly db: Database, private readonly folios: FolioService) {}
 
   async findAll(propertyId: string) {
     return this.db.query.vehicleRegistrations.findMany({
@@ -75,17 +78,21 @@ export class ParkingService {
     return updated;
   }
 
-  async exit(id: string, propertyId: string, data: ExitParkingDto) {
+  async exit(id: string, actor: AuthenticatedAccount, data: ExitParkingDto, context: RequestContext) {
     return await this.db.transaction(async (tx) => {
-      const vehicle = await tx.query.vehicleRegistrations.findFirst({
-        where: and(eq(vehicleRegistrations.id, id), eq(vehicleRegistrations.propertyId, propertyId))
-      });
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const vehicle = (await tx.select().from(vehicleRegistrations).where(and(eq(vehicleRegistrations.id, id), eq(vehicleRegistrations.propertyId, actor.propertyId))).limit(1).for('update', { of: vehicleRegistrations }))[0];
       if (!vehicle) throw new NotFoundException('Vehículo no encontrado');
-
-      let chargeId = null;
-      if (Number(vehicle.fee) > 0) {
-        chargeId = `CAR-${vehicle.id}`;
+      if (vehicle.status === 'Fuera') {
+        if (Number(vehicle.fee) <= 0 && !vehicle.chargeId) return vehicle;
+        if (!vehicle.chargeId) throw new ConflictException('Parking exit has no canonical ancillary charge');
+        await this.folios.assertAncillaryChargeReference(tx, actor, { stayId: vehicle.stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, chargeId: vehicle.chargeId });
+        return vehicle;
       }
+      if (vehicle.status !== 'Dentro') throw new ConflictException('Vehicle cannot exit from its current status');
+      const chargeId = Number(vehicle.fee) > 0
+        ? (await this.folios.appendAncillaryChargeLocked(tx, actor, { stayId: vehicle.stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, reason: 'Parking exit' }, context)).id
+        : null;
 
       const [updated] = await tx.update(vehicleRegistrations).set({
         status: 'Fuera',
@@ -95,7 +102,7 @@ export class ParkingService {
         chargeId,
         updatedAt: new Date(),
       })
-      .where(and(eq(vehicleRegistrations.id, id), eq(vehicleRegistrations.propertyId, propertyId)))
+      .where(and(eq(vehicleRegistrations.id, id), eq(vehicleRegistrations.propertyId, actor.propertyId)))
       .returning();
 
       if (!updated) throw new NotFoundException('Vehículo no encontrado');
