@@ -1,12 +1,14 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Environment } from '../config/environment.js';
 import { AuthService } from './auth.service.js';
 import type { AuthenticatedRequest } from './auth.types.js';
 import { Public } from './decorators/public.decorator.js';
 import { parseLoginDto } from './dto/login.dto.js';
 import { parseChangePasswordDto } from './dto/change-password.dto.js';
+import { parseGoogleLoginDto } from './dto/google-login.dto.js';
 import { AllowPasswordChangeRequired } from './decorators/allow-password-change-required.decorator.js';
 import { getRequestContext } from './request-context.js';
 import { SessionService } from './session.service.js';
@@ -22,6 +24,28 @@ export class AuthController {
     const result = await this.auth.login(parseLoginDto(body), getRequestContext(request));
     reply.setCookie(this.cookieName(), result.token, this.cookieOptions(result.expiresAt));
     return { account: result.account, expiresAt: result.expiresAt };
+  }
+
+  @Public()
+  @Get('google/challenge')
+  googleChallenge(@Res({ passthrough: true }) reply: FastifyReply) {
+    const nonce = randomBytes(32).toString('base64url');
+    reply.setCookie(this.googleNonceCookieName(), createHash('sha256').update(nonce).digest('hex'), this.googleNonceCookieOptions());
+    return { nonce };
+  }
+
+  @Public()
+  @Post('google')
+  @HttpCode(200)
+  async google(@Body() body: unknown, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    try {
+      const result = await this.auth.loginGoogle(parseGoogleLoginDto(body), request.cookies?.[this.googleNonceCookieName()], getRequestContext(request));
+      if (result.status === 'pending') return result;
+      reply.setCookie(this.cookieName(), result.token, this.cookieOptions(result.expiresAt));
+      return { status: 'authenticated', account: result.account, expiresAt: result.expiresAt };
+    } finally {
+      reply.clearCookie(this.googleNonceCookieName(), this.googleNonceCookieOptions());
+    }
   }
 
   @Get('session')
@@ -49,7 +73,11 @@ export class AuthController {
   }
 
   private cookieName(): string { return this.config.get('AUTH_COOKIE_NAME', { infer: true }); }
+  private googleNonceCookieName(): string { return 'pp_google_nonce'; }
   private cookieOptions(expires?: Date) {
     return { path: '/api', httpOnly: true, sameSite: 'strict' as const, secure: this.config.get('NODE_ENV', { infer: true }) === 'production', priority: 'high' as const, ...(expires ? { expires } : {}) };
+  }
+  private googleNonceCookieOptions() {
+    return { path: '/api/auth/google', httpOnly: true, sameSite: 'strict' as const, secure: this.config.get('NODE_ENV', { infer: true }) === 'production', priority: 'high' as const, maxAge: 300 };
   }
 }

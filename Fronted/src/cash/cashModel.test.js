@@ -24,6 +24,6 @@ describe('cash request DTO mapping', () => {
       amount: 50.25,
       method: 'Efectivo',
     });
-    expect(CASH_PAYMENT_METHODS).toEqual(['Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin']);
+    expect(CASH_PAYMENT_METHODS).toEqual(['Efectivo']);
   });
 });

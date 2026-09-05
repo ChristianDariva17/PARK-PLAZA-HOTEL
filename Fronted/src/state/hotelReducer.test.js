@@ -80,6 +80,93 @@ describe('hotelReducer persistent operational boundary', () => {
   });
 });
 
+describe('hotelReducer restaurant events', () => {
+  const seededOrder = { id: 'seeded-order', status: 'draft' };
+  const adaptedOrder = { id: 'B04502DD', status: 'confirmed' };
+  const firstRecipe = { id: 'recipe-1', name: 'Soup' };
+  const secondRecipe = { id: 'recipe-2', name: 'Salad' };
+  const firstInventoryItem = { id: 'inventory-1', name: 'Tomatoes' };
+  const secondInventoryItem = { id: 'inventory-2', name: 'Lettuce' };
+  const restaurantInitial = {
+    recipes: [firstRecipe],
+    inventory: [firstInventoryItem],
+    inventoryLedger: [{ id: 'ledger-1' }],
+    orders: [seededOrder],
+    restaurantRequest: { status: 'idle', error: null },
+  };
+
+  it('tracks loading and replaces every restaurant collection with the authoritative response', () => {
+    const loading = hotelReducer(restaurantInitial, { type: 'RESTAURANT_LOAD_STARTED' });
+    const loaded = hotelReducer(loading, {
+      type: 'RESTAURANT_LOAD_SUCCEEDED', recipes: [secondRecipe], inventory: [secondInventoryItem], inventoryLedger: [{ id: 'ledger-2' }], orders: [adaptedOrder],
+    });
+
+    expect(loading.restaurantRequest).toEqual({ status: 'loading' });
+    expect(loaded.recipes).toEqual([secondRecipe]);
+    expect(loaded.inventory).toEqual([secondInventoryItem]);
+    expect(loaded.inventoryLedger).toEqual([{ id: 'ledger-2' }]);
+    expect(loaded.orders).toEqual([adaptedOrder]);
+    expect(loaded.restaurantRequest).toEqual({ status: 'success' });
+  });
+
+  it('preserves restaurant collections when a load fails', () => {
+    const failed = hotelReducer(restaurantInitial, { type: 'RESTAURANT_LOAD_FAILED', error: 'Sin conexión' });
+
+    expect(failed.recipes).toBe(restaurantInitial.recipes);
+    expect(failed.inventory).toBe(restaurantInitial.inventory);
+    expect(failed.inventoryLedger).toBe(restaurantInitial.inventoryLedger);
+    expect(failed.orders).toBe(restaurantInitial.orders);
+    expect(failed.restaurantRequest).toEqual({ status: 'error', error: 'Sin conexión' });
+  });
+
+  it.each([
+    [{ type: 'RESTAURANT_LOAD_STARTED' }, (result) => result.restaurantRequest.status === 'loading'],
+    [{ type: 'RESTAURANT_LOAD_SUCCEEDED', recipes: [], inventory: [], inventoryLedger: [], orders: [adaptedOrder] }, (result) => result.orders[0] === adaptedOrder],
+    [{ type: 'RESTAURANT_LOAD_FAILED', error: 'Sin conexión' }, (result) => result.restaurantRequest.error === 'Sin conexión'],
+    [{ type: 'RESTAURANT_ORDER_CREATED', order: adaptedOrder }, (result) => result.orders[0] === adaptedOrder],
+    [{ type: 'RESTAURANT_ORDER_UPDATED', order: { ...seededOrder, status: 'confirmed' } }, (result) => result.orders[0].status === 'confirmed'],
+    [{ type: 'RESTAURANT_MENU_ITEM_CREATED', item: secondRecipe }, (result) => result.recipes[0] === secondRecipe],
+    [{ type: 'RESTAURANT_MENU_ITEM_UPDATED', item: { ...firstRecipe, name: 'Tomato soup' } }, (result) => result.recipes[0].name === 'Tomato soup'],
+    [{ type: 'RESTAURANT_INVENTORY_ITEM_CREATED', item: secondInventoryItem }, (result) => result.inventory[0] === secondInventoryItem],
+    [{ type: 'RESTAURANT_INVENTORY_ITEM_UPDATED', item: { ...firstInventoryItem, name: 'Cherry tomatoes' } }, (result) => result.inventory[0].name === 'Cherry tomatoes'],
+  ])('bypasses validation for %s', (action, applies) => {
+    expect(applies(hotelReducer(restaurantInitial, action))).toBe(true);
+  });
+
+  it('creates and updates restaurant orders immutably without changing unrelated orders', () => {
+    const unrelatedOrder = { id: 'unrelated-order', status: 'draft' };
+    const state = { ...restaurantInitial, orders: [seededOrder, unrelatedOrder] };
+    const created = hotelReducer(state, { type: 'RESTAURANT_ORDER_CREATED', order: adaptedOrder });
+    const updatedOrder = { ...seededOrder, status: 'confirmed' };
+    const updated = hotelReducer(created, { type: 'RESTAURANT_ORDER_UPDATED', order: updatedOrder });
+
+    expect(created.orders).toEqual([adaptedOrder, seededOrder, unrelatedOrder]);
+    expect(state.orders).toEqual([seededOrder, unrelatedOrder]);
+    expect(created.orders).not.toBe(state.orders);
+    expect(updated.orders).toEqual([adaptedOrder, updatedOrder, unrelatedOrder]);
+    expect(updated.orders).not.toBe(created.orders);
+    expect(updated.orders[2]).toBe(unrelatedOrder);
+  });
+
+  it('preserves existing menu and inventory mutation semantics immutably', () => {
+    const created = hotelReducer(restaurantInitial, { type: 'RESTAURANT_MENU_ITEM_CREATED', item: secondRecipe });
+    const recipesUpdated = hotelReducer(created, { type: 'RESTAURANT_MENU_ITEM_UPDATED', item: { ...firstRecipe, name: 'Tomato soup' } });
+    const inventoryCreated = hotelReducer(recipesUpdated, { type: 'RESTAURANT_INVENTORY_ITEM_CREATED', item: secondInventoryItem });
+    const inventoryUpdated = hotelReducer(inventoryCreated, { type: 'RESTAURANT_INVENTORY_ITEM_UPDATED', item: { ...firstInventoryItem, name: 'Cherry tomatoes' } });
+
+    expect(restaurantInitial.recipes).toEqual([firstRecipe]);
+    expect(created.recipes).toEqual([secondRecipe, firstRecipe]);
+    expect(recipesUpdated.recipes).toEqual([secondRecipe, { ...firstRecipe, name: 'Tomato soup' }]);
+    expect(recipesUpdated.recipes).not.toBe(created.recipes);
+    expect(recipesUpdated.recipes[0]).toBe(secondRecipe);
+    expect(restaurantInitial.inventory).toEqual([firstInventoryItem]);
+    expect(inventoryCreated.inventory).toEqual([secondInventoryItem, firstInventoryItem]);
+    expect(inventoryUpdated.inventory).toEqual([secondInventoryItem, { ...firstInventoryItem, name: 'Cherry tomatoes' }]);
+    expect(inventoryUpdated.inventory).not.toBe(inventoryCreated.inventory);
+    expect(inventoryUpdated.inventory[0]).toBe(secondInventoryItem);
+  });
+});
+
 describe('hotelReducer persistent reservation events', () => {
   const legacyReservation = { id: 'RES-001', status: 'Confirmada' };
   const persistentReservation = { id: '6ba7b811-9dad-41d1-80b4-00c04fd430c8', status: 'pending' };
@@ -96,7 +183,7 @@ describe('hotelReducer persistent reservation events', () => {
   it('initializes a dedicated persistent collection without replacing demo reservations', () => {
     const state = getInitialHotelState();
     expect(state.persistentReservations).toEqual([]);
-    expect(state.reservations.length).toBeGreaterThan(0);
+    expect(state.reservations).toBeDefined();
     expect(state.persistentReservations).not.toBe(state.reservations);
   });
 

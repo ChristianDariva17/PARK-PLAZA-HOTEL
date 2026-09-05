@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
@@ -11,6 +11,7 @@ export interface MaintenanceTicketResponse {
   id: string;
   propertyId: string;
   roomId: string | null;
+  room: { id: string; number: string; status: string } | null;
   type: 'maintenance';
   referenceId: string | null;
   description: string;
@@ -24,12 +25,20 @@ export interface MaintenanceTicketResponse {
   updatedAt: string;
 }
 
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending:     ['assigned', 'in_progress'],
-  assigned:    ['in_progress'],
-  in_progress: ['resolved'],
-  resolved:    ['closed', 'in_progress'],
-  closed:      ['in_progress'],
+const ACTION_TRANSITIONS: Record<ProgressMaintenanceDto['action'], string[]> = {
+  assign: ['pending'],
+  start: ['assigned'],
+  resolve: ['in_progress'],
+  close: ['resolved'],
+  reopen: ['resolved', 'closed'],
+};
+
+const ACTION_STATUS: Record<ProgressMaintenanceDto['action'], 'assigned' | 'in_progress' | 'resolved' | 'closed'> = {
+  assign: 'assigned',
+  start: 'in_progress',
+  resolve: 'resolved',
+  close: 'closed',
+  reopen: 'in_progress',
 };
 
 @Injectable()
@@ -41,11 +50,12 @@ export class MaintenanceService {
 
   async list(propertyId: string): Promise<MaintenanceTicketResponse[]> {
     const rows = await this.database
-      .select()
+      .select({ ticket: incidents, roomId: rooms.id, roomNumber: rooms.number, roomStatus: rooms.status })
       .from(incidents)
+      .leftJoin(rooms, and(eq(incidents.roomId, rooms.id), eq(incidents.propertyId, rooms.propertyId)))
       .where(and(eq(incidents.propertyId, propertyId), eq(incidents.type, 'maintenance')))
       .orderBy(incidents.createdAt);
-    return rows.map((r) => this.format(r));
+    return rows.map((row) => this.format(row.ticket, row.roomId ? { id: row.roomId, number: row.roomNumber!, status: row.roomStatus! } : null));
   }
 
   async create(
@@ -78,10 +88,14 @@ export class MaintenanceService {
       const ticket = inserted[0]!;
 
       if (dto.blocksRoom && dto.roomId) {
-        await tx
+        const blockedRoom = await tx
           .update(rooms)
           .set({ status: 'maintenance' })
-          .where(and(eq(rooms.id, dto.roomId), eq(rooms.propertyId, actor.propertyId)));
+          .where(and(eq(rooms.id, dto.roomId), eq(rooms.propertyId, actor.propertyId), eq(rooms.status, 'available')))
+          .returning({ id: rooms.id });
+        if (blockedRoom.length === 0) {
+          throw new ConflictException('Only an available room can be blocked for maintenance');
+        }
       }
 
       await this.audit.record(
@@ -145,15 +159,16 @@ export class MaintenanceService {
 
       if (dto.blocksRoom !== undefined && ticket.roomId) {
         if (dto.blocksRoom && !ticket.blocksRoom) {
-          await tx
+          const blockedRoom = await tx
             .update(rooms)
             .set({ status: 'maintenance' })
-            .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId)));
+            .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId), eq(rooms.status, 'available')))
+            .returning({ id: rooms.id });
+          if (blockedRoom.length === 0) {
+            throw new ConflictException('Only an available room can be blocked for maintenance');
+          }
         } else if (!dto.blocksRoom && ticket.blocksRoom) {
-          await tx
-            .update(rooms)
-            .set({ status: 'available' })
-            .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId)));
+          throw new ConflictException('Close the ticket and explicitly release the room instead');
         }
       }
 
@@ -203,30 +218,50 @@ export class MaintenanceService {
         );
       }
 
-      const allowed = STATUS_TRANSITIONS[ticket.status] ?? [];
-      if (allowed.length === 0) {
-        throw new ConflictException(`Ticket in status '${ticket.status}' cannot be progressed`);
+      if (!ACTION_TRANSITIONS[dto.action].includes(ticket.status)) {
+        throw new ConflictException(`Action '${dto.action}' is not allowed for a ticket in status '${ticket.status}'`);
       }
 
-      const nextStatus = allowed[0] as typeof ticket.status;
+      const nextStatus = ACTION_STATUS[dto.action];
       const evidence = dto.evidence ? [...ticket.evidence, dto.evidence] : ticket.evidence;
       const now = new Date();
+      const blocksRoom = dto.action === 'close' && dto.releaseRoom ? false : ticket.blocksRoom;
 
       await tx
         .update(incidents)
-        .set({ status: nextStatus, evidence, updatedAt: now })
+        .set({
+          status: nextStatus,
+          responsible: dto.action === 'assign' ? dto.responsible! : ticket.responsible,
+          solution: dto.action === 'resolve' ? dto.solution! : ticket.solution,
+          evidence,
+          blocksRoom,
+          updatedAt: now,
+        })
         .where(eq(incidents.id, ticket.id));
 
-      if ((nextStatus === 'resolved' || nextStatus === 'closed') && ticket.blocksRoom && ticket.roomId) {
-        await tx
-          .update(rooms)
-          .set({ status: 'available' })
-          .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId)));
+      if (dto.action === 'close' && dto.releaseRoom && ticket.blocksRoom && ticket.roomId) {
+        const blockingTickets = await tx
+          .select({ id: incidents.id })
+          .from(incidents)
+          .where(and(
+            eq(incidents.propertyId, actor.propertyId),
+            eq(incidents.roomId, ticket.roomId),
+            eq(incidents.type, 'maintenance'),
+            eq(incidents.blocksRoom, true),
+            ne(incidents.id, ticket.id),
+            inArray(incidents.status, ['pending', 'assigned', 'in_progress', 'resolved']),
+          ));
+        if (blockingTickets.length > 0) {
+          throw new ConflictException('Room cannot be released while another maintenance ticket blocks it');
+        }
 
-        await tx
-          .update(incidents)
-          .set({ blocksRoom: false })
-          .where(eq(incidents.id, ticket.id));
+        const room = await tx.select({ status: rooms.status }).from(rooms)
+          .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId))).limit(1).for('update');
+        if (!room[0] || room[0].status !== 'maintenance') {
+          throw new ConflictException('Room is no longer in maintenance and cannot be released from this ticket');
+        }
+        await tx.update(rooms).set({ status: 'available' })
+          .where(and(eq(rooms.id, ticket.roomId), eq(rooms.propertyId, actor.propertyId), eq(rooms.status, 'maintenance')));
       }
 
       await this.audit.record(
@@ -235,7 +270,7 @@ export class MaintenanceService {
           eventType: 'maintenance.progressed',
           subjectType: 'incident',
           subjectId: ticket.id,
-          metadata: { from: ticket.status, to: nextStatus, roomId: ticket.roomId ?? null },
+          metadata: { action: dto.action, from: ticket.status, to: nextStatus, releaseRoom: dto.releaseRoom, roomId: ticket.roomId ?? null },
         },
         tx,
       );
@@ -243,19 +278,21 @@ export class MaintenanceService {
       return this.format({
         ...ticket,
         status: nextStatus,
-        blocksRoom:
-          nextStatus === 'resolved' || nextStatus === 'closed' ? false : ticket.blocksRoom,
+        responsible: dto.action === 'assign' ? dto.responsible! : ticket.responsible,
+        solution: dto.action === 'resolve' ? dto.solution! : ticket.solution,
+        blocksRoom,
         evidence,
         updatedAt: now,
       });
     });
   }
 
-  private format(row: any): MaintenanceTicketResponse {
+  private format(row: any, room: MaintenanceTicketResponse['room'] = null): MaintenanceTicketResponse {
     return {
       id: row.id,
       propertyId: row.propertyId,
       roomId: row.roomId ?? null,
+      room,
       type: 'maintenance',
       referenceId: row.referenceId ?? null,
       description: row.description,

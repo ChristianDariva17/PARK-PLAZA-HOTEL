@@ -17,9 +17,9 @@ describe('cash client endpoint contract', () => {
     await countCashSession('session-id', { countedAmount: 10 }, signal);
     await closeCashSession('session-id', { countedAmount: 10, note: 'Cierre' }, signal);
     await createCashMovement({ type: 'Ingreso', concept: 'Pago', amount: 10, method: 'Efectivo' }, signal);
-    expect(authRequest).toHaveBeenNthCalledWith(1, '/api/cash/session/open', expect.objectContaining({ method: 'POST', body: JSON.stringify({ openingAmount: 10, responsible: 'Ana', shift: 'Mañana' }), signal }));
-    expect(authRequest).toHaveBeenNthCalledWith(2, '/api/cash/session/count/session-id', expect.objectContaining({ body: JSON.stringify({ countedAmount: 10 }) }));
-    expect(authRequest).toHaveBeenNthCalledWith(3, '/api/cash/session/close/session-id', expect.objectContaining({ body: JSON.stringify({ countedAmount: 10, note: 'Cierre' }) }));
-    expect(authRequest).toHaveBeenNthCalledWith(4, '/api/cash/movements', expect.objectContaining({ body: JSON.stringify({ type: 'Ingreso', concept: 'Pago', amount: 10, method: 'Efectivo' }) }));
+    expect(authRequest).toHaveBeenNthCalledWith(1, '/api/cash/session/open', expect.objectContaining({ method: 'POST', body: JSON.stringify({ openingAmount: 10, responsible: 'Ana', shift: 'Mañana' }), signal, headers: { 'idempotency-key': expect.any(String) } }));
+    expect(authRequest).toHaveBeenNthCalledWith(2, '/api/cash/session/count/session-id', expect.objectContaining({ body: JSON.stringify({ countedAmount: 10 }), headers: { 'idempotency-key': expect.any(String) } }));
+    expect(authRequest).toHaveBeenNthCalledWith(3, '/api/cash/session/close/session-id', expect.objectContaining({ body: JSON.stringify({ countedAmount: 10, note: 'Cierre' }), headers: { 'idempotency-key': expect.any(String) } }));
+    expect(authRequest).toHaveBeenNthCalledWith(4, '/api/cash/movements', expect.objectContaining({ body: JSON.stringify({ type: 'Ingreso', concept: 'Pago', amount: 10, method: 'Efectivo' }), headers: { 'idempotency-key': expect.any(String) } }));
   });
 });

@@ -17,6 +17,7 @@ export const environmentSchema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   CORS_ALLOWED_ORIGINS: csv,
   AUTH_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_-]+$/).default('pp_session'),
+  CUSTOMER_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_-]+$/).default('customer_session'),
   AUTH_SESSION_MAX_HOURS: z.coerce.number().int().min(1).max(8).default(8),
   AUTH_SESSION_IDLE_MINUTES: z.coerce.number().int().min(1).max(30).default(30),
   AUTH_LOGIN_MAX_FAILURES: z.coerce.number().int().min(1).max(100).default(5),
@@ -24,6 +25,12 @@ export const environmentSchema = z.object({
   AUTH_LOGIN_MAX_DELAY_MS: z.coerce.number().int().min(0).max(60000).default(4000),
   AUTH_LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   AUTH_LOGIN_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_REGISTRATION_PROPERTY_ID: z.string().uuid().optional(),
+  CUSTOMER_PORTAL_PROPERTY_ID: z.string().uuid(),
+  FIREBASE_PROJECT_ID: z.string().min(1),
+  CUSTOMER_SESSION_MAX_DAYS: z.coerce.number().int().min(1).default(30),
+  CUSTOMER_SESSION_IDLE_HOURS: z.coerce.number().int().min(1).default(24),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

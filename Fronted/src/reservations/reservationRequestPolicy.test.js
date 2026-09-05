@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PERMISSIONS } from '../auth/permissions.js';
-import { hasReservationCreateAccess, isCurrentReservationOperation, reservationReconciliationSucceeded } from './reservationRequestPolicy.js';
+import { hasReservationCreateAccess, hasReservationLifecycleAccess, isCurrentReservationOperation, reservationReconciliationSucceeded } from './reservationRequestPolicy.js';
 
 describe('reservation request policy', () => {
   it('fails closed unless every create-flow permission is present', () => {
@@ -23,5 +23,11 @@ describe('reservation request policy', () => {
     expect(reservationReconciliationSucceeded([{ status: 'fulfilled', value: [] }, { status: 'fulfilled', value: { rooms: [] } }])).toBe(true);
     expect(reservationReconciliationSucceeded([{ status: 'fulfilled', value: null }, { status: 'fulfilled', value: { rooms: [] } }])).toBe(false);
     expect(reservationReconciliationSucceeded([{ status: 'rejected', reason: new Error('failed') }, { status: 'fulfilled', value: { rooms: [] } }])).toBe(false);
+  });
+  it('requires the exact lifecycle permission for each operation', () => {
+    const permissions = [PERMISSIONS.reservationsRead, PERMISSIONS.reservationsUpdate, PERMISSIONS.reservationsCancel];
+    expect(hasReservationLifecycleAccess('authenticated', permissions, 'confirm')).toBe(true);
+    expect(hasReservationLifecycleAccess('authenticated', permissions, 'cancel')).toBe(true);
+    expect(hasReservationLifecycleAccess('authenticated', permissions.filter((item) => item !== PERMISSIONS.reservationsCancel), 'cancel')).toBe(false);
   });
 });

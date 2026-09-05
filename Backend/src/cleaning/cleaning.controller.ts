@@ -5,6 +5,7 @@ import { RequirePermissions } from '../auth/decorators/require-permissions.decor
 import { getRequestContext } from '../auth/request-context.js';
 import {
   parseCleaningTaskId,
+  parseCreateCleaningTaskDto,
   parseCreateIncidentDto,
   parseIdempotencyKey,
   parseProgressCleaningTaskDto,
@@ -20,6 +21,22 @@ export class CleaningController {
   @RequirePermissions('cleaning.read')
   list(@CurrentAccount() actor: AuthenticatedAccount) {
     return this.cleaning.list(actor.propertyId);
+  }
+
+  @Post()
+  @RequirePermissions('cleaning.assign')
+  create(
+    @Body() body: unknown,
+    @Headers('idempotency-key') key: unknown,
+    @CurrentAccount() actor: AuthenticatedAccount,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.cleaning.createTask(
+      actor,
+      parseCreateCleaningTaskDto(body),
+      parseIdempotencyKey(key),
+      getRequestContext(request),
+    );
   }
 
   @Patch(':id')

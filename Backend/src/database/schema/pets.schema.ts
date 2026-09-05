@@ -20,17 +20,25 @@ export const pets = pgTable('pets', {
   id: varchar('id', { length: 20 }).primaryKey(), // e.g. PET-...
   propertyId: uuid('property_id').notNull(),
   stayId: uuid('stay_id'), // can be null if not linked to active stay
-  clientId: uuid('client_id').notNull(),
+  clientId: uuid('client_id'), // nullable for external visitors / day visitors
 
   name: varchar('name', { length: 100 }).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // Perro, Gato, etc
+  breed: varchar('breed', { length: 100 }),
   size: varchar('size', { length: 50 }).notNull(), // Pequeño, Mediano, Grande
-  lodgingPlace: varchar('lodging_place', { length: 100 }).notNull(), // Habitación, Cochera
+  lodgingPlace: varchar('lodging_place', { length: 100 }).notNull(), // Habitación, Cochera, Restaurante
   charge: numeric('charge', { precision: 14, scale: 2 }).notNull().default('0.00'),
   chargeId: varchar('charge_id', { length: 50 }),
   chargeApplied: boolean('charge_applied').notNull().default(false),
   notes: text('notes'),
   damageIncidentId: varchar('damage_incident_id', { length: 50 }),
+  vaccinationVerified: boolean('vaccination_verified').default(false).notNull(),
+  temperament: varchar('temperament', { length: 50 }),
+  emergencyContact: varchar('emergency_contact', { length: 100 }),
+  welcomeKitDelivered: boolean('welcome_kit_delivered').default(false).notNull(),
+  originType: varchar('origin_type', { length: 50 }).default('stay').notNull(),
+  ownerName: varchar('owner_name', { length: 100 }),
+  ownerPhone: varchar('owner_phone', { length: 50 }),
   status: petStatus('status').notNull().default('Activa'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

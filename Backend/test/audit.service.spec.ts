@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuditService, type AuditExecutor } from '../src/audit/audit.service.js';
-import { auditEvents } from '../src/database/schema/index.js';
+import { auditEvents, notifications } from '../src/database/schema/index.js';
 
 type AuditEventRow = typeof auditEvents.$inferInsert;
 
@@ -38,6 +38,31 @@ describe('AuditService', () => {
     expect(database.insert).not.toHaveBeenCalled();
     expect(transaction.insert).toHaveBeenCalledWith(auditEvents);
     expect(transaction.values).toHaveBeenCalledWith({ eventType: 'account.created', metadata: {} });
+  });
+
+  it('keeps notification writes outside the audit transaction', async () => {
+    const database = createExecutor();
+    const transaction = createExecutor();
+    const service = new AuditService(database.executor);
+
+    await service.record({ propertyId: 'property-id', actorAccountId: 'account-id', eventType: 'auth.login' }, transaction.executor);
+
+    expect(transaction.insert).toHaveBeenCalledWith(auditEvents);
+    expect(database.insert).toHaveBeenCalledWith(notifications);
+  });
+
+  it('does not fail the audit record when notification delivery fails', async () => {
+    const auditInsert = vi.fn((_table: typeof auditEvents) => ({ values: vi.fn(async () => undefined) }));
+    const database: AuditExecutor = {
+      insert: vi.fn((table: typeof auditEvents | typeof notifications) => {
+        if (table === notifications) return { values: vi.fn(async () => { throw new Error('notification unavailable'); }) };
+        return auditInsert(table as typeof auditEvents);
+      }),
+    };
+    const service = new AuditService(database);
+
+    await expect(service.record({ propertyId: 'property-id', actorAccountId: 'account-id', eventType: 'auth.login' })).resolves.toBeUndefined();
+    expect(auditInsert).toHaveBeenCalledWith(auditEvents);
   });
 
   it('inserts and sanitizes every event in recordMany', async () => {

@@ -36,6 +36,16 @@ describe('SessionGuard', () => {
     expect(sessions.resolve).not.toHaveBeenCalled();
   });
 
+  it('bypasses public customer routes before resolving a colliding staff cookie', async () => {
+    const reflector = { getAllAndOverride: vi.fn().mockReturnValue(true) } as unknown as Reflector;
+    const sessions = { resolve: vi.fn().mockRejectedValue(new Error('staff session lookup must not run')) } as unknown as SessionService;
+    const config = { get: vi.fn().mockReturnValue('pp_session') } as unknown as ConfigService<Environment, true>;
+
+    await expect(new SessionGuard(reflector, sessions, config).canActivate(executionContext({ cookies: { pp_session: 'staff-session' } }))).resolves.toBe(true);
+
+    expect(sessions.resolve).not.toHaveBeenCalled();
+  });
+
   it('rejects a missing session cookie', async () => {
     const reflector = { getAllAndOverride: vi.fn().mockReturnValue(false) } as unknown as Reflector;
     const sessions = { resolve: vi.fn() } as unknown as SessionService;

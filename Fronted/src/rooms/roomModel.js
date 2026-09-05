@@ -113,6 +113,13 @@ export function adaptRoomMutationResponse(response, expectedRoomId) {
   return room;
 }
 
+export function adaptRoomCategoryMutationResponse(response, expectedCategoryId) {
+  if (!UUID_PATTERN.test(String(expectedCategoryId || ''))) failContract();
+  const category = adaptRoomCategoryResponse(response);
+  if (category.id !== expectedCategoryId) failContract();
+  return category;
+}
+
 export function adaptRoomInventoryResponse(response) {
   if (!hasExactKeys(response, INVENTORY_KEYS) || !Array.isArray(response.rooms) || !Array.isArray(response.categories)) failContract();
   const categories = response.categories.map(adaptRoomCategoryResponse);
@@ -137,6 +144,19 @@ export function buildRoomPatch(current, input) {
   if (number !== current.number) patch.number = number;
   if (floor !== current.floor) patch.floor = floor;
   if (input.categoryId !== current.categoryId) patch.categoryId = input.categoryId;
+  return Object.keys(patch).length ? patch : null;
+}
+
+export function buildCategoryPatch(current, input) {
+  const patch = {};
+  const name = input.name?.trim();
+  const code = input.code?.trim();
+  const capacity = input.capacity !== undefined ? Number(input.capacity) : undefined;
+  const baseNightlyRate = input.baseNightlyRate !== undefined ? Number(input.baseNightlyRate).toFixed(2) : undefined;
+  if (name && name !== current.name) patch.name = name;
+  if (code && code !== current.code) patch.code = code;
+  if (capacity && capacity !== current.capacity) patch.capacity = capacity;
+  if (baseNightlyRate && baseNightlyRate !== current.baseNightlyRate) patch.baseNightlyRate = baseNightlyRate;
   return Object.keys(patch).length ? patch : null;
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { changePasswordRequest, getInitialSession, getSession, loginRequest, logoutRequest, resetInitialSession, subscribeUnauthorized } from './authClient.js';
+import { changePasswordRequest, getInitialSession, getSession, googleLoginRequest, loginRequest, logoutRequest, resetInitialSession, subscribeUnauthorized } from './authClient.js';
 import { AuthStateContext } from './authContext.js';
 
 const INITIAL_STATE = { status: 'checking', account: null, permissions: [], error: null };
@@ -46,6 +46,16 @@ export function AuthProvider({ children }) {
     applySession(session);
   };
 
+  const loginWithGoogle = async (credential) => {
+    const result = await googleLoginRequest(credential);
+    if (result.status === 'pending') return result;
+    const session = await getSession();
+    if (!session) throw new Error('No se pudo confirmar la sesión iniciada. Intentá nuevamente.');
+    resetInitialSession();
+    applySession(session);
+    return result;
+  };
+
   const logout = async () => {
     setLoggingOut(true);
     try {
@@ -68,5 +78,5 @@ export function AuthProvider({ children }) {
     applySession(null);
   };
 
-  return <AuthStateContext.Provider value={{ ...auth, loggingOut, login, logout, changePassword, retryBootstrap }}>{children}</AuthStateContext.Provider>;
+  return <AuthStateContext.Provider value={{ ...auth, loggingOut, login, loginWithGoogle, logout, changePassword, retryBootstrap }}>{children}</AuthStateContext.Provider>;
 }

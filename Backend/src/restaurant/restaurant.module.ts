@@ -8,5 +8,6 @@ import { RestaurantService } from './restaurant.service.js';
   imports: [DatabaseModule, FolioModule],
   controllers: [RestaurantController],
   providers: [RestaurantService],
+  exports: [RestaurantService],
 })
 export class RestaurantModule {}

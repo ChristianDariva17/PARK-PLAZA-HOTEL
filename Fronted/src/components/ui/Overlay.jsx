@@ -120,7 +120,3 @@ export function TabPanel({ active, children, label, id }) {
   if (!active) return null;
   return <section id={id ? `tab-panel-${id}` : undefined} className="tab-panel" role="tabpanel" aria-label={label} aria-labelledby={id ? `tab-${id}` : undefined} tabIndex="0">{children}</section>;
 }
-
-export function PrototypeNotice({ children }) {
-  return <div className="prototype-notice" role="note"><strong>Alcance del prototipo:</strong> {children}</div>;
-}

@@ -11,6 +11,9 @@ export const properties = pgTable('properties', {
   dayUseEnd: varchar('day_use_end', { length: 5 }).notNull().default('18:00'),
   dayUseMinimumMinutes: integer('day_use_minimum_minutes').notNull().default(180),
   reservationIntervalMinutes: integer('reservation_interval_minutes').notNull().default(30),
+  latitude: numeric({ precision: 10, scale: 7 }),
+  longitude: numeric({ precision: 10, scale: 7 }),
+  geofenceRadiusMeters: integer('geofence_radius_meters').notNull().default(80),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   check('properties_currency_check', sql`${t.currency} ~ '^[A-Z]{3}$'`),
@@ -31,3 +34,11 @@ export const rooms = pgTable('rooms', {
   categoryId: uuid('category_id').notNull(), number: varchar({ length: 16 }).notNull(), floor: integer().notNull(),
   status: roomStatus().notNull().default('available'), createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [unique().on(t.propertyId, t.number), unique().on(t.id, t.propertyId), foreignKey({ columns: [t.categoryId, t.propertyId], foreignColumns: [roomCategories.id, roomCategories.propertyId] }).onDelete('restrict'), index('rooms_category_idx').on(t.categoryId)]);
+
+export const roomCategoryAmenities = pgTable('room_category_amenities', {
+  id: uuid().defaultRandom().primaryKey(),
+  propertyId: uuid('property_id').notNull().references(() => properties.id, { onDelete: 'cascade' }),
+  categoryId: uuid('category_id').notNull().references(() => roomCategories.id, { onDelete: 'cascade' }),
+  amenityKey: varchar('amenity_key', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [unique().on(t.propertyId, t.categoryId, t.amenityKey), index('room_category_amenities_cat_idx').on(t.categoryId)]);

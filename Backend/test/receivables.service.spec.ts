@@ -7,7 +7,7 @@ const actor = { accountId: 'account-a', propertyId: 'property-a', email: 'a@exam
 const context = { requestId: 'receivable-runtime-test' };
 const receivable = { id: 'receivable-a', propertyId: actor.propertyId, stayId: 'stay-a', folioId: 'folio-a', status: 'open', originalAmount: '12.50', outstandingAmount: '12.50', reason: 'Debt', openedAt: new Date('2028-01-01T00:00:00Z'), settledAt: null };
 const detailRow = { receivable, guest: { id: 'guest-a', firstName: 'Ada', lastName: 'Lovelace', status: 'active' }, reservation: { id: 'reservation-a' }, stay: { id: 'stay-a', status: 'checked_out' }, folio: { id: 'folio-a' } };
-const payment = { id: 'entry-a', type: 'payment', amount: '12.50', paymentMethod: 'Tarjeta', reason: null, reversalOfEntryId: null, sourceType: 'receivable_collection', createdAt: new Date('2028-01-02T00:00:00Z') };
+const payment = { id: 'entry-a', type: 'payment', amount: '12.50' as any, paymentMethod: 'Tarjeta', reason: null, reversalOfEntryId: null, sourceType: 'receivable_collection', createdAt: new Date('2028-01-02T00:00:00Z') };
 
 function query<T>(value: T) {
   const chain: Record<string, unknown> = {};
@@ -57,27 +57,27 @@ describe('receivable runtime behavior', () => {
 
   it('scenario: Successful collection appends the original folio payment and settles atomically', async () => {
     const subject = setup([[], [receivable], [{ id: receivable.stayId, status: 'checked_out', settlement: 'receivable' }]]);
-    await expect(subject.service.collect(actor, receivable.id, { amount: '12.50', method: 'Tarjeta' }, 'key-a', context)).resolves.toMatchObject({ entry: { id: payment.id }, receivable: { status: 'settled', outstandingAmount: '0.00' } });
+    await expect(subject.service.collect(actor, receivable.id, { amount: '12.50' as any, method: 'Tarjeta' }, 'key-a', context)).resolves.toMatchObject({ entry: { id: payment.id }, receivable: { status: 'settled', outstandingAmount: '0.00' } });
     expect(subject.folios.appendLockedReceivableEntry).toHaveBeenCalledWith(expect.anything(), actor, expect.objectContaining({ folioId: receivable.folioId, stayId: receivable.stayId, sourceType: 'receivable_collection' }), context);
     expect(subject.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'receivable.collection_approved', propertyId: actor.propertyId }), expect.anything());
   });
 
   it('scenario: Invalid collection leaves the folio and projection untouched', async () => {
     const subject = setup([[], [{ ...receivable, outstandingAmount: '1.00' }], [{ id: receivable.stayId, status: 'checked_out', settlement: 'receivable' }]]);
-    await expect(subject.service.collect(actor, receivable.id, { amount: '1.01', method: 'Tarjeta' }, 'key-b', context)).rejects.toBeInstanceOf(ConflictException);
+    await expect(subject.service.collect(actor, receivable.id, { amount: '1.01' as any, method: 'Tarjeta' }, 'key-b', context)).rejects.toBeInstanceOf(ConflictException);
     expect(subject.folios.appendLockedReceivableEntry).not.toHaveBeenCalled(); expect(subject.updates).toHaveLength(0);
   });
 
   it('scenario: Retry returns its recorded result without a second payment', async () => {
     const response = { receivable: { id: receivable.id }, entry: { id: payment.id } };
     const subject = setup([], response);
-    await expect(subject.service.collect(actor, receivable.id, { amount: '12.50', method: 'Tarjeta' }, 'retry-key', context)).resolves.toEqual(response);
+    await expect(subject.service.collect(actor, receivable.id, { amount: '12.50' as any, method: 'Tarjeta' }, 'retry-key', context)).resolves.toEqual(response);
     expect(subject.folios.appendLockedReceivableEntry).not.toHaveBeenCalled(); expect(subject.updates).toHaveLength(0);
   });
 
   it('scenario: Cash session rejects an actor without an owned open session before mutation', async () => {
     const subject = setup([[], [receivable], [{ id: receivable.stayId, status: 'checked_out', settlement: 'receivable' }], []]);
-    await expect(subject.service.collect(actor, receivable.id, { amount: '1.00', method: 'Efectivo' }, 'cash-key', context)).rejects.toBeInstanceOf(ConflictException);
+    await expect(subject.service.collect(actor, receivable.id, { amount: '1.00' as any, method: 'Efectivo' }, 'cash-key', context)).rejects.toBeInstanceOf(ConflictException);
     expect(subject.folios.appendLockedReceivableEntry).not.toHaveBeenCalled(); expect(subject.updates).toHaveLength(0);
   });
 

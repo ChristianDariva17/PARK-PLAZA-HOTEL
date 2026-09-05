@@ -10,6 +10,7 @@ import {
   PENALTIES,
   ROOM_PRICING,
   selectAccountBalance,
+  selectActiveStays,
   validateOrder,
   validateReservation,
 } from '../domain/hotelModel.js';
@@ -250,7 +251,21 @@ export const validateHotelAction = (state, action) => {
       const current = action.type === 'PARKING_UPDATE' ? state.vehicles.find((item) => item.id === action.vehicleId) : null;
       const payload = action.payload;
       const duplicate = state.vehicles.some((item) => item.id !== current?.id && item.status === 'Dentro' && (item.plate.toUpperCase() === payload.plate?.trim().toUpperCase() || item.space.toUpperCase() === payload.space?.trim().toUpperCase()));
-      const message = action.type === 'PARKING_UPDATE' && (!current || current.status !== 'Dentro') ? 'Sólo se editan vehículos que están dentro.' : !state.stays.some((stay) => stay.id === payload.stayId && ['Activa', 'active'].includes(stay.status)) ? 'Seleccioná una estadía activa.' : !hasText(payload.plate) || !hasText(payload.space) || !Number.isFinite(Number(payload.fee)) || Number(payload.fee) < 0 ? 'Revisá placa, espacio y tarifa manual.' : duplicate ? 'La placa o el espacio ya están ocupados.' : null;
+      const isStay = payload.originType === 'stay' || (!payload.originType && Boolean(payload.stayId));
+      const activeStays = selectActiveStays(state);
+      const invalidStay = isStay && !activeStays.some((stay) => stay.id === payload.stayId || stay.roomId === payload.stayId);
+      const invalidVisitor = !isStay && !hasText(payload.driverName);
+      const message = action.type === 'PARKING_UPDATE' && (!current || current.status !== 'Dentro')
+        ? 'Sólo se editan vehículos que están dentro.'
+        : invalidStay
+        ? 'Seleccioná una estadía activa.'
+        : invalidVisitor
+        ? 'Para clientes externos o visitas, ingresá el nombre del conductor.'
+        : !hasText(payload.plate) || !hasText(payload.space) || !Number.isFinite(Number(payload.fee)) || Number(payload.fee) < 0
+        ? 'Revisá placa, espacio y tarifa manual.'
+        : duplicate
+        ? 'La placa o el espacio ya están ocupados.'
+        : null;
       return { ok: !message, message };
     }
     case 'PARKING_EXIT': {
@@ -264,14 +279,31 @@ export const validateHotelAction = (state, action) => {
     case 'PET_CREATE':
     case 'PET_UPDATE': {
       const pet = action.type === 'PET_UPDATE' ? state.pets.find((item) => item.id === action.petId) : null;
-      const payload = action.payload;
-      const stay = payload.stayId ? state.stays.find((item) => {
-        const primaryGuestId = state.reservations.find((reservation) => reservation.id === item.reservationId)?.primaryGuestId;
-        return item.id === payload.stayId && ['Activa', 'active'].includes(item.status) && (item.clientId || primaryGuestId) === payload.clientId;
-      }) : null;
+      const payload = action.payload || {};
+      const originType = payload.originType || (payload.stayId ? 'stay' : 'visitor');
+      const isStay = originType === 'stay' && Boolean(payload.stayId);
+      const activeStays = selectActiveStays(state);
+      const stay = isStay ? activeStays.find((item) => item.id === payload.stayId || item.roomId === payload.stayId) : null;
       const duplicateRequest = hasText(action.requestId) && (state.auditLog.some((entry) => entry.requestId === action.requestId) || state.accounts.some((item) => item.charges.some((charge) => charge.requestId === action.requestId)));
       const chargeChanged = pet && Number(payload.charge) !== pet.charge;
-      const message = action.type === 'PET_UPDATE' && !pet ? 'La mascota no existe.' : pet?.status === 'Archivada' ? 'Reactivá la mascota antes de editarla.' : !state.clients.some((client) => client.id === payload.clientId && client.status !== 'Archivado') || !hasText(payload.name) || !isFiniteAtLeast(payload.charge) ? 'Revisá propietario activo, nombre y tarifa.' : action.type === 'PET_UPDATE' && chargeChanged ? 'La tarifa registrada no se edita; registrá una operación financiera separada.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && !stay ? 'Para registrar una tarifa seleccioná una estadía activa del propietario.' : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && !hasText(action.requestId) ? 'Falta el identificador estable de la tarifa.' : action.type === 'PET_CREATE' && duplicateRequest ? 'La operación de mascota ya fue aplicada.' : null;
+      const hasValidOwner = isStay
+        ? Boolean(payload.clientId || stay?.clientId || stay?.clientName || payload.ownerName?.trim())
+        : Boolean(payload.ownerName?.trim() || payload.clientId);
+      const message = action.type === 'PET_UPDATE' && !pet
+        ? 'La mascota no existe.'
+        : pet?.status === 'Archivada'
+          ? 'Reactivá la mascota antes de editarla.'
+          : !hasValidOwner || !hasText(payload.name) || !isFiniteAtLeast(payload.charge)
+            ? 'Revisá propietario activo/nombre del dueño, nombre de la mascota y tarifa.'
+            : action.type === 'PET_UPDATE' && chargeChanged
+              ? 'La tarifa registrada no se edita; registrá una operación financiera separada.'
+              : action.type === 'PET_CREATE' && isStay && Number(payload.charge) > 0 && !stay
+                ? 'Para registrar una tarifa de habitación seleccioná una estadía activa del propietario.'
+                : action.type === 'PET_CREATE' && Number(payload.charge) > 0 && isStay && !hasText(action.requestId)
+                  ? 'Falta el identificador estable de la tarifa.'
+                  : action.type === 'PET_CREATE' && duplicateRequest
+                    ? 'La operación de mascota ya fue aplicada.'
+                    : null;
       return { ok: !message, message };
     }
     case 'PET_ARCHIVE':
@@ -487,26 +519,6 @@ export const validateHotelAction = (state, action) => {
       const amount = Number(action.countedAmount);
       return { ok: Boolean(session && Number.isFinite(amount) && amount >= 0), message: session ? 'Ingresá un conteo válido.' : 'No hay una caja abierta.' };
     }
-
-    // ─── Restaurant (Persistent) ─────────────────────────────────────────────
-    case 'RESTAURANT_LOAD_STARTED':
-      return { ...state, restaurantRequest: { status: 'loading' } };
-    case 'RESTAURANT_LOAD_SUCCEEDED':
-      return { ...state, recipes: action.recipes, inventory: action.inventory, inventoryLedger: action.inventoryLedger, orders: action.orders, restaurantRequest: { status: 'success' } };
-    case 'RESTAURANT_LOAD_FAILED':
-      return { ...state, restaurantRequest: { status: 'error', error: action.error } };
-    case 'RESTAURANT_ORDER_CREATED':
-      return { ...state, orders: [action.order, ...state.orders] };
-    case 'RESTAURANT_ORDER_UPDATED':
-      return { ...state, orders: state.orders.map((o) => o.id === action.order.id ? action.order : o) };
-    case 'RESTAURANT_MENU_ITEM_CREATED':
-      return { ...state, recipes: [action.item, ...state.recipes] };
-    case 'RESTAURANT_MENU_ITEM_UPDATED':
-      return { ...state, recipes: state.recipes.map((r) => r.id === action.item.id ? action.item : r) };
-    case 'RESTAURANT_INVENTORY_ITEM_CREATED':
-      return { ...state, inventory: [action.item, ...state.inventory] };
-    case 'RESTAURANT_INVENTORY_ITEM_UPDATED':
-      return { ...state, inventory: state.inventory.map((i) => i.id === action.item.id ? action.item : i) };
     case 'NOTIFICATIONS_READ_ALL':
       return { ok: state.notifications.some((item) => !item.read), message: 'No hay notificaciones sin leer.' };
     case 'NOTIFICATIONS_READ_AUTHORIZED': {
@@ -514,6 +526,26 @@ export const validateHotelAction = (state, action) => {
       const unreadIds = new Set(state.notifications.filter((item) => !item.read).map((item) => item.id));
       return { ok: notificationIds.length > 0 && notificationIds.every((id) => unreadIds.has(id)), message: 'No hay notificaciones autorizadas sin leer.' };
     }
+    case 'RESTAURANT_LOAD_STARTED':
+    case 'RESTAURANT_LOAD_SUCCEEDED':
+    case 'RESTAURANT_LOAD_FAILED':
+    case 'RESTAURANT_ORDER_CREATED':
+    case 'RESTAURANT_ORDER_UPDATED':
+    case 'RESTAURANT_MENU_ITEM_CREATED':
+    case 'RESTAURANT_MENU_ITEM_UPDATED':
+    case 'RESTAURANT_INVENTORY_ITEM_CREATED':
+    case 'RESTAURANT_INVENTORY_ITEM_UPDATED':
+    case 'RESOURCE_LOAD_STARTED':
+    case 'RESOURCE_LOAD_SUCCEEDED':
+    case 'RESOURCE_LOAD_FAILED':
+    case 'RESOURCE_ACCESS_FORBIDDEN':
+    case 'RESOURCE_LOAD_CANCELLED':
+    case 'RESTAURANT_RESOURCES_RESET':
+    case 'MANAGED_MENU_LOAD_STARTED':
+    case 'MANAGED_MENU_LOAD_SUCCEEDED':
+    case 'MANAGED_MENU_LOAD_FAILED':
+    case 'MANAGED_MENU_LOAD_CANCELLED':
+      return { ok: true };
     default:
       return { ok: false, message: `Acción no admitida: ${action.type || 'sin tipo'}.` };
   }
@@ -687,6 +719,24 @@ export function hotelReducer(state, action) {
       return { ...state, roomRequest: { status: 'saving', error: null } };
     case 'ROOM_MUTATION_COMMITTED':
       return { ...state, rooms: state.rooms.map((room) => room.id === action.room.id ? action.room : room), roomRequest: { status: 'success', error: null } };
+    case 'ROOM_SOCKET_UPDATED':
+      return { ...state, rooms: state.rooms.map((room) => room.id === action.room.id ? { ...room, ...action.room } : room) };
+    case 'ROOM_CATEGORY_UPDATED':
+      return {
+        ...state,
+        roomCategories: state.roomCategories.map((cat) => cat.id === action.category.id ? action.category : cat),
+        rooms: state.rooms.map((room) => {
+          if (room.categoryId === action.category.id) {
+            return {
+              ...room,
+              category: action.category.name,
+              capacity: action.category.capacity,
+              nightlyRate: action.category.baseNightlyRate,
+            };
+          }
+          return room;
+        }),
+      };
     case 'ROOM_REQUEST_FAILED':
       return { ...state, roomRequest: { status: 'error', error: action.error } };
     case 'ROOM_REQUEST_CANCELLED':
@@ -1265,7 +1315,100 @@ export function hotelReducer(state, action) {
       return addAudit({ ...state, cashSessions }, 'Cerró caja', 'Caja', session.id, `Esperado ${expectedAmount}; contado ${countedAmount}; diferencia ${countedAmount - expectedAmount}`);
     }
 
-    // ─── Restaurant (Persistent) ─────────────────────────────────────────────
+    // ─── Restaurant Resources (Menu, Orders, Inventory, Ledger) ─────────────
+    case 'RESTAURANT_RESOURCES_RESET':
+      return {
+        ...state,
+        restaurantResources: {
+          identityKey: action.identityKey || null,
+          menu: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
+          orders: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
+          inventory: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
+          inventoryLedger: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
+        },
+      };
+    case 'RESOURCE_LOAD_STARTED':
+      return {
+        ...state,
+        restaurantResources: {
+          ...state.restaurantResources,
+          [action.resourceKey]: {
+            ...state.restaurantResources?.[action.resourceKey],
+            status: 'loading',
+            generation: action.generation,
+            error: null,
+          },
+        },
+      };
+    case 'RESOURCE_LOAD_SUCCEEDED': {
+      const nextResources = {
+        ...state.restaurantResources,
+        identityKey: action.identityKey || state.restaurantResources?.identityKey,
+        [action.resourceKey]: {
+          ...state.restaurantResources?.[action.resourceKey],
+          status: 'success',
+          generation: action.generation,
+          error: null,
+          updatedAt: action.updatedAt || new Date().toISOString(),
+        },
+      };
+      const domainKey = action.domainKey;
+      return {
+        ...state,
+        restaurantResources: nextResources,
+        ...(domainKey ? { [domainKey]: action.data } : {}),
+      };
+    }
+    case 'RESOURCE_LOAD_FAILED':
+      return {
+        ...state,
+        restaurantResources: {
+          ...state.restaurantResources,
+          identityKey: action.identityKey || state.restaurantResources?.identityKey,
+          [action.resourceKey]: {
+            ...state.restaurantResources?.[action.resourceKey],
+            status: 'error',
+            generation: action.generation,
+            error: action.error,
+          },
+        },
+      };
+    case 'RESOURCE_ACCESS_FORBIDDEN':
+      return {
+        ...state,
+        restaurantResources: {
+          ...state.restaurantResources,
+          identityKey: action.identityKey || state.restaurantResources?.identityKey,
+          [action.resourceKey]: {
+            ...state.restaurantResources?.[action.resourceKey],
+            status: 'forbidden',
+            generation: action.generation,
+            error: null,
+          },
+        },
+      };
+    case 'RESOURCE_LOAD_CANCELLED':
+      return {
+        ...state,
+        restaurantResources: {
+          ...state.restaurantResources,
+          [action.resourceKey]: {
+            ...state.restaurantResources?.[action.resourceKey],
+            status: state.restaurantResources?.[action.resourceKey]?.status === 'loading' ? 'idle' : state.restaurantResources?.[action.resourceKey]?.status,
+          },
+        },
+      };
+
+    // ─── Managed Menu (Cocina y Bar 5★) ──────────────────────────────────────
+    case 'MANAGED_MENU_LOAD_STARTED':
+      return { ...state, menuManagementRequest: { status: 'loading', error: null } };
+    case 'MANAGED_MENU_LOAD_SUCCEEDED':
+      return { ...state, managedMenu: action.items, menuManagementRequest: { status: 'success', error: null } };
+    case 'MANAGED_MENU_LOAD_FAILED':
+      return { ...state, menuManagementRequest: { status: 'error', error: action.error } };
+    case 'MANAGED_MENU_LOAD_CANCELLED':
+      return { ...state, menuManagementRequest: { status: 'idle', error: null } };
+
     case 'RESTAURANT_LOAD_STARTED':
       return { ...state, restaurantRequest: { status: 'loading' } };
     case 'RESTAURANT_LOAD_SUCCEEDED':

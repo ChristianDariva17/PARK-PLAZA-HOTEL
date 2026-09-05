@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adaptRoomCategoryMutationResponse,
   adaptRoomCategoryResponse,
   adaptRoomInventoryResponse,
   adaptRoomMutationResponse,
   adaptRoomResponse,
+  buildCategoryPatch,
   displayRoomReference,
   RoomContractError,
   roomStatusToCode,
@@ -114,6 +116,17 @@ describe('room response adapter', () => {
     expect(adaptRoomMutationResponse(roomResponse, roomId)).toMatchObject({ id: roomId, number: '101' });
     expectContractFailure(() => adaptRoomMutationResponse({ ...roomResponse, id: otherRoomId }, roomId));
     expectContractFailure(() => adaptRoomMutationResponse(roomResponse, '101'));
+  });
+
+  it('correlates category mutation responses to the exact requested UUID', () => {
+    expect(adaptRoomCategoryMutationResponse(categoryResponse, categoryId)).toMatchObject({ id: categoryId, name: 'Simple', baseNightlyRate: '95.00' });
+    expectContractFailure(() => adaptRoomCategoryMutationResponse(categoryResponse, otherRoomId));
+  });
+
+  it('builds category patch only for changed fields', () => {
+    const current = { name: 'Simple', code: 'SIMPLE', capacity: 1, baseNightlyRate: '95.00' };
+    expect(buildCategoryPatch(current, { name: 'Simple Eco', baseNightlyRate: 110 })).toEqual({ name: 'Simple Eco', baseNightlyRate: '110.00' });
+    expect(buildCategoryPatch(current, { name: 'Simple', code: 'SIMPLE', capacity: 1, baseNightlyRate: '95.00' })).toBeNull();
   });
 
   it('resolves rooms only by exact UUID and never by room number', () => {

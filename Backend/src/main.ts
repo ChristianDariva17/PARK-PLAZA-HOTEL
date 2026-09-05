@@ -10,7 +10,7 @@ import { HttpExceptionFilter } from './http/http-exception.filter.js';
 
 async function bootstrap(): Promise<void> {
   const environment = validateEnv(process.env);
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ trustProxy: environment.API_TRUST_PROXY_HOPS }));
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ trustProxy: environment.API_TRUST_PROXY_HOPS, bodyLimit: 5 * 1024 * 1024 }));
   app.useGlobalFilters(new HttpExceptionFilter());
   await app.register(helmet);
   await app.register(cookie);

@@ -725,8 +725,8 @@ describe('PostgreSQL financial folio invariants', () => {
       const database = drizzle(client, { schema });
       const folios = new FolioService(database, { record: async () => undefined } as never);
       const actor: AuthenticatedAccount = { accountId, propertyId: fixture.propertyId, roleKey: 'test', email: `ancillary-${suffix}@example.invalid`, permissions: [], sessionId: 'test', passwordChangeRequired: false };
-      const first = await folios.appendAncillaryChargeLocked(database, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50', reason: 'Parking exit' }, { requestId: 'ancillary-test' });
-      const replay = await folios.appendAncillaryChargeLocked(database, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50', reason: 'Parking exit' }, { requestId: 'ancillary-test' });
+      const first = await folios.appendAncillaryChargeLocked(database as any, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50' as any, reason: 'Parking exit' }, { requestId: 'ancillary-test' });
+      const replay = await folios.appendAncillaryChargeLocked(database as any, actor, { stayId: fixture.stayId, sourceType: 'parking_exit', sourceId: 'VEH-TEST', amount: '7.50' as any, reason: 'Parking exit' }, { requestId: 'ancillary-test' });
       expect(first.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(replay).toEqual(first);
       const entries = await client.query<{ id: string }>('SELECT id FROM folio_entries WHERE property_id = $1 AND source_type = $2 AND source_id = $3', [fixture.propertyId, 'parking_exit', 'VEH-TEST']);
@@ -781,7 +781,7 @@ describe('PostgreSQL financial folio invariants', () => {
       await client.query(await readFile(new URL('../drizzle/0013_reconcile_receivables.sql', import.meta.url), 'utf8'));
       const projection = await client.query<{ property_id: string; outstanding_amount: string; status: string; settled_at: Date | null }>('SELECT property_id, outstanding_amount, status, settled_at FROM receivables WHERE stay_id = ANY($1::uuid[]) ORDER BY property_id', [[fixture.stayId, other.stayId]]);
       expect(projection.rows).toHaveLength(2);
-      expect(projection.rows).toEqual(expect.arrayContaining([{ property_id: fixture.propertyId, outstanding_amount: '12.50', status: 'open', settled_at: null }, { property_id: other.propertyId, outstanding_amount: '7.00', status: 'open', settled_at: null }]));
+      expect(projection.rows).toEqual(expect.arrayContaining([{ property_id: fixture.propertyId, outstanding_amount: '12.50' as any, status: 'open', settled_at: null }, { property_id: other.propertyId, outstanding_amount: '7.00' as any, status: 'open', settled_at: null }]));
       const commandKey = randomUUID();
       await client.query(`INSERT INTO receivable_commands (property_id, operation, idempotency_key, response) VALUES ($1, 'collection', $2, '{}'::jsonb)`, [fixture.propertyId, commandKey]);
       const duplicate = await captureViolation(client, () => client.query(`INSERT INTO receivable_commands (property_id, operation, idempotency_key, response) VALUES ($1, 'collection', $2, '{}'::jsonb)`, [fixture.propertyId, commandKey]));
@@ -816,17 +816,17 @@ describe('PostgreSQL financial folio invariants', () => {
     try {
       const keyA = randomUUID(); const keyB = randomUUID();
       const results = await Promise.allSettled([
-        serviceFor(clientA).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, keyA, { requestId: 'race-a' }),
-        serviceFor(clientB).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, keyB, { requestId: 'race-b' }),
+        serviceFor(clientA).collect(actor, receivableId, { amount: '12.50' as any, method: 'Tarjeta' }, keyA, { requestId: 'race-a' }),
+        serviceFor(clientB).collect(actor, receivableId, { amount: '12.50' as any, method: 'Tarjeta' }, keyB, { requestId: 'race-b' }),
       ]);
       expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
       expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
       const accepted = results.find((result) => result.status === 'fulfilled');
       if (!accepted || accepted.status !== 'fulfilled') throw new Error('Expected one accepted collection');
       const acceptedKey = accepted === results[0] ? keyA : keyB;
-      await expect(serviceFor(clientA).collect(actor, receivableId, { amount: '12.50', method: 'Tarjeta' }, acceptedKey, { requestId: 'race-retry' })).resolves.toEqual(accepted.value);
+      await expect(serviceFor(clientA).collect(actor, receivableId, { amount: '12.50' as any, method: 'Tarjeta' }, acceptedKey, { requestId: 'race-retry' })).resolves.toEqual(accepted.value);
       const persisted = await pool.query<{ outstanding_amount: string; status: string; payments: number }>(`SELECT r.outstanding_amount, r.status, count(e.id) FILTER (WHERE e.source_type = 'receivable_collection')::integer AS payments FROM receivables r LEFT JOIN folio_entries e ON e.folio_id = r.folio_id AND e.property_id = r.property_id WHERE r.id = $1 GROUP BY r.id`, [receivableId]);
-      expect(persisted.rows).toEqual([{ outstanding_amount: '0.00', status: 'settled', payments: 1 }]);
+      expect(persisted.rows).toEqual([{ outstanding_amount: '0.00' as any, status: 'settled', payments: 1 }]);
     } finally {
       clientA.release(); clientB.release(); await racePool.end();
       await pool.query('DELETE FROM folio_entries WHERE stay_id = $1', [fixture.stayId]);

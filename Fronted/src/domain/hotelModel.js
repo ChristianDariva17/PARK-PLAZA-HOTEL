@@ -18,13 +18,6 @@ export const PENALTIES = [
   { id: 'PEN-03', name: 'Daño de mobiliario', amount: 250, evidenceRequired: true, active: true },
 ];
 
-const isoDate = (offset = 0) => {
-  const value = new Date();
-  value.setHours(12, 0, 0, 0);
-  value.setDate(value.getDate() + offset);
-  return value.toISOString().slice(0, 10);
-};
-
 export const nightsBetween = (checkIn, checkOut) => {
   const difference = new Date(`${checkOut}T12:00:00`) - new Date(`${checkIn}T12:00:00`);
   return Math.max(1, Math.ceil(difference / 86400000));
@@ -91,6 +84,8 @@ export const formatMoney = (amount = 0) => new Intl.NumberFormat('es-PE', {
   style: 'currency', currency: 'PEN', minimumFractionDigits: 2,
 }).format(amount);
 
+export const formatDateTime = (value) => (value ? new Date(value).toLocaleString('es-PE') : 'No registrado');
+
 export const getInitialHotelState = () => {
   return {
     rooms: [],
@@ -106,140 +101,124 @@ export const getInitialHotelState = () => {
     persistentStays: [],
     stayRequest: { status: 'idle', error: null },
     stayCommandRequest: { status: 'idle', error: null, retryBlocked: false },
-    reservations: [
-      { id: 'RES-000', clientId: 'CLI-001', roomId: '101', category: 'Doble', checkIn: isoDate(-1), checkOut: isoDate(1), nights: 2, guests: 2, extraGuests: 0, petIds: ['PET-001'], services: ['Piscina'], nightlyRate: 145, total: 350, advance: 0, balance: 350, status: 'Cliente presente', contractId: 'HP-2026-000000', arrivalLimit: '20:00', paymentMethod: 'Tarjeta' },
-      { id: 'RES-001', clientId: 'CLI-003', roomId: '102', category: 'Triple', checkIn: isoDate(1), checkOut: isoDate(3), nights: 2, guests: 2, extraGuests: 0, petIds: [], services: ['Desayuno'], nightlyRate: 175, total: 370, advance: 185, balance: 185, status: 'Confirmada', contractId: 'HP-2026-000001', arrivalLimit: '20:00', paymentMethod: 'Yape' },
-      { id: 'RES-002', clientId: 'CLI-002', roomId: '202', category: 'Suite', checkIn: isoDate(4), checkOut: isoDate(6), nights: 2, guests: 2, extraGuests: 0, petIds: [], services: [], nightlyRate: 260, total: 520, advance: 260, balance: 260, status: 'Confirmada', contractId: 'HP-2026-000002', arrivalLimit: '21:00', paymentMethod: 'Tarjeta' },
-      { id: 'RES-003', clientId: 'CLI-002', roomId: '201', category: 'Triple', checkIn: isoDate(-2), checkOut: isoDate(2), nights: 4, guests: 1, extraGuests: 0, petIds: [], services: ['Cochera'], nightlyRate: 175, total: 715, advance: 0, balance: 715, status: 'Cliente presente', contractId: 'HP-2026-000003', arrivalLimit: '20:00', paymentMethod: 'Efectivo' },
-    ],
-    contracts: [
-      { id: 'HP-2026-000001', reservationId: 'RES-001', clientId: 'CLI-003', roomId: '102', status: 'Pendiente de firma', version: 1, generatedAt: new Date().toISOString(), signedDocument: null, versions: [{ version: 1, reason: 'Generación por confirmación de reserva' }] },
-      { id: 'HP-2026-000002', reservationId: 'RES-002', clientId: 'CLI-002', roomId: '202', status: 'Pendiente de firma', version: 1, generatedAt: new Date().toISOString(), signedDocument: null, versions: [{ version: 1, reason: 'Generación por confirmación de reserva' }] },
-      { id: 'HP-2026-000000', reservationId: 'RES-000', clientId: 'CLI-001', roomId: '101', status: 'Firmado', version: 1, generatedAt: new Date().toISOString(), signedDocument: 'Registro local de demostración', versions: [{ version: 1, reason: 'Contrato inicial firmado' }] },
-      { id: 'HP-2026-000003', reservationId: 'RES-003', clientId: 'CLI-002', roomId: '201', status: 'Firmado', version: 1, generatedAt: new Date().toISOString(), signedDocument: 'Registro local de demostración', versions: [{ version: 1, reason: 'Contrato inicial firmado' }] },
-    ],
-    stays: [
-      { id: 'EST-001', reservationId: 'RES-000', clientId: 'CLI-001', roomId: '101', accountId: 'CTA-001', status: 'Activa', checkInAt: isoDate(-1), expectedCheckOut: isoDate(1), accessIds: ['ACC-001'] },
-      { id: 'EST-002', reservationId: 'RES-003', clientId: 'CLI-002', roomId: '201', accountId: 'CTA-002', status: 'Activa', checkInAt: isoDate(-2), expectedCheckOut: isoDate(2), accessIds: [] },
-    ],
-    accounts: [
-      { id: 'CTA-001', stayId: 'EST-001', roomId: '101', status: 'Abierta', charges: [{ id: 'CAR-001', concept: 'Hospedaje', category: 'Hospedaje', amount: 290, createdAt: isoDate(-1) }, { id: 'CAR-002', concept: 'Piscina · 2 personas', category: 'Piscina', amount: 60, createdAt: isoDate(-1) }], payments: [] },
-      { id: 'CTA-002', stayId: 'EST-002', roomId: '201', status: 'Abierta', charges: [{ id: 'CAR-003', concept: 'Hospedaje', category: 'Hospedaje', amount: 700, createdAt: isoDate(-2) }, { id: 'CAR-004', concept: 'Cochera', category: 'Cochera', amount: 15, createdAt: isoDate(-1) }], payments: [] },
-    ],
-    payments: [
-      { id: 'PAG-001', clientId: 'CLI-003', reservationId: 'RES-001', accountId: null, orderId: null, amount: 185, method: 'Yape', operationNumber: 'YAP-741205', status: 'Registrado', concept: 'Adelanto 50 %', createdAt: new Date().toISOString(), responsible: 'Recepción demo' },
-      { id: 'PAG-002', clientId: 'CLI-002', reservationId: 'RES-002', accountId: null, orderId: null, amount: 260, method: 'Tarjeta', operationNumber: 'POS-102985', status: 'Registrado', concept: 'Adelanto 50 %', createdAt: new Date().toISOString(), responsible: 'Recepción demo' },
-    ],
-    documents: [
-      { id: 'DOC-001', type: 'Comprobante de adelanto', referenceId: 'RES-001', status: 'Borrador interno', fiscalStatus: 'Integración fiscal pendiente' },
-      { id: 'DOC-002', type: 'Contrato de hospedaje', referenceId: 'HP-2026-000001', status: 'Generado', fiscalStatus: 'No aplica' },
-    ],
-    cleaningTasks: [
-      { id: 'LIM-001', roomId: '103', status: 'Pendiente', assignedTo: 'Teresa Quispe', reason: 'Salida de huésped', startedAt: null, completedAt: null, evidence: [] },
-      { id: 'LIM-002', roomId: '309', status: 'En proceso', assignedTo: 'Patricia López', reason: 'Limpieza profunda', startedAt: new Date().toISOString(), completedAt: null, evidence: [] },
-    ],
-    maintenanceTickets: [
-      { id: 'MAN-001', roomId: '108', type: 'Aire acondicionado', description: 'Equipo sin respuesta; habitación bloqueada preventivamente.', priority: 'Alta', assignedTo: 'Carlos Méndez', status: 'En reparación', severe: false, evidence: ['Diagnóstico inicial registrado'], solution: '' },
-      { id: 'MAN-002', roomId: '405', type: 'Electricidad', description: 'Falla de tablero eléctrico.', priority: 'Urgente', assignedTo: 'Jorge Herrera', status: 'Asignado', severe: true, evidence: ['Reporte técnico pendiente'], solution: '' },
-    ],
-    orders: [
-      { id: 'PED-001', stayId: 'EST-001', roomId: '101', source: 'Habitación', items: [{ recipeId: 'REC-001', name: 'Sándwich club', quantity: 1, price: 32, ingredientSnapshot: [{ inventoryId: 'INV-001', quantity: 2 }, { inventoryId: 'INV-002', quantity: 120 }, { inventoryId: 'INV-005', quantity: 30 }] }], total: 32, paymentMethod: 'Cargar a la habitación', status: 'Pedido recibido', inventoryStage: 'Sin reservar', accountingStage: 'Pendiente', comment: 'Sin mayonesa', estimatedMinutes: 25 },
-      { id: 'PED-002', stayId: null, roomId: null, source: 'Barra', items: [{ recipeId: 'REC-002', name: 'Mojito', quantity: 2, price: 28, ingredientSnapshot: [{ inventoryId: 'INV-003', quantity: 1.5 }, { inventoryId: 'INV-004', quantity: 1 }] }], total: 56, paymentMethod: 'Tarjeta', status: 'En preparación', inventoryStage: 'Reservado', accountingStage: 'Pendiente', comment: '', estimatedMinutes: 12 },
-      { id: 'PED-003', stayId: null, roomId: null, source: 'Terraza', items: [{ recipeId: 'REC-001', name: 'Sándwich club', quantity: 1, price: 32, ingredientSnapshot: [{ inventoryId: 'INV-001', quantity: 2 }, { inventoryId: 'INV-002', quantity: 120 }, { inventoryId: 'INV-005', quantity: 30 }] }], total: 32, paymentMethod: 'Yape', status: 'Pedido recibido', inventoryStage: 'Sin reservar', accountingStage: 'Pendiente', comment: 'Entrega en mesa T-04', estimatedMinutes: 20 },
-    ],
-    inventoryLedger: [
-      { id: 'LED-001', inventoryId: 'INV-001', type: 'Entrada', quantity: 26, referenceId: 'INICIAL', note: 'Saldo inicial', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-002', inventoryId: 'INV-002', type: 'Entrada', quantity: 4200, referenceId: 'INICIAL', note: 'Saldo inicial', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-003', inventoryId: 'INV-003', type: 'Entrada', quantity: 48.2, referenceId: 'INICIAL', note: 'Saldo inicial', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-004', inventoryId: 'INV-004', type: 'Entrada', quantity: 32, referenceId: 'INICIAL', note: 'Saldo inicial', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-005', inventoryId: 'INV-005', type: 'Entrada', quantity: 650, referenceId: 'INICIAL', note: 'Saldo inicial', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-006', inventoryId: 'INV-003', type: 'Reserva', quantity: -3, referenceId: 'PED-002', note: 'Reserva heredada', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-      { id: 'LED-007', inventoryId: 'INV-004', type: 'Reserva', quantity: -2, referenceId: 'PED-002', note: 'Reserva heredada', createdAt: new Date().toISOString(), responsible: 'Sistema demo' },
-    ],
-    inventory: [
-      { id: 'INV-001', name: 'Pan de molde', category: 'Alimentos', unit: 'unidad', stock: 26, reserved: 0, minimum: 10, lot: 'PAN-0808', expiresAt: isoDate(4), supplierId: 'PRO-001', cost: 0.8 },
-      { id: 'INV-002', name: 'Pechuga de pollo', category: 'Alimentos', unit: 'g', stock: 4200, reserved: 0, minimum: 1500, lot: 'POL-0807', expiresAt: isoDate(3), supplierId: 'PRO-001', cost: 0.03 },
-      { id: 'INV-003', name: 'Ron blanco', category: 'Licores', unit: 'oz', stock: 48.2, reserved: 3, minimum: 15, lot: 'RON-0721', expiresAt: null, supplierId: 'PRO-002', cost: 4.4 },
-      { id: 'INV-004', name: 'Jugo de limón', category: 'Bebidas', unit: 'oz', stock: 32, reserved: 2, minimum: 12, lot: 'LIM-0808', expiresAt: isoDate(2), supplierId: 'PRO-001', cost: 0.9 },
-      { id: 'INV-005', name: 'Queso', category: 'Alimentos', unit: 'g', stock: 650, reserved: 0, minimum: 800, lot: 'QUE-0805', expiresAt: isoDate(1), supplierId: 'PRO-003', cost: 0.04 },
-    ],
-    recipes: [
-      { id: 'REC-001', name: 'Sándwich club', type: 'Cocina', salePrice: 32, ingredients: [{ inventoryId: 'INV-001', quantity: 2 }, { inventoryId: 'INV-002', quantity: 120 }, { inventoryId: 'INV-005', quantity: 30 }], status: 'Activa' },
-      { id: 'REC-002', name: 'Mojito', type: 'Bar', salePrice: 28, ingredients: [{ inventoryId: 'INV-003', quantity: 1.5 }, { inventoryId: 'INV-004', quantity: 1 }], status: 'Activa' },
-    ],
-    vehicles: [
-      { id: 'VEH-001', clientId: 'CLI-001', stayId: 'EST-001', roomId: '101', type: 'Auto', brandModel: 'Toyota Corolla', plate: 'ABC-123', entryAt: new Date().toISOString(), exitAt: null, space: 'A-01', fee: 15, status: 'Dentro' },
-      { id: 'VEH-002', clientId: 'CLI-002', stayId: 'EST-002', roomId: '201', type: 'Moto', brandModel: 'Honda CB190R', plate: 'M2-4812', entryAt: new Date().toISOString(), exitAt: null, space: 'M-03', fee: 0, status: 'Dentro' },
-    ],
-    pets: [
-      { id: 'PET-001', clientId: 'CLI-001', stayId: 'EST-001', type: 'Perro', name: 'Milo', size: 'Mediano', lodgingPlace: 'Habitación 101', charge: 45, notes: 'Requiere cama para mascota.', damageIncidentId: null, status: 'Activa' },
-      { id: 'PET-002', clientId: 'CLI-003', stayId: null, type: 'Gato', name: 'Nube', size: 'Pequeño', lodgingPlace: 'Zona habilitada de cochera', charge: 30, notes: 'Registro previo; sin estadía activa.', damageIncidentId: null, status: 'Activa' },
-    ],
-    recreationAccess: [
-      { id: 'ACC-001', stayId: 'EST-001', clientId: 'CLI-001', roomId: '101', zone: 'Piscina', status: 'Habilitado', paid: true, validUntil: isoDate(1), allowedPeople: 2, peopleInside: 0, entries: 0, qrReference: 'QR dinámico demo' },
-    ],
+    reservations: [],
+    contracts: [],
+    stays: [],
+    accounts: [],
+    payments: [],
+    documents: [],
+    cleaningTasks: [],
+    maintenanceTickets: [],
+    orders: [],
+    inventoryLedger: [],
+    inventory: [],
+    recipes: [],
+    managedMenu: [],
+    restaurantResources: {
+      identityKey: null,
+      menu: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
+      orders: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
+      inventory: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
+      inventoryLedger: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
+    },
+    menuPendingMutations: [],
+    menuImportRequest: { status: 'idle', preview: null, contentHash: null, error: null },
+    vehicles: [],
+    pets: [],
+    recreationAccess: [],
     accessLog: [],
     poolCapacity: 30,
-    suppliers: [
-      { id: 'PRO-001', businessName: 'Mercado Fresco Lima SAC', ruc: '20518877121', contact: 'Andrea Ruiz', phone: '+51 944 500 120', email: 'ventas@mercadofresco.pe', products: ['Alimentos', 'Bebidas'], averageDeliveryDays: 1, primary: true },
-      { id: 'PRO-002', businessName: 'Licores Andinos SAC', ruc: '20604410982', contact: 'Javier Luna', phone: '+51 933 227 401', email: 'pedidos@licoresandinos.pe', products: ['Licores'], averageDeliveryDays: 2, primary: true },
-      { id: 'PRO-003', businessName: 'Distribuciones Plaza EIRL', ruc: '20499120443', contact: 'Rosa Medina', phone: '+51 955 440 882', email: 'contacto@displaza.pe', products: ['Limpieza', 'Lácteos'], averageDeliveryDays: 3, primary: false },
-    ],
-    events: [
-      { id: 'EVE-001', clientId: 'CLI-003', title: 'Reunión familiar', date: isoDate(5), startTime: '18:00', endTime: '22:00', venue: 'Terraza', attendees: 35, services: ['Catering', 'Sonido'], advance: 0, total: 1300, status: 'Confirmado' },
-      { id: 'EVE-002', clientId: 'CLI-002', title: 'Encuentro empresarial', date: isoDate(8), startTime: '09:00', endTime: '13:00', venue: 'Bar', attendees: 24, services: ['Coffee break', 'Proyector'], advance: 0, total: 900, status: 'Tentativo' },
-    ],
-    staff: [
-      { id: 'PER-001', documentNumber: '44556677', name: 'Sofía Medina', role: 'Recepcionista', area: 'Recepción', phone: '+51 955 102 003', email: 'sofia.medina@parkplaza.pe', salary: 2400, status: 'Activo', shift: '07:00 - 15:00', attendance: 'Ingreso 06:57', overtimeHours: 1.5 },
-      { id: 'PER-002', documentNumber: '33221188', name: 'Teresa Quispe', role: 'Camarista', area: 'Limpieza', phone: '+51 944 012 849', email: 'teresa.quispe@parkplaza.pe', salary: 1900, status: 'Activo', shift: '08:00 - 16:00', attendance: 'Ingreso 08:03', overtimeHours: 0 },
-      { id: 'PER-003', documentNumber: '70112233', name: 'Juan Martínez', role: 'Cocinero', area: 'Cocina', phone: '+51 922 710 344', email: 'juan.martinez@parkplaza.pe', salary: 2300, status: 'Activo', shift: '12:00 - 20:00', attendance: 'Pendiente', overtimeHours: 2 },
-    ],
-    staffShifts: [
-      { id: 'TUR-001', staffId: 'PER-001', date: isoDate(0), startTime: '07:00', endTime: '15:00', status: 'Programado', responsible: 'Administrador demo', createdAt: new Date().toISOString() },
-      { id: 'TUR-002', staffId: 'PER-002', date: isoDate(0), startTime: '08:00', endTime: '16:00', status: 'Programado', responsible: 'Administrador demo', createdAt: new Date().toISOString() },
-    ],
+    suppliers: [],
+    events: [],
+    staff: [],
+    staffShifts: [],
     attendanceLog: [],
-    cashSessions: [{ id: 'CAJ-001', openedAt: new Date().toISOString(), closedAt: null, openingAmount: 500, countedAmount: null, expectedAmount: null, difference: null, responsible: 'Sofía Medina', shift: 'Mañana', status: 'Abierta', notes: 'Turno mañana' }],
-    cashMovements: [
-      { id: 'MOV-001', sessionId: 'CAJ-001', type: 'Ingreso', concept: 'Adelanto RES-001', referenceId: 'PAG-001', amount: 185, method: 'Yape', createdAt: new Date().toISOString(), responsible: 'Sofía Medina' },
-      { id: 'MOV-002', sessionId: 'CAJ-001', type: 'Ingreso', concept: 'Adelanto RES-002', referenceId: 'PAG-002', amount: 260, method: 'Tarjeta', createdAt: new Date().toISOString(), responsible: 'Sofía Medina' },
-      { id: 'MOV-003', sessionId: 'CAJ-001', type: 'Egreso', concept: 'Compra urgente de limpieza', referenceId: null, amount: 42, method: 'Efectivo', createdAt: new Date().toISOString(), responsible: 'Sofía Medina' },
-    ],
-    incidents: [
-      { id: 'INC-001', type: 'Mantenimiento', referenceId: 'MAN-002', roomId: '405', description: 'Falla eléctrica grave; habitación fuera de servicio.', priority: 'Urgente', responsible: 'Jorge Herrera', status: 'Asignada', evidence: ['Reporte técnico inicial'], solution: '' },
-      { id: 'INC-002', type: 'Servicio', referenceId: 'EST-002', roomId: '201', description: 'Demora reportada en room service.', priority: 'Media', responsible: 'Supervisión', status: 'Pendiente', evidence: [], solution: '' },
-      { id: 'INC-003', type: 'Mantenimiento', referenceId: 'MAN-001', roomId: '108', description: 'Equipo de aire acondicionado sin respuesta.', priority: 'Alta', responsible: 'Carlos Méndez', status: 'En proceso', evidence: ['Diagnóstico inicial registrado'], solution: '' },
-    ],
-    surveys: [
-      { id: 'ENC-001', clientId: 'CLI-001', stayId: null, sentAt: isoDate(-15), status: 'Respondida', overall: 5, cleaning: 5, service: 4, room: 5, food: 4, comment: 'Excelente atención.', promotionsAuthorized: true },
-      { id: 'ENC-002', clientId: 'CLI-003', stayId: null, sentAt: isoDate(-2), status: 'Pendiente', overall: null, cleaning: null, service: null, room: null, food: null, comment: '', promotionsAuthorized: false },
-    ],
-    roles: [
-      { id: 'ROL-ADMIN', name: 'Administrador', users: 1, permissions: ['Todos los módulos', 'Configuración', 'Auditoría'] },
-      { id: 'ROL-REC', name: 'Recepcionista', users: 3, permissions: ['Clientes', 'Reservas', 'Check-in/out', 'Pagos'] },
-      { id: 'ROL-LIM', name: 'Limpieza', users: 4, permissions: ['Tareas asignadas', 'Evidencias', 'Incidencias'] },
-      { id: 'ROL-COC', name: 'Cocina', users: 3, permissions: ['Pedidos', 'Recetas', 'Inventario relacionado'] },
-    ],
-    auditLog: [
-      { id: 'AUD-001', user: 'Sistema demo', action: 'Generó contrato', module: 'Contratos', recordId: 'HP-2026-000001', createdAt: new Date().toISOString(), detail: 'Versión 1 por reserva confirmada' },
-      { id: 'AUD-002', user: 'Sofía Medina', action: 'Registró pago', module: 'Pagos', recordId: 'PAG-001', createdAt: new Date().toISOString(), detail: 'Adelanto 50 % mediante Yape' },
-    ],
-    notifications: [
-      { id: 'NOT-001', type: 'warning', title: 'Stock bajo: Queso', description: '650 g disponibles; mínimo 800 g.', route: 'inventario', read: false },
-      { id: 'NOT-002', type: 'info', title: 'Contrato pendiente de firma', description: 'HP-2026-000001 requiere revisión en check-in.', route: 'contratos', read: false },
-    ],
-    integrations: [
-      { id: 'INT-FISCAL', name: 'Facturación electrónica', status: 'Pendiente de integración', detail: 'No se emiten comprobantes fiscales reales.' },
-      { id: 'INT-MSG', name: 'Correo y WhatsApp', status: 'Pendiente de integración', detail: 'Las notificaciones se registran solo dentro del prototipo.' },
-      { id: 'INT-POOL', name: 'Lector QR y valla', status: 'Pendiente de hardware', detail: 'La validación se simula sin abrir dispositivos.' },
-      { id: 'INT-BACKUP', name: 'Copias de seguridad', status: 'No configurado', detail: 'No existe persistencia ni respaldo automático en este frontend.' },
-      { id: 'INT-AUTH', name: 'Autenticación segura', status: 'Pendiente de backend', detail: 'Roles visibles sin control de sesión real.' },
-    ],
+    cashSessions: [],
+    cashMovements: [],
+    cashCounts: [],
+    incidents: [],
+    auditLog: [],
+    notifications: [],
+    integrations: [],
   };
 };
 
 export const selectClientName = (state, clientId) => state.clients.find((client) => client.id === clientId)?.name || 'Sin cliente';
 export const selectRoom = (state, roomId) => state.rooms.find((room) => room.id === String(roomId));
+
+export const selectActiveStays = (state) => {
+  if (!state) return [];
+  const list = [];
+  const seenIds = new Set();
+  const seenRoomKeys = new Set();
+
+  const addStay = (stay, origin = 'stay') => {
+    if (!stay || !stay.id || seenIds.has(String(stay.id))) return;
+
+    // Resolve room by id or number
+    const room = (state.rooms || []).find(
+      (r) => String(r.id) === String(stay.roomId) || String(r.number) === String(stay.roomId)
+    );
+    const roomNumber = room?.number || stay.roomNumber || (stay.roomId ? String(stay.roomId) : 'Sin hab.');
+    const roomId = room?.id || stay.roomId || null;
+
+    // Resolve reservation and client
+    const reservation = (state.persistentReservations || state.reservations || []).find(
+      (r) => String(r.id) === String(stay.reservationId)
+    );
+    const clientId = stay.clientId || reservation?.primaryGuestId || reservation?.clientId || room?.guestId || null;
+    const client = (state.clients || []).find((c) => String(c.id) === String(clientId));
+    const clientName = client?.name || (client?.firstName ? `${client.firstName} ${client.lastName || ''}`.trim() : null) || room?.guestName || stay.guestName || (client ? 'Cliente registrado' : `Huésped Hab. ${roomNumber}`);
+
+    const record = {
+      ...stay,
+      id: String(stay.id),
+      roomId: roomId ? String(roomId) : null,
+      roomNumber: String(roomNumber),
+      clientId: clientId ? String(clientId) : null,
+      clientName,
+      status: stay.status || 'Activa',
+      origin,
+    };
+
+    list.push(record);
+    seenIds.add(record.id);
+    if (record.roomId) seenRoomKeys.add(String(record.roomId));
+    if (record.roomNumber) seenRoomKeys.add(String(record.roomNumber));
+  };
+
+  // 1. Persistent stays from backend API
+  (state.persistentStays || [])
+    .filter((s) => ['active', 'Activa'].includes(s.status))
+    .forEach((s) => addStay(s, 'persistent'));
+
+  // 2. Local stays from prototype state
+  (state.stays || [])
+    .filter((s) => ['active', 'Activa'].includes(s.status))
+    .forEach((s) => addStay(s, 'local'));
+
+  // 3. Occupied rooms in state.rooms (guarantees that ANY occupied room is available as an active stay)
+  (state.rooms || [])
+    .filter((r) => ['Ocupada', 'occupied'].includes(r.status) || r.statusCode === 'occupied' || Boolean(r.activeStayId))
+    .forEach((r) => {
+      const alreadyIncluded = (r.id && seenRoomKeys.has(String(r.id))) || (r.number && seenRoomKeys.has(String(r.number)));
+      if (!alreadyIncluded) {
+        const stayId = r.activeStayId || `EST-${r.number || r.id}`;
+        addStay({
+          id: stayId,
+          roomId: r.id,
+          roomNumber: r.number,
+          clientId: r.guestId || null,
+          status: 'Activa',
+          checkInAt: r.checkInAt || new Date().toISOString(),
+          expectedCheckOut: r.expectedCheckOut || null,
+          synthetic: true,
+        }, 'room_occupied');
+      }
+    });
+
+  return list;
+};
 export const selectAccountBalance = (account) => {
   const charges = account?.charges.reduce((sum, charge) => sum + charge.amount, 0) || 0;
   const payments = account?.payments.reduce((sum, payment) => sum + payment.amount, 0) || 0;

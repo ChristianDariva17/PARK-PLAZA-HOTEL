@@ -32,6 +32,8 @@ export function acquireAccountTransactionLock(
   return acquireTransactionLock(transaction, 'account', accountId);
 }
 
+export const acquireCustomerTransactionLock = acquireAccountTransactionLock;
+
 /** Global lock order: property before account whenever a transaction needs both. */
 export async function acquirePropertyThenAccountTransactionLocks(
   transaction: TransactionLockExecutor,

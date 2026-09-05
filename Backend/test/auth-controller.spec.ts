@@ -6,7 +6,7 @@ import type { SessionService } from '../src/auth/session.service.js';
 import type { Environment } from '../src/config/environment.js';
 
 function controller(nodeEnv: Environment['NODE_ENV']) {
-  const auth = { login: vi.fn(), changePassword: vi.fn().mockResolvedValue(undefined) } as unknown as AuthService;
+  const auth = { login: vi.fn(), loginGoogle: vi.fn(), changePassword: vi.fn().mockResolvedValue(undefined) } as unknown as AuthService;
   const sessions = { revoke: vi.fn().mockResolvedValue(undefined) } as unknown as SessionService;
   const config = { get: vi.fn((key: keyof Environment) => key === 'AUTH_COOKIE_NAME' ? 'pp_session' : nodeEnv) } as unknown as ConfigService<Environment, true>;
   return { instance: new AuthController(auth, sessions, config), auth, sessions };
@@ -40,5 +40,20 @@ describe('AuthController cookies', () => {
     await instance.changePassword({ currentPassword: 'temporary password', newPassword: 'new secure password' }, request as never, reply as never);
     expect(auth.changePassword).toHaveBeenCalledWith(request.auth, { currentPassword: 'temporary password', newPassword: 'new secure password' }, { requestId: 'request-id', ipAddress: '127.0.0.1' });
     expect(reply.clearCookie).toHaveBeenCalledWith('pp_session', expect.objectContaining({ path: '/api', httpOnly: true }));
+  });
+
+  it('requires a one-time Google nonce cookie before creating the internal session', async () => {
+    const { instance, auth } = controller('production');
+    const expiresAt = new Date('2030-01-01T00:00:00Z');
+    vi.mocked(auth.loginGoogle).mockResolvedValue({ status: 'authenticated', token: 'opaque-token', sessionId: 'session-id', expiresAt, account: { id: 'account-id', propertyId: 'property-id', email: 'user@example.com', role: 'receptionist' } });
+    const reply = { setCookie: vi.fn(), clearCookie: vi.fn() };
+    const request = { id: 'request-id', ip: '127.0.0.1', headers: {}, cookies: { pp_google_nonce: 'nonce-hash' } };
+
+    const response = await instance.google({ credential: 'credential' }, request as never, reply as never);
+
+    expect(auth.loginGoogle).toHaveBeenCalledWith({ credential: 'credential' }, 'nonce-hash', { requestId: 'request-id', ipAddress: '127.0.0.1' });
+    expect(reply.setCookie).toHaveBeenCalledWith('pp_session', 'opaque-token', expect.objectContaining({ httpOnly: true, secure: true, expires: expiresAt }));
+    expect(reply.clearCookie).toHaveBeenCalledWith('pp_google_nonce', expect.objectContaining({ path: '/api/auth/google', httpOnly: true, secure: true }));
+    expect(response).toEqual(expect.objectContaining({ status: 'authenticated' }));
   });
 });

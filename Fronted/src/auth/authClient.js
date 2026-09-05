@@ -16,6 +16,11 @@ const KNOWN_ERROR_MESSAGES = new Map([
   ['You cannot reset your own password; use change password instead', 'Para tu propia cuenta, usá el cambio de contraseña.'],
   ['Insufficient permissions', 'No tenés permiso para realizar esta operación.'],
   ['Invalid request body', 'Revisá los datos ingresados.'],
+  ['Invalid Google credential', 'No se pudo verificar la cuenta de Google. Intentá nuevamente.'],
+  ['Google account is disabled', 'Esta cuenta se encuentra deshabilitada.'],
+  ['Google access request was rejected', 'Tu solicitud de acceso fue rechazada.'],
+  ['Google Sign-In is not configured', 'El inicio con Google todavía no está configurado.'],
+  ['Google registration is not configured', 'El registro con Google todavía no está configurado.'],
 ]);
 
 export class AuthRequestError extends Error {
@@ -25,6 +30,42 @@ export class AuthRequestError extends Error {
     this.status = status;
     this.known = known;
   }
+}
+
+const RESOURCE_ERROR_CODES = new Map([
+  [401, 'session'], [403, 'forbidden'], [404, 'absent'], [409, 'reconcile'], [422, 'validation'],
+]);
+
+export function normalizeResourceError(error) {
+  const status = error instanceof AuthRequestError ? error.status : null;
+  return Object.freeze({ code: RESOURCE_ERROR_CODES.get(status) || 'transport', status, retry: status === null || status === 404 || status === 409 });
+}
+
+export function serializeExactMoney(value) {
+  if (typeof value !== 'string' || !/^(0|[1-9]\d*)\.\d{2}$/.test(value)) throw new TypeError('Money must be an exact decimal string with two fractional digits.');
+  return value;
+}
+
+export function createKeyedCommand(command, key = globalThis.crypto?.randomUUID?.()) {
+  if (!key) throw new Error('A stable idempotency key is required.');
+  return Object.freeze({ key, run: () => command(key) });
+}
+
+export function createResourceRead(request) {
+  let generation = 0;
+  let controller = null;
+  return async () => {
+    controller?.abort();
+    controller = new AbortController();
+    const currentGeneration = ++generation;
+    try {
+      const value = await request(controller.signal);
+      return currentGeneration === generation ? { status: 'settled', value } : { status: 'superseded' };
+    } catch (error) {
+      if (currentGeneration !== generation || controller.signal.aborted) return { status: 'superseded' };
+      throw error;
+    }
+  };
 }
 
 export function subscribeUnauthorized(listener) {
@@ -53,7 +94,9 @@ export async function authRequest(url, options = {}) {
       ...fetchOptions,
       headers: fetchOptions.body ? { 'Content-Type': 'application/json', ...fetchOptions.headers } : fetchOptions.headers,
     });
-  } catch {
+  } catch (error) {
+    // Canceled requests are expected during effect cleanup, not connection failures.
+    if (error?.name === 'AbortError') throw error;
     throw new AuthRequestError('No se pudo conectar con el servidor. Intentá nuevamente.');
   }
 
@@ -113,6 +156,12 @@ export async function loginRequest(email, password) {
     }
     throw error;
   }
+}
+
+export function googleLoginRequest(credential) {
+  return authRequest('/api/auth/google', {
+    method: 'POST', body: JSON.stringify({ credential }), signalUnauthorized: false,
+  });
 }
 
 export function logoutRequest() {

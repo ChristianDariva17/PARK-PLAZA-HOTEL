@@ -63,6 +63,9 @@ export class FolioService {
   async postRestaurantCharge(tx: any, actor: AuthenticatedAccount, stayId: string, orderId: string, amount: string, context: RequestContext) {
     return this.insert(tx, actor, stayId, { type: 'charge', amount, sourceType: 'restaurant_order', sourceId: orderId, idempotencyKey: orderId, reason: 'Restaurant order delivered' }, context);
   }
+  async postAmenityCharge(tx: any, actor: any, stayId: string, reservationId: string, amount: string, reason: string, context: RequestContext) {
+    return this.insert(tx, actor, stayId, { type: 'charge', amount, sourceType: 'amenity_reservation', sourceId: reservationId, idempotencyKey: reservationId, reason }, context);
+  }
   async reverseRestaurantCharge(tx: any, actor: AuthenticatedAccount, stayId: string, orderId: string, reason: string, context: RequestContext) {
     const original = (await tx.select().from(folioEntries).where(and(eq(folioEntries.propertyId, actor.propertyId), eq(folioEntries.sourceType, 'restaurant_order'), eq(folioEntries.sourceId, orderId))).limit(1))[0];
     if (!original) throw new ConflictException('Restaurant folio charge is unavailable');
@@ -71,7 +74,7 @@ export class FolioService {
     return this.insert(tx, actor, stayId, { type: 'reversal', amount: original.amount, sourceType: 'restaurant_cancellation', sourceId: orderId, idempotencyKey: original.id, reversalOfEntryId: original.id, reason }, context);
   }
   /** Internal-only: callers hold their ancillary row and property transaction lock. */
-  async appendAncillaryChargeLocked(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; reason: string }, context: RequestContext): Promise<{ id: string }> {
+  async appendAncillaryChargeLocked(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_entry' | 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; reason: string }, context: RequestContext): Promise<{ id: string }> {
     if (cents(input.amount) <= 0n) throw new BadRequestException('Ancillary charges must be positive');
     const idempotencyKey = ancillaryKey(input.sourceType, input.sourceId);
     const source = (await tx.select().from(folioEntries).where(and(eq(folioEntries.propertyId, actor.propertyId), eq(folioEntries.sourceType, input.sourceType), eq(folioEntries.sourceId, input.sourceId))).limit(1))[0];
@@ -84,9 +87,16 @@ export class FolioService {
     return { id: entry.id };
   }
 
-  async assertAncillaryChargeReference(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; chargeId: string }) {
+  async assertAncillaryChargeReference(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceType: 'parking_entry' | 'parking_exit' | 'pet_charge'; sourceId: string; amount: string; chargeId: string }) {
     const entry = (await tx.select().from(folioEntries).where(and(eq(folioEntries.id, input.chargeId), eq(folioEntries.propertyId, actor.propertyId))).limit(1))[0];
     if (!entry || !this.isCompatibleAncillaryEntry(entry, input, ancillaryKey(input.sourceType, input.sourceId))) throw new ConflictException('Ancillary charge reference is not canonical');
+    return entry;
+  }
+
+  async assertParkingChargeReference(tx: any, actor: AuthenticatedAccount, input: { stayId: string; sourceId: string; amount: string; chargeId: string }) {
+    const entry = (await tx.select().from(folioEntries).where(and(eq(folioEntries.id, input.chargeId), eq(folioEntries.propertyId, actor.propertyId))).limit(1))[0];
+    const validSource = entry?.sourceType === 'parking_entry' || entry?.sourceType === 'parking_exit';
+    if (!entry || !validSource || !this.isCompatibleAncillaryEntry(entry, { ...input, sourceType: entry.sourceType }, ancillaryKey(entry.sourceType, input.sourceId))) throw new ConflictException('Ancillary charge reference is not canonical');
     return entry;
   }
   /** Internal-only append for a receivable already locked and validated by ReceivablesService. Generic folio commands remain closed after checkout. */

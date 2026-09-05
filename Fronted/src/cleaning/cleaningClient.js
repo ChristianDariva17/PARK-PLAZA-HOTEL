@@ -66,6 +66,7 @@ const command = (url, method, { body, key, signal } = {}) =>
 export const createCleaningIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
 export const getCleaningTasks = (signal) => request('/api/cleaning', { signal });
+export const createCleaningTask = (body, key, signal) => command(`/api/cleaning`, 'POST', { body, key, signal });
 export const updateCleaningTask = (taskId, body, key, signal) => command(`/api/cleaning/${taskId}`, 'PATCH', { body, key, signal });
 export const progressCleaningTask = (taskId, body, key, signal) => command(`/api/cleaning/${taskId}/progress`, 'POST', { body, key, signal });
 export const reportCleaningIncident = (taskId, body, key, signal) => command(`/api/cleaning/${taskId}/incident`, 'POST', { body, key, signal });

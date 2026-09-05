@@ -4,6 +4,8 @@ import { properties } from './hotel.schema.js';
 
 export const accountStatus = pgEnum('account_status', ['active', 'disabled']);
 export const loginAttemptKind = pgEnum('login_attempt_kind', ['ip', 'account']);
+export const accountIdentityProvider = pgEnum('account_identity_provider', ['google']);
+export const googleAccessRequestStatus = pgEnum('google_access_request_status', ['pending', 'approved', 'rejected']);
 
 export const roles = pgTable('roles', {
   id: uuid().defaultRandom().primaryKey(),
@@ -18,7 +20,7 @@ export const permissions = pgTable('permissions', {
   key: varchar({ length: 100 }).notNull().unique(),
   description: varchar({ length: 255 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [check('permissions_key_check', sql`${table.key} ~ '^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$'`)]);
+}, (table) => [check('permissions_key_check', sql`${table.key} ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'`)]);
 
 export const rolePermissions = pgTable('role_permissions', {
   roleId: uuid('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
@@ -31,7 +33,7 @@ export const accounts = pgTable('accounts', {
   propertyId: uuid('property_id').notNull().references(() => properties.id, { onDelete: 'restrict' }),
   roleId: uuid('role_id').notNull().references(() => roles.id, { onDelete: 'restrict' }),
   email: varchar({ length: 254 }).notNull(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: text('password_hash'),
   passwordChangeRequired: boolean('password_change_required').notNull().default(false),
   status: accountStatus().notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -41,6 +43,39 @@ export const accounts = pgTable('accounts', {
   unique().on(table.id, table.propertyId),
   index('accounts_property_idx').on(table.propertyId),
   check('accounts_email_normalized_check', sql`${table.email} = lower(btrim(${table.email}))`),
+]);
+
+export const accountIdentities = pgTable('account_identities', {
+  id: uuid().defaultRandom().primaryKey(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  provider: accountIdentityProvider().notNull(),
+  providerSubject: varchar('provider_subject', { length: 255 }).notNull(),
+  email: varchar({ length: 254 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('account_identities_provider_subject_unique').on(table.provider, table.providerSubject),
+  uniqueIndex('account_identities_account_provider_unique').on(table.accountId, table.provider),
+  check('account_identities_email_normalized_check', sql`${table.email} = lower(btrim(${table.email}))`),
+]);
+
+export const googleAccessRequests = pgTable('google_access_requests', {
+  id: uuid().defaultRandom().primaryKey(),
+  propertyId: uuid('property_id').notNull().references(() => properties.id, { onDelete: 'restrict' }),
+  providerSubject: varchar('provider_subject', { length: 255 }).notNull(),
+  email: varchar({ length: 254 }).notNull(),
+  displayName: varchar('display_name', { length: 200 }),
+  status: googleAccessRequestStatus().notNull().default('pending'),
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'restrict' }),
+  reviewedByAccountId: uuid('reviewed_by_account_id').references(() => accounts.id, { onDelete: 'restrict' }),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('google_access_requests_subject_unique').on(table.providerSubject),
+  uniqueIndex('google_access_requests_account_unique').on(table.accountId).where(sql`${table.accountId} IS NOT NULL`),
+  index('google_access_requests_property_status_idx').on(table.propertyId, table.status, table.requestedAt),
+  check('google_access_requests_email_normalized_check', sql`${table.email} = lower(btrim(${table.email}))`),
 ]);
 
 export const staff = pgTable('staff', {
@@ -102,4 +137,8 @@ export const auditEvents = pgTable('audit_events', {
   ipAddress: varchar('ip_address', { length: 64 }),
   userAgent: varchar('user_agent', { length: 512 }),
   metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
-}, (table) => [index('audit_events_actor_time_idx').on(table.actorAccountId, table.occurredAt), index('audit_events_event_time_idx').on(table.eventType, table.occurredAt)]);
+}, (table) => [
+  index('audit_events_actor_time_idx').on(table.actorAccountId, table.occurredAt),
+  index('audit_events_event_time_idx').on(table.eventType, table.occurredAt),
+  index('audit_events_property_time_idx').on(table.propertyId, table.occurredAt),
+]);

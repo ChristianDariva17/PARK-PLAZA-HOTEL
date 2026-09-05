@@ -35,8 +35,8 @@ describe('parking and pets controller property authority', () => {
 
   it('passes authenticated scope separately from strict create payloads', async () => {
     const parking = { create: vi.fn().mockResolvedValue({ id: 'VEH-001' }) } as unknown as ParkingService;
-    await new ParkingController(parking).create({ id: 'VEH-001', ...linked, plate: 'abc-123', space: 'a1', fee: '10.5', vehicleType: 'Auto', brandModel: 'Sedan', entryResponsible: 'Ana' }, actor);
-    expect(parking.create).toHaveBeenCalledWith(propertyId, expect.objectContaining({ plate: 'ABC-123', space: 'A1', fee: 10.5 }));
+    await new ParkingController(parking).create({ id: 'VEH-001', ...linked, plate: 'abc-123', space: 'a1', fee: '10.5', vehicleType: 'Auto', brandModel: 'Sedan', entryResponsible: 'Ana' }, actor, { id: 'req-1', headers: {}, ip: '127.0.0.1' } as any);
+    expect(parking.create).toHaveBeenCalledWith(actor, expect.objectContaining({ plate: 'ABC-123', space: 'A1', fee: 10.5 }), expect.anything());
     expect(vi.mocked(parking.create).mock.calls[0]![1]).not.toHaveProperty('propertyId');
   });
 
@@ -44,6 +44,17 @@ describe('parking and pets controller property authority', () => {
     const pets = { create: vi.fn().mockResolvedValue({ id: 'PET-001' }) } as unknown as PetsService;
     await new PetsController(pets).create({ id: 'PET-001', stayId: linked.stayId, clientId: linked.clientId, name: 'Milo', type: 'Perro', size: 'Mediano', lodgingPlace: 'Habitación', charge: 5 }, actor, { id: 'request-1', headers: { 'user-agent': 'vitest' }, ip: '127.0.0.1' } as any);
     expect(pets.create).toHaveBeenCalledWith(actor, expect.objectContaining({ id: 'PET-001', charge: 5 }), { requestId: 'request-1', ipAddress: '127.0.0.1', userAgent: 'vitest' });
+  });
+
+  it('rejects pet creation without a stay and update attempts to alter folio linkage or charge', () => {
+    const pets = { create: vi.fn(), update: vi.fn() } as unknown as PetsService;
+    const controller = new PetsController(pets);
+    expect(() => controller.create({ id: 'PET-001', clientId: linked.clientId, name: 'Milo', type: 'Perro', size: 'Mediano', lodgingPlace: 'Habitación', charge: 0 }, actor, {} as any)).toThrow('Invalid request body');
+    expect(() => controller.update('PET-001', { stayId: linked.stayId }, actor)).toThrow('Invalid request body');
+    expect(() => controller.update('PET-001', { clientId: linked.clientId }, actor)).toThrow('Invalid request body');
+    expect(() => controller.update('PET-001', { charge: 10 }, actor)).toThrow('Invalid request body');
+    expect(pets.create).not.toHaveBeenCalled();
+    expect(pets.update).not.toHaveBeenCalled();
   });
 
   it('derives mutation scope from the authenticated account for every route', async () => {

@@ -84,17 +84,23 @@ describe('parking and pets service property predicates', () => {
     }
   });
 
-  it('preserves pet creation posting fields when an operational charge is updated', async () => {
+  it('updates descriptive pet fields without altering canonical charge fields', async () => {
     const current = { ...pet, chargeId: 'entry-id', chargeApplied: true };
-    const selections = [queryResult([{ id: clientId }]), queryResult([{ id: stayId }]), queryResult([{ guestId: clientId }])];
     const updated = mutation([current]);
-    const database = { query: { pets: { findFirst: vi.fn().mockResolvedValue(current) } }, select: vi.fn(() => selections.shift()), update: vi.fn(() => updated) } as unknown as Database;
+    const database = { query: { pets: { findFirst: vi.fn().mockResolvedValue(current) } }, update: vi.fn(() => updated) } as unknown as Database;
     const folios = { appendAncillaryChargeLocked: vi.fn() };
-    await new PetsService(database, folios as any).update(pet.id, propertyId, { charge: 9 });
-    expect(updated.set.mock.calls[0]![0]).toMatchObject({ charge: '9.00' });
+    await new PetsService(database, folios as any).update(pet.id, propertyId, { name: 'Milo' });
+    expect(updated.set.mock.calls[0]![0]).toMatchObject({ name: 'Milo' });
+    expect(updated.set.mock.calls[0]![0]).not.toHaveProperty('charge');
     expect(updated.set.mock.calls[0]![0]).not.toHaveProperty('chargeApplied');
     expect(updated.set.mock.calls[0]![0]).not.toHaveProperty('chargeId');
     expect(folios.appendAncillaryChargeLocked).not.toHaveBeenCalled();
+  });
+
+  it.each(['stayId', 'clientId', 'charge'])('rejects an update that changes pet %s', async (field) => {
+    const database = { query: { pets: { findFirst: vi.fn() } } } as unknown as Database;
+    await expect(new PetsService(database, {} as any).update(pet.id, propertyId, { [field]: field === 'charge' ? 10 : stayId } as any)).rejects.toBeInstanceOf(BadRequestException);
+    expect(database.query.pets.findFirst).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -120,7 +126,7 @@ describe('parking and pets service property predicates', () => {
     const exited = { ...vehicle, status: 'Fuera', chargeId: 'entry-id' };
     const tx = { execute: vi.fn().mockResolvedValue(undefined), select: vi.fn(() => queryResult([exited])) };
     const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
-    const folios = { appendAncillaryChargeLocked: vi.fn(), assertAncillaryChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
+    const folios = { read: vi.fn().mockResolvedValue({ settlement: 'open' }), appendAncillaryChargeLocked: vi.fn(), assertAncillaryChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
 
     await expect(new ParkingService(database, folios as any).exit(vehicle.id, actor, { exitResponsible: 'Ana' }, {})).resolves.toEqual(exited);
     expect(folios.assertAncillaryChargeReference).toHaveBeenCalledWith(tx, actor, { stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, chargeId: 'entry-id' });
@@ -129,10 +135,10 @@ describe('parking and pets service property predicates', () => {
 
   it('scenario: Attached pet creation retry returns the canonical entry without appending another charge', async () => {
     const existing = { ...pet, charge: '5.00', chargeApplied: true, chargeId: 'entry-id', status: 'Activa' };
-    const queries = [[{ id: clientId }], [{ id: stayId }], [{ guestId: clientId }], [existing]];
+    const queries = [[{ id: clientId }], [{ id: stayId, status: 'active' }], [{ guestId: clientId }], [existing]];
     const tx = { execute: vi.fn().mockResolvedValue(undefined), select: vi.fn(() => queryResult(queries.shift() ?? [])) };
     const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
-    const folios = { appendAncillaryChargeLocked: vi.fn(), assertAncillaryChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
+    const folios = { read: vi.fn().mockResolvedValue({ settlement: 'open' }), appendAncillaryChargeLocked: vi.fn(), assertAncillaryChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
 
     await expect(new PetsService(database, folios as any).create(actor, { ...pet, charge: 5 } as any, {})).resolves.toEqual(existing);
     expect(folios.assertAncillaryChargeReference).toHaveBeenCalledWith(tx, actor, { stayId, sourceType: 'pet_charge', sourceId: pet.id, amount: '5.00', chargeId: 'entry-id' });
@@ -141,13 +147,10 @@ describe('parking and pets service property predicates', () => {
 
   it.each([
     ['attached positive charge', { ...pet, charge: 5 }, true, 'entry-id'],
-    ['detached pet', { ...pet, stayId: null, charge: 5 }, false, null],
     ['zero-value pet', { ...pet, charge: 0 }, false, null],
   ])('scenario: Pet creation %s posts only when eligible', async (_scenario, input, charged, expectedChargeId) => {
     const created = { ...input, charge: input.charge.toFixed(2), chargeApplied: charged, chargeId: expectedChargeId, status: 'Activa' };
-    const queries = input.stayId === null
-      ? [[{ id: clientId }], []]
-      : [[{ id: clientId }], [{ id: stayId }], [{ guestId: clientId }], []];
+    const queries = [[{ id: clientId }], [{ id: stayId, status: 'active' }], [{ guestId: clientId }], []];
     const inserted: unknown[] = [];
     const tx = {
       execute: vi.fn().mockResolvedValue(undefined),
@@ -155,7 +158,7 @@ describe('parking and pets service property predicates', () => {
       insert: vi.fn(() => ({ values: vi.fn((value: unknown) => { inserted.push(value); return { returning: vi.fn().mockResolvedValue([created]) }; }) })),
     };
     const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
-    const folios = { appendAncillaryChargeLocked: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
+    const folios = { read: vi.fn().mockResolvedValue({ settlement: 'open' }), appendAncillaryChargeLocked: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
 
     await expect(new PetsService(database, folios as any).create(actor, input as any, { requestId: 'pet-request' })).resolves.toMatchObject({ chargeApplied: charged, chargeId: expectedChargeId });
     if (charged) {
@@ -166,21 +169,27 @@ describe('parking and pets service property predicates', () => {
     expect(inserted).toContainEqual(expect.objectContaining({ chargeApplied: charged, chargeId: expectedChargeId }));
   });
 
-  it('rejects pet update when its guest or stay link is outside the property', async () => {
-    const guestMismatch = { query: { pets: { findFirst: vi.fn().mockResolvedValue(pet) } }, select: vi.fn(() => queryResult([])), update: vi.fn() } as unknown as Database;
-    await expect(new PetsService(guestMismatch, {} as any).update(pet.id, propertyId, { name: 'Milo' })).rejects.toBeInstanceOf(BadRequestException);
+  it('rejects a missing or inactive stay before creating a pet', async () => {
+    const missingStay = { transaction: vi.fn((callback: (transaction: any) => unknown) => callback({ execute: vi.fn(), select: vi.fn(() => queryResult([{ id: clientId }])) })) } as unknown as Database;
+    await expect(new PetsService(missingStay, { read: vi.fn() } as any).create(actor, { ...pet, stayId: undefined } as any, {})).rejects.toBeInstanceOf(BadRequestException);
 
-    const selections = [queryResult([{ id: clientId }]), queryResult([]), queryResult([{ guestId: clientId }])];
-    const stayMismatch = { query: { pets: { findFirst: vi.fn().mockResolvedValue(pet) } }, select: vi.fn(() => selections.shift()), update: vi.fn() } as unknown as Database;
-    await expect(new PetsService(stayMismatch, {} as any).update(pet.id, propertyId, { name: 'Milo' })).rejects.toBeInstanceOf(BadRequestException);
+    const queries = [[{ id: clientId }], [{ id: stayId, status: 'checked_out' }], [{ guestId: clientId }]];
+    const inactiveStay = { transaction: vi.fn((callback: (transaction: any) => unknown) => callback({ execute: vi.fn(), select: vi.fn(() => queryResult(queries.shift() ?? [])) })) } as unknown as Database;
+    await expect(new PetsService(inactiveStay, { read: vi.fn() } as any).create(actor, { ...pet, charge: 0 } as any, {})).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('scopes every pet mutation write by record and property after real link validation', async () => {
-    const selections = [queryResult([{ id: clientId }]), queryResult([{ id: stayId }]), queryResult([{ guestId: clientId }])];
+  it('rejects pet creation when the active stay folio is not open', async () => {
+    const queries = [[{ id: clientId }], [{ id: stayId, status: 'active' }], [{ guestId: clientId }]];
+    const tx = { execute: vi.fn(), select: vi.fn(() => queryResult(queries.shift() ?? [])) };
+    const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
+    await expect(new PetsService(database, { read: vi.fn().mockResolvedValue({ settlement: 'settled' }) } as any).create(actor, { ...pet, charge: 0 } as any, {})).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('scopes every pet mutation write by record and property', async () => {
     const updated = mutation([pet]);
     const archived = mutation([pet]);
     const reactivated = mutation([pet]);
-    const database = { query: { pets: { findFirst: vi.fn().mockResolvedValue(pet) } }, select: vi.fn(() => selections.shift()), update: vi.fn().mockReturnValueOnce(updated).mockReturnValueOnce(archived).mockReturnValueOnce(reactivated) } as unknown as Database;
+    const database = { query: { pets: { findFirst: vi.fn().mockResolvedValue(pet) } }, update: vi.fn().mockReturnValueOnce(updated).mockReturnValueOnce(archived).mockReturnValueOnce(reactivated) } as unknown as Database;
     const service = new PetsService(database, {} as any);
     await service.update(pet.id, propertyId, { name: 'Milo' });
     await service.archive(pet.id, propertyId, 'History');

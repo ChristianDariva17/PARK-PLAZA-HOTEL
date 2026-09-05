@@ -7,6 +7,7 @@ import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { Req } from '@nestjs/common';
 import {
   parseAdjustInventoryDto,
+  parseAdvanceOrderItemDto,
   parseArchiveDto,
   parseAdvanceOrderDto,
   parseCancelOrderDto,
@@ -28,6 +29,12 @@ export class RestaurantController {
   @Get('menu')
   @RequirePermissions('orders.read')
   listMenu(@CurrentAccount() actor: AuthenticatedAccount) {
+    return this.restaurant.listMenu(actor.propertyId);
+  }
+
+  @Get('internal/menu')
+  @RequirePermissions('orders.read')
+  listInternalMenu(@CurrentAccount() actor: AuthenticatedAccount) {
     return this.restaurant.listMenu(actor.propertyId);
   }
 
@@ -60,6 +67,15 @@ export class RestaurantController {
     @CurrentAccount() actor: AuthenticatedAccount,
   ) {
     return this.restaurant.archiveMenuItem(actor, parseUuidParam(id), parseArchiveDto(body));
+  }
+
+  @Post('menu/:id/reactivate')
+  @RequirePermissions('kitchen.archive')
+  reactivateMenuItem(
+    @Param('id') id: string,
+    @CurrentAccount() actor: AuthenticatedAccount,
+  ) {
+    return this.restaurant.reactivateMenuItem(actor, parseUuidParam(id));
   }
 
   // ─── Inventory ────────────────────────────────────────────────────────────
@@ -117,6 +133,15 @@ export class RestaurantController {
     return this.restaurant.archiveInventoryItem(actor, parseUuidParam(id), parseArchiveDto(body));
   }
 
+  @Post('inventory/:id/reactivate')
+  @RequirePermissions('inventory.archive')
+  reactivateInventoryItem(
+    @Param('id') id: string,
+    @CurrentAccount() actor: AuthenticatedAccount,
+  ) {
+    return this.restaurant.reactivateInventoryItem(actor, parseUuidParam(id));
+  }
+
   // ─── Orders ───────────────────────────────────────────────────────────────
   @Get('orders')
   @RequirePermissions('orders.read')
@@ -154,6 +179,24 @@ export class RestaurantController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.restaurant.advanceOrder(actor, parseUuidParam(id), parseAdvanceOrderDto(body), getRequestContext(req));
+  }
+
+  @Post('orders/:orderId/items/:itemId/advance')
+  @RequirePermissions('orders.advance')
+  advanceOrderItem(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Body() body: unknown,
+    @CurrentAccount() actor: AuthenticatedAccount,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.restaurant.advanceOrderItem(
+      actor,
+      parseUuidParam(orderId),
+      parseUuidParam(itemId),
+      parseAdvanceOrderItemDto(body),
+      getRequestContext(req),
+    );
   }
 
   @Post('orders/:id/cancel')

@@ -17,7 +17,7 @@ export function PageHeader({ title, description, action, actionType, metadata })
   const route = window.location.hash.replace(/^#\/?/, '').split('?')[0];
   const explicitActionType = actionType || action?.props?.actionType;
   const required = explicitActionType ? permissionForAction({ type: explicitActionType }) : permissionForPrimaryAction(route, action?.props?.children);
-  const authorizedAction = action && required && can(required) ? action : null;
+  const authorizedAction = action ? (!required || can(required) ? action : null) : null;
   return <header className="page-heading"><div>{metadata ? <span className="page-metadata">{metadata}</span> : null}<h2>{title}</h2><p>{description}</p></div>{authorizedAction ? <div className="page-actions">{authorizedAction}</div> : null}</header>;
 }
 
@@ -33,7 +33,7 @@ export function StatusBadge({ children }) {
 }
 
 export function EmptyState({ title = 'Sin resultados', description = 'No hay registros que coincidan con los filtros actuales.' }) {
-  return <div className="empty-state"><Search size={28} aria-hidden="true" /><strong>{title}</strong><span>{description}</span></div>;
+  return <div className="empty-state"><Search size={48} className="empty-state-icon" aria-hidden="true" /><h3>{title}</h3><p>{description}</p></div>;
 }
 
 export function SectionHeader({ eyebrow, title, description, action, id }) {
@@ -41,7 +41,7 @@ export function SectionHeader({ eyebrow, title, description, action, id }) {
 }
 
 export function MetricStrip({ items, label = 'Resumen operativo' }) {
-  return <section className="metric-strip" aria-label={label}>{items.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong>{item.detail ? <small>{item.detail}</small> : null}</div>)}</section>;
+  return <section className="metric-strip" aria-label={label}>{items.map((item) => <div key={item.label} className="metric-card"><span className="metric-label">{item.label}</span><strong className="metric-value">{item.value}</strong>{item.detail ? <small>{item.detail}</small> : null}</div>)}</section>;
 }
 
 export function DetailGrid({ items, compact = false }) {

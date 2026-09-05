@@ -6,6 +6,7 @@ const AVAILABILITY_KEYS = ['checkInAt', 'checkOutAt', 'durationMinutes', 'guestC
 const POLICY_KEYS = ['dayUseEnd', 'dayUseMinimumMinutes', 'dayUseStart', 'reservationIntervalMinutes', 'timezone'];
 const AVAILABLE_ROOM_KEYS = ['capacity', 'categoryId', 'floor', 'nightlyRate', 'number', 'operationalStatus', 'roomId', 'totalAmount'];
 const CREATE_KEYS = ['checkInAt', 'checkOutAt', 'guestCount', 'primaryGuestId', 'roomId'];
+const DETAIL_KEYS = ['checkIn', 'checkInAt', 'checkOut', 'checkOutAt', 'createdAt', 'guestCount', 'id', 'lifecycle', 'nightlyRate', 'permittedActions', 'primaryGuest', 'room', 'status', 'totalAmount', 'updatedAt'];
 const QUERY_KEYS = ['checkInAt', 'checkOutAt', 'guestCount'];
 const INVALID_RESPONSE_MESSAGE = 'El servidor devolvió datos de reservas no válidos. Actualice la información e intente nuevamente.';
 
@@ -56,4 +57,23 @@ export function adaptReservationCreateResponse(response, request) {
   const reservation = adaptReservationResponse(response);
   if (reservation.status !== 'pending' || reservation.roomId !== request.roomId || reservation.primaryGuestId !== request.primaryGuestId || reservation.checkInAt !== request.checkInAt || reservation.checkOutAt !== request.checkOutAt || reservation.guestCount !== request.guestCount) failContract();
   return reservation;
+}
+
+export function adaptReservationDetailResponse(response) {
+  if (!hasExactKeys(response, DETAIL_KEYS) || !isUuid(response.id) || !Object.hasOwn(RESERVATION_STATUS_LABELS, response.status) || !/^\d{4}-\d{2}-\d{2}$/.test(response.checkIn) || !/^\d{4}-\d{2}-\d{2}$/.test(response.checkOut) || !validInterval(response.checkInAt, response.checkOutAt) || !isPositiveInteger(response.guestCount) || !isDecimal(response.nightlyRate) || !isDecimal(response.totalAmount) || !isUtcTimestamp(response.createdAt) || !isUtcTimestamp(response.updatedAt) || !hasExactKeys(response.lifecycle, ['changedAt', 'reason']) || (response.lifecycle.changedAt !== null && !isUtcTimestamp(response.lifecycle.changedAt)) || (response.lifecycle.reason !== null && (typeof response.lifecycle.reason !== 'string' || !response.lifecycle.reason.trim())) || !hasExactKeys(response.room, ['floor', 'id', 'number']) || !isUuid(response.room.id) || typeof response.room.number !== 'string' || !Number.isSafeInteger(response.room.floor) || !hasExactKeys(response.primaryGuest, ['documentNumber', 'documentType', 'id', 'name']) || !isUuid(response.primaryGuest.id) || typeof response.primaryGuest.name !== 'string' || !Array.isArray(response.permittedActions) || response.permittedActions.some((action) => !['confirm', 'cancel', 'disposition'].includes(action))) failContract();
+  return { ...response, lifecycle: { ...response.lifecycle }, room: { ...response.room }, primaryGuest: { ...response.primaryGuest }, permittedActions: [...response.permittedActions] };
+}
+
+export function adaptReservationCommandResponse(response) {
+  if (!hasExactKeys(response, ['replayed', 'reservation']) || typeof response.replayed !== 'boolean') failContract();
+  return { reservation: adaptReservationDetailResponse(response.reservation), replayed: response.replayed };
+}
+
+export function buildReservationLifecycleDto(operation, input = {}) {
+  if (operation === 'confirm') { if (!hasExactKeys(input, [])) throw new Error('Confirm does not accept fields.'); return {}; }
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+  if (!reason) throw new Error('Ingrese un motivo.');
+  if (operation === 'cancel') { if (!hasExactKeys(input, ['reason'])) throw new Error('Ingrese un motivo válido.'); return { reason }; }
+  if (operation === 'disposition' && hasExactKeys(input, ['disposition', 'reason']) && ['no_show', 'expired'].includes(input.disposition)) return { disposition: input.disposition, reason };
+  throw new Error('Seleccione una disposición válida.');
 }

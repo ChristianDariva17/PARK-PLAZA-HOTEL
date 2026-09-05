@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adaptReservationAvailabilityResponse, adaptReservationCreateResponse, adaptReservationListResponse, buildReservationAvailabilityQuery, buildReservationCreateDto, ReservationContractError } from './reservationModel.js';
+import { adaptReservationAvailabilityResponse, adaptReservationCommandResponse, adaptReservationCreateResponse, adaptReservationDetailResponse, adaptReservationListResponse, buildReservationAvailabilityQuery, buildReservationCreateDto, buildReservationLifecycleDto, ReservationContractError } from './reservationModel.js';
 
 const roomId = '550e8400-e29b-41d4-a716-446655440000';
 const categoryId = '550e8400-e29b-41d4-a716-446655440001';
@@ -23,5 +23,12 @@ describe('interval reservation frontend contract', () => {
     expect(buildReservationAvailabilityQuery({ checkInAt: input.checkInAt, checkOutAt: input.checkOutAt, guestCount: '2' })).toEqual({ checkInAt: input.checkInAt, checkOutAt: input.checkOutAt, guestCount: 2 });
     expect(buildReservationCreateDto({ ...input, guestCount: '2' })).toEqual(input);
     expect(() => buildReservationCreateDto({ ...input, propertyId: roomId })).toThrow();
+  });
+  it('preserves civil dates and accepts only server-authoritative lifecycle envelopes', () => {
+    const detail = { id: reservationId, status: 'pending', checkIn: '2028-02-28', checkOut: '2028-03-01', checkInAt: input.checkInAt, checkOutAt: input.checkOutAt, guestCount: 2, nightlyRate: '123.45', totalAmount: '102.88', createdAt: '2026-08-14T12:00:00.000Z', updatedAt: '2026-08-14T12:00:00.000Z', lifecycle: { changedAt: null, reason: null }, room: { id: roomId, number: '101', floor: 1 }, primaryGuest: { id: guestId, name: 'Ada Lovelace', documentType: 'dni', documentNumber: '123' }, permittedActions: ['confirm', 'cancel', 'disposition'] };
+    expect(adaptReservationDetailResponse(detail).checkIn).toBe('2028-02-28');
+    expect(adaptReservationCommandResponse({ reservation: detail, replayed: true }).replayed).toBe(true);
+    expect(buildReservationLifecycleDto('cancel', { reason: '  Requested  ' })).toEqual({ reason: 'Requested' });
+    expect(() => buildReservationLifecycleDto('disposition', { reason: 'x', disposition: 'cancelled' })).toThrow();
   });
 });

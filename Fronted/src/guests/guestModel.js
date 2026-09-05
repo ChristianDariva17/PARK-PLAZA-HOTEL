@@ -7,17 +7,13 @@ export const GUEST_DOCUMENT_TYPES = Object.freeze({
 
 export const GUEST_STATUS_LABELS = Object.freeze({ active: 'Activo', archived: 'Archivado' });
 
-const GUEST_FIELDS = ['firstName', 'lastName', 'birthDate', 'nationality', 'email', 'phone', 'address', 'emergencyContact', 'notes'];
-const NULLABLE_FIELDS = new Set(['birthDate', 'nationality', 'email', 'phone', 'address', 'emergencyContact', 'notes']);
+const GUEST_FIELDS = ['firstName', 'lastName', 'nationality', 'email', 'phone', 'address', 'emergencyContact', 'notes'];
+const NULLABLE_FIELDS = new Set(['nationality', 'email', 'phone', 'address', 'emergencyContact', 'notes']);
 const LOCAL_DEFAULTS = Object.freeze({
   visits: 0,
   totalSpent: 0,
-  loyaltyTier: 'Bronce',
-  loyaltyPoints: 0,
-  promoAuth: false,
   petIds: Object.freeze([]),
   preferences: Object.freeze([]),
-  rating: null,
 });
 
 const trimmed = (value) => typeof value === 'string' ? value.trim() : '';
@@ -40,18 +36,16 @@ function normalizeDocument(document) {
   if (!Object.hasOwn(GUEST_DOCUMENT_TYPES, type)) throw new Error('Seleccione un tipo de documento válido.');
   return {
     type,
-    issuingCountry: countryCode(document.issuingCountry, true),
+    issuingCountry: type === 'dni' || type === 'foreign_id' ? 'PE' : countryCode(document.issuingCountry, true),
     documentNumber: requiredText(document.documentNumber, 'El número de documento').toUpperCase(),
-    expiresOn: nullableText(document.expiresOn),
   };
 }
 
-function normalizeGuestFields(input) {
+function normalizeGuestFields(input, documentType) {
   const fields = {
     firstName: requiredText(input.firstName, 'Los nombres'),
     lastName: requiredText(input.lastName, 'Los apellidos'),
-    birthDate: nullableText(input.birthDate),
-    nationality: countryCode(input.nationality),
+    nationality: documentType === 'passport' ? countryCode(input.nationality, true) : null,
     email: nullableText(input.email)?.toLowerCase() ?? null,
     phone: nullableText(input.phone),
     address: nullableText(input.address),
@@ -86,37 +80,33 @@ export function adaptGuestResponse(response, localGuest = {}) {
     documentExpiresOn: document.expiresOn ?? '',
     visits: localGuest.visits ?? LOCAL_DEFAULTS.visits,
     totalSpent: localGuest.totalSpent ?? LOCAL_DEFAULTS.totalSpent,
-    loyaltyTier: localGuest.loyaltyTier ?? LOCAL_DEFAULTS.loyaltyTier,
-    loyaltyPoints: localGuest.loyaltyPoints ?? LOCAL_DEFAULTS.loyaltyPoints,
-    promoAuth: localGuest.promoAuth ?? LOCAL_DEFAULTS.promoAuth,
     petIds: localGuest.petIds ?? [],
     preferences: localGuest.preferences ?? [],
-    rating: localGuest.rating ?? LOCAL_DEFAULTS.rating,
     ...(localGuest.biometric ? { biometric: localGuest.biometric } : {}),
   };
 }
 
 export function buildGuestCreateDto(input) {
+  const primaryDocument = normalizeDocument(input.primaryDocument);
   return {
-    ...normalizeGuestFields(input),
-    primaryDocument: normalizeDocument(input.primaryDocument),
+    ...normalizeGuestFields(input, primaryDocument.type),
+    primaryDocument,
   };
 }
 
 export function buildGuestPatchDto(current, input) {
-  const candidate = normalizeGuestFields(input);
+  const document = normalizeDocument(input.primaryDocument);
+  const candidate = normalizeGuestFields(input, document.type);
   const patch = {};
   for (const field of GUEST_FIELDS) {
     const currentValue = NULLABLE_FIELDS.has(field) ? (current[field] || null) : current[field];
     if (candidate[field] !== currentValue) patch[field] = candidate[field];
   }
 
-  const document = normalizeDocument(input.primaryDocument);
   const currentDocument = current.primaryDocument;
   if (document.type !== currentDocument.type
     || document.issuingCountry !== currentDocument.issuingCountry
-    || document.documentNumber !== currentDocument.documentNumber
-    || document.expiresOn !== (currentDocument.expiresOn ?? null)) {
+    || document.documentNumber !== currentDocument.documentNumber) {
     patch.primaryDocument = document;
   }
 

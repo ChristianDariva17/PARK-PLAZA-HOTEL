@@ -9,7 +9,7 @@ const createMaintenanceSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
   responsible: z.string().trim().min(1).max(100).optional(),
   blocksRoom: z.boolean().optional().default(false),
-  evidence: z.string().trim().max(500).optional(),
+  evidence: z.string().trim().max(2_000_000).optional(),
 }).strict();
 
 const updateMaintenanceSchema = z.object({
@@ -17,14 +17,28 @@ const updateMaintenanceSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
   responsible: z.string().trim().min(1).max(100).optional(),
   solution: z.string().trim().max(2000).optional(),
-  evidence: z.string().trim().max(500).optional(),
+  evidence: z.string().trim().max(2_000_000).optional(),
   blocksRoom: z.boolean().optional(),
 }).strict();
 
 const progressMaintenanceSchema = z.object({
+  action: z.enum(['assign', 'start', 'resolve', 'close', 'reopen']),
   expectedStatus: z.enum(['pending', 'assigned', 'in_progress', 'resolved', 'closed']).optional(),
-  evidence: z.string().trim().max(500).optional(),
-}).strict();
+  responsible: z.string().trim().min(1).max(100).optional(),
+  solution: z.string().trim().min(1).max(2000).optional(),
+  evidence: z.string().trim().max(2_000_000).optional(),
+  releaseRoom: z.boolean().optional().default(false),
+}).strict().superRefine((value, context) => {
+  if (value.action === 'assign' && !value.responsible) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['responsible'], message: 'Responsible is required when assigning a ticket' });
+  }
+  if (value.action === 'resolve' && !value.solution) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['solution'], message: 'Solution is required when resolving a ticket' });
+  }
+  if (value.action !== 'close' && value.releaseRoom) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['releaseRoom'], message: 'A room can only be released when closing a ticket' });
+  }
+});
 
 const idempotencyKeySchema = z.string().uuid();
 

@@ -9,6 +9,7 @@ import { acquirePropertyTransactionLock } from '../database/transaction-policy.j
 import { assertEligibleEarlyCheckIn, assertInterval, proratedAmount, type PropertyIntervalPolicy } from '../reservations/interval-policy.js';
 import type { CheckInDto, CheckOutDto, WalkInDto } from './stays.dto.js';
 import { FolioService } from '../folios/folio.service.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 
 export interface StayCommandResponse extends Record<string, unknown> {
   stay: { id: string; reservationId: string; roomId: string; status: 'active' | 'checked_out'; checkInAt: string; checkOutAt: string | null };
@@ -24,7 +25,12 @@ const propertySelection = { timezone: properties.timezone, dayUseStart: properti
 
 @Injectable()
 export class StaysService {
-  constructor(@Inject(DATABASE) private readonly database: Database, private readonly audit: AuditService, private readonly foliosService: FolioService) {}
+  constructor(
+    @Inject(DATABASE) private readonly database: Database,
+    private readonly audit: AuditService,
+    private readonly foliosService: FolioService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   async list(propertyId: string): Promise<PersistentStayResponse[]> {
     const rows = await this.database.select({ id: stays.id, reservationId: stays.reservationId, roomId: stays.roomId, status: stays.status, checkInAt: stays.checkInAt, checkOutAt: stays.checkOutAt })
@@ -148,6 +154,8 @@ export class StaysService {
         if (!policy) throw new NotFoundException('Property not found');
         const response = await run(tx, policy);
         await tx.insert(stayCommands).values({ propertyId: actor.propertyId, operation, idempotencyKey: key, response });
+        this.realtime.emitToProperty(actor.propertyId, 'room:status_changed', response.room);
+        this.realtime.emitToProperty(actor.propertyId, 'stay:status_changed', response);
         return response;
       });
     } catch (error) {

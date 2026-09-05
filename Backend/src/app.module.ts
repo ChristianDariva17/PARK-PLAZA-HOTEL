@@ -19,11 +19,21 @@ import { ParkingModule } from './parking/parking.module.js';
 import { PetsModule } from './pets/pets.module.js';
 import { FolioModule } from './folios/folio.module.js';
 import { ReceivablesModule } from './receivables/receivables.module.js';
+import { CustomerModule } from './customer/customer.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
+import { SuppliersModule } from './suppliers/suppliers.module.js';
+import { StaffModule } from './staff/staff.module.js';
+import { AttendanceModule } from './attendance/attendance.module.js';
+import { AmenitiesModule } from './amenities/amenities.module.js';
+import { RolesModule } from './roles/roles.module.js';
+import { CommunicationsModule } from './communications/communications.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
     DatabaseModule,
+    RealtimeModule,
     AuditModule,
     AuthModule,
     AccountsModule,
@@ -40,6 +50,14 @@ import { ReceivablesModule } from './receivables/receivables.module.js';
     PetsModule,
     FolioModule,
     ReceivablesModule,
+    CustomerModule,
+    DocumentsModule,
+    SuppliersModule,
+    StaffModule,
+    AttendanceModule,
+    AmenitiesModule,
+    RolesModule,
+    CommunicationsModule,
   ],
   controllers: [HealthController],
 })

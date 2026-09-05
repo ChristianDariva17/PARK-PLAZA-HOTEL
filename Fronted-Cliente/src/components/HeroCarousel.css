@@ -1,0 +1,281 @@
+.hero-carousel-container {
+  margin: 0;
+  background-color: #1a1a1a;
+  color: #FFFFFFDD;
+  position: relative;
+  overflow: hidden;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  height: 100vh;
+  width: 100vw;
+}
+
+.hero-carousel-container .card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-position: center;
+  background-size: cover;
+  box-shadow: 6px 6px 10px 2px rgba(0, 0, 0, 0.6);
+}
+
+.hero-carousel-container .card-content {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #FFFFFFDD;
+  padding-left: 16px;
+  width: 200px;
+  box-sizing: border-box;
+}
+
+.hero-carousel-container .content-start {
+  width: 30px;
+  height: 5px;
+  border-radius: 99px;
+  background-color: #FFFFFFDD;
+}
+
+.hero-carousel-container .content-place {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.hero-carousel-container .content-title-1,
+.hero-carousel-container .content-title-2 {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 20px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.hero-carousel-container .details {
+  position: absolute;
+  top: 240px;
+  left: 60px;
+  z-index: 22;
+}
+
+.hero-carousel-container .place-box {
+  height: 46px;
+  overflow: hidden;
+}
+
+.hero-carousel-container .place-box .text {
+  padding-top: 16px;
+  font-size: 20px;
+  position: relative;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.hero-carousel-container .place-box .text::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 4px;
+  border-radius: 99px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.hero-carousel-container .title-box-1,
+.hero-carousel-container .title-box-2 {
+  margin-top: 2px;
+  height: 100px;
+  overflow: hidden;
+}
+
+.hero-carousel-container .title-1,
+.hero-carousel-container .title-2 {
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  font-size: 72px;
+  text-shadow: 0 4px 8px rgba(0,0,0,0.8);
+  line-height: 1.1;
+}
+
+.hero-carousel-container .desc {
+  margin-top: 16px;
+  width: 500px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.hero-carousel-container .cta {
+  width: 500px;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.hero-carousel-container button.bookmark {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 99px;
+  background-color: var(--color-gold, #D4AF37);
+  color: white;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+}
+
+.hero-carousel-container button.bookmark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hero-carousel-container button.discover {
+  border: 1px solid #ffffff;
+  background-color: transparent;
+  height: 36px;
+  border-radius: 99px;
+  color: #ffffff;
+  padding: 4px 24px;
+  font-size: 12px;
+  margin-left: 16px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  letter-spacing: 1px;
+}
+
+.hero-carousel-container .pagination {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  display: inline-flex;
+}
+
+.hero-carousel-container .arrow {
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  border: 2px solid #ffffff55;
+  display: grid;
+  place-items: center;
+  z-index: 60;
+}
+
+.hero-carousel-container .arrow svg {
+  width: 24px;
+  height: 24px;
+}
+
+.hero-carousel-container .progress-sub-container {
+  margin-left: 24px;
+  width: 500px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  z-index: 60;
+}
+
+.hero-carousel-container .progress-sub-background {
+  width: 500px;
+  height: 3px;
+  background-color: #ffffff33;
+}
+
+.hero-carousel-container .progress-sub-foreground {
+  height: 3px;
+  background-color: var(--color-gold, #D4AF37);
+}
+
+.hero-carousel-container .slide-numbers {
+  width: 50px;
+  height: 50px;
+  overflow: hidden;
+  position: relative;
+  z-index: 60;
+}
+
+.hero-carousel-container .slide-numbers .item {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.hero-carousel-container .indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 5px;
+  z-index: 60;
+  background-color: var(--color-gold, #D4AF37);
+}
+
+.hero-carousel-container .cover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #fff;
+  z-index: 100;
+}
+
+@media (max-width: 768px) {
+  .hero-carousel-container .details {
+    top: 100px;
+    left: 20px;
+    width: calc(100vw - 40px);
+  }
+  .hero-carousel-container .desc {
+    width: 100%;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .hero-carousel-container .cta {
+    width: 100%;
+  }
+  .hero-carousel-container .title-1,
+  .hero-carousel-container .title-2 {
+    font-size: 48px;
+  }
+  .hero-carousel-container .title-box-1,
+  .hero-carousel-container .title-box-2 {
+    height: 60px;
+  }
+  .hero-carousel-container .progress-sub-container,
+  .hero-carousel-container .progress-sub-background {
+    width: 150px;
+  }
+  
+  .hero-carousel-container .card-content {
+    padding-left: 8px;
+    width: 80px;
+    box-sizing: border-box;
+  }
+  .hero-carousel-container .content-start {
+    width: 16px;
+    height: 3px;
+  }
+  .hero-carousel-container .content-place {
+    font-size: 8px;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hero-carousel-container .content-title-1 {
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+}

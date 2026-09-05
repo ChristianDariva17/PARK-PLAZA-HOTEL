@@ -13,15 +13,14 @@ export class SessionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector, private readonly sessions: SessionService, private readonly config: ConfigService<Environment, true>) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [context.getHandler(), context.getClass()]);
+    if (isPublic) return true;
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = request.cookies?.[this.config.get('AUTH_COOKIE_NAME', { infer: true })];
     if (!token) {
-      if (isPublic) return true;
       throw new UnauthorizedException('Authentication required');
     }
     const auth = await this.sessions.resolve(token, getRequestContext(request));
     if (!auth) {
-      if (isPublic) return true;
       throw new UnauthorizedException('Authentication required');
     }
     request.auth = auth;

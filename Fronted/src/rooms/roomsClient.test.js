@@ -12,7 +12,7 @@ vi.mock('../auth/authClient.js', () => {
 });
 
 import { AuthRequestError, authRequest } from '../auth/authClient.js';
-import { createRoomCancellationError, getRooms, RoomRequestError, setRoomBlocked, updateRoom } from './roomsClient.js';
+import { createRoomCancellationError, getRoomCategories, getRooms, RoomRequestError, setRoomBlocked, updateRoom, updateRoomCategory } from './roomsClient.js';
 
 beforeEach(() => {
   vi.mocked(authRequest).mockReset();
@@ -25,6 +25,22 @@ describe('room client contract', () => {
     vi.mocked(authRequest).mockResolvedValue(payload);
     await expect(getRooms(signal)).resolves.toBe(payload);
     expect(authRequest).toHaveBeenCalledWith('/api/rooms', { signal });
+  });
+
+  it('forwards GET categories endpoint and signal', async () => {
+    const signal = new AbortController().signal;
+    const payload = [];
+    vi.mocked(authRequest).mockResolvedValue(payload);
+    await expect(getRoomCategories(signal)).resolves.toBe(payload);
+    expect(authRequest).toHaveBeenCalledWith('/api/rooms/categories', { signal });
+  });
+
+  it('forwards update category endpoint, method, serialized body, and signal', async () => {
+    const signal = new AbortController().signal;
+    const body = { name: 'Suite Deluxe', baseNightlyRate: '350.00' };
+    vi.mocked(authRequest).mockResolvedValue({ id: 'cat-id' });
+    await updateRoomCategory('cat-id', body, signal);
+    expect(authRequest).toHaveBeenCalledWith('/api/rooms/categories/cat-id', { method: 'PATCH', body: JSON.stringify(body), signal });
   });
 
   it('forwards update endpoint, method, serialized body, and signal', async () => {

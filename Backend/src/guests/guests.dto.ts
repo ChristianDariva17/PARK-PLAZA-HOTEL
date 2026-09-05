@@ -28,7 +28,7 @@ const guestFields = {
   notes: optionalText(2000),
 };
 
-const createGuestSchema = z.object({ ...guestFields, primaryDocument: primaryDocumentSchema }).strict();
+export const createGuestSchema = z.object({ ...guestFields, primaryDocument: primaryDocumentSchema }).strict();
 const updatePrimaryDocumentSchema = primaryDocumentSchema.partial().strict().refine((value) => Object.keys(value).length > 0);
 const updateGuestSchema = z.object({
   firstName: guestFields.firstName.optional(),

@@ -19,13 +19,13 @@ describe('FolioService financial command behavior', () => {
   it('derives the signed balance from immutable charge, payment, and reversal history', async () => {
     const setup = service();
     const selections = [[{ id: 'stay', settlement: 'open', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], [
-      { id: 'charge', type: 'charge', amount: '12.50', reversalOfEntryId: null },
-      { id: 'payment', type: 'payment', amount: '5.00', reversalOfEntryId: null },
-      { id: 'reversal', type: 'reversal', amount: '5.00', reversalOfEntryId: 'payment' },
+      { id: 'charge', type: 'charge', amount: '12.50' as any, reversalOfEntryId: null },
+      { id: 'payment', type: 'payment', amount: '5.00' as any, reversalOfEntryId: null },
+      { id: 'reversal', type: 'reversal', amount: '5.00' as any, reversalOfEntryId: 'payment' },
     ]];
-    setup.tx.select.mockImplementation(() => chain(selections.shift() ?? []));
+    setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
 
-    await expect(setup.service.read(setup.tx, actor.propertyId, 'stay')).resolves.toMatchObject({ balance: '12.50', entries: expect.arrayContaining([expect.objectContaining({ id: 'charge' })]) });
+    await expect(setup.service.read(setup.tx as any, actor.propertyId, 'stay')).resolves.toMatchObject({ balance: '12.50', entries: expect.arrayContaining([expect.objectContaining({ id: 'charge' })]) });
   });
 
   it('returns an idempotent retry without inserting another charge and rejects missing property stays before writes', async () => {
@@ -33,40 +33,40 @@ describe('FolioService financial command behavior', () => {
     vi.spyOn(replay.service, 'read').mockResolvedValue(state());
     vi.spyOn(replay.service as any, 'findByIdempotencyKey').mockResolvedValue({ id: 'existing' });
     const insert = vi.spyOn(replay.service as any, 'insert');
-    await replay.service.charge(actor, 'stay', { amount: '4.00', description: 'Laundry' }, 'charge-key', context);
+    await replay.service.charge(actor, 'stay', { amount: '4.00' as any, description: 'Laundry' }, 'charge-key', context);
     expect(replay.tx.execute).toHaveBeenCalledOnce();
     expect(insert).not.toHaveBeenCalled();
 
     const foreign = service();
     vi.spyOn(foreign.service as any, 'findByIdempotencyKey').mockResolvedValue(undefined);
     vi.spyOn(foreign.service, 'read').mockRejectedValue(new NotFoundException('Stay not found'));
-    await expect(foreign.service.charge(actor, 'foreign-stay', { amount: '4.00', description: 'Laundry' }, 'foreign-key', context)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(foreign.service.charge(actor, 'foreign-stay', { amount: '4.00' as any, description: 'Laundry' }, 'foreign-key', context)).rejects.toBeInstanceOf(NotFoundException);
     expect(foreign.tx.insert).not.toHaveBeenCalled();
   });
 
   it('replays a compatible ancillary source with its real UUID without a second audit', async () => {
     const setup = service();
-    setup.tx.select.mockImplementation(() => chain([]));
+    setup.tx as any.select.mockImplementation(() => chain([]));
     const insert = vi.spyOn(setup.service as any, 'insert').mockResolvedValue({ id: '8e6c4ee6-555d-58ed-9015-6fce38b513ea' });
-    await expect(setup.service.appendAncillaryChargeLocked(setup.tx, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-1', amount: '8.00', reason: 'Parking exit' }, context)).resolves.toEqual({ id: '8e6c4ee6-555d-58ed-9015-6fce38b513ea' });
+    await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-1', amount: '8.00' as any, reason: 'Parking exit' }, context)).resolves.toEqual({ id: '8e6c4ee6-555d-58ed-9015-6fce38b513ea' });
     expect(insert).toHaveBeenCalledOnce();
   });
 
   it('scenario: Post-settlement ancillary posting is rejected before a ledger insert', async () => {
     const setup = service();
     const selections = [[], [], [{ id: 'stay', settlement: 'settled', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], []];
-    setup.tx.select.mockImplementation(() => chain(selections.shift() ?? []));
+    setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
 
-    await expect(setup.service.appendAncillaryChargeLocked(setup.tx, actor, { stayId: 'stay', sourceType: 'pet_charge', sourceId: 'PET-1', amount: '5.00', reason: 'Pet lodging charge' }, context)).rejects.toBeInstanceOf(ConflictException);
-    expect(setup.tx.insert).not.toHaveBeenCalled();
+    await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'pet_charge', sourceId: 'PET-1', amount: '5.00' as any, reason: 'Pet lodging charge' }, context)).rejects.toBeInstanceOf(ConflictException);
+    expect(setup.tx as any.insert).not.toHaveBeenCalled();
   });
 
   it('scenario: Checkout contention uses the locked stay before the ancillary insert', async () => {
     const setup = commandSetup([[], [], [stayRow], [folioRow], []], [{ id: 'entry-id' }]);
 
-    await expect(setup.service.appendAncillaryChargeLocked(setup.tx, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00', reason: 'Parking exit' }, context)).resolves.toEqual({ id: 'entry-id' });
-    expect(setup.tx.select.mock.results[2]!.value.for).toHaveBeenCalledWith('update', expect.anything());
-    expect(setup.inserted).toContainEqual(expect.objectContaining({ sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00' }));
+    await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00' as any, reason: 'Parking exit' }, context)).resolves.toEqual({ id: 'entry-id' });
+    expect(setup.tx as any.select.mock.results[2]!.value.for).toHaveBeenCalledWith('update', expect.anything());
+    expect(setup.inserted).toContainEqual(expect.objectContaining({ sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00' as any }));
   });
 
   it('rejects overpayment before ledger insertion and accepts a true partial Tarjeta payment without cash movement', async () => {
@@ -74,13 +74,13 @@ describe('FolioService financial command behavior', () => {
     const read = vi.spyOn(setup.service, 'read').mockResolvedValue(state([], '4.00'));
     vi.spyOn(setup.service as any, 'findByIdempotencyKey').mockResolvedValue(undefined);
     const insert = vi.spyOn(setup.service as any, 'insert');
-    await expect(setup.service.payment(actor, 'stay', { amount: '4.01', method: 'Tarjeta' }, 'payment-key', context)).rejects.toBeInstanceOf(ConflictException);
-    expect(read).toHaveBeenCalledWith(setup.tx, actor.propertyId, 'stay', true);
+    await expect(setup.service.payment(actor, 'stay', { amount: '4.01' as any, method: 'Tarjeta' }, 'payment-key', context)).rejects.toBeInstanceOf(ConflictException);
+    expect(read).toHaveBeenCalledWith(setup.tx as any, actor.propertyId, 'stay', true);
     expect(insert).not.toHaveBeenCalled();
 
     const partial = commandSetup([[ ], [stayRow], [folioRow], [charge], [], [stayRow], [folioRow], [charge, cardPayment]], [cardPayment]);
-    await expect(partial.service.payment(actor, 'stay', { amount: '4.00', method: 'Tarjeta' }, 'card-key', context)).resolves.toMatchObject({ balance: '6.00' });
-    expect(partial.inserted).toEqual([expect.objectContaining({ type: 'payment', amount: '4.00', paymentMethod: 'Tarjeta' })]);
+    await expect(partial.service.payment(actor, 'stay', { amount: '4.00' as any, method: 'Tarjeta' }, 'card-key', context)).resolves.toMatchObject({ balance: '6.00' });
+    expect(partial.inserted).toEqual([expect.objectContaining({ type: 'payment', amount: '4.00' as any, paymentMethod: 'Tarjeta' })]);
   });
 
   it('creates exactly one referenced Ingreso for Efectivo payment and one linked Egreso for its public-command reversal', async () => {
@@ -89,12 +89,12 @@ describe('FolioService financial command behavior', () => {
     vi.spyOn(setup.service as any, 'findByIdempotencyKey').mockResolvedValue(undefined);
     const cashSession = vi.spyOn(setup.service as any, 'assertOpenCashSession').mockRejectedValue(new ConflictException('closed'));
     const insert = vi.spyOn(setup.service as any, 'insert');
-    await expect(setup.service.payment(actor, 'stay', { amount: '5.00', method: 'Efectivo' }, 'cash-key', context)).rejects.toBeInstanceOf(ConflictException);
+    await expect(setup.service.payment(actor, 'stay', { amount: '5.00' as any, method: 'Efectivo' }, 'cash-key', context)).rejects.toBeInstanceOf(ConflictException);
     expect(insert).not.toHaveBeenCalled();
     cashSession.mockRestore();
 
     const payment = commandSetup([[], [stayRow], [folioRow], [charge], [openSession], [], [openSession], [stayRow], [folioRow], [charge, cashPayment]], [cashPayment]);
-    await payment.service.payment(actor, 'stay', { amount: '5.00', method: 'Efectivo' }, 'cash-key', context);
+    await payment.service.payment(actor, 'stay', { amount: '5.00' as any, method: 'Efectivo' }, 'cash-key', context);
     expect(payment.inserted).toEqual([
       expect.objectContaining({ type: 'payment', idempotencyKey: 'cash-key' }),
       expect.objectContaining({ type: 'Ingreso', referenceId: 'cash-payment', method: 'Efectivo' }),
@@ -126,17 +126,17 @@ describe('FolioService financial command behavior', () => {
 
 const stayRow = { id: 'stay', settlement: 'open', receivableAmount: null, receivableReason: null };
 const folioRow = { id: 'folio' };
-const charge = { id: 'charge', type: 'charge', amount: '10.00', reversalOfEntryId: null };
-const cardPayment = { id: 'card-payment', type: 'payment', amount: '4.00', paymentMethod: 'Tarjeta', reversalOfEntryId: null };
-const cashPayment = { id: 'cash-payment', type: 'payment', amount: '5.00', paymentMethod: 'Efectivo', reversalOfEntryId: null };
-const cardReversal = { id: 'card-reversal', type: 'reversal', amount: '4.00', reversalOfEntryId: 'card-payment' };
-const cashReversal = { id: 'cash-reversal', type: 'reversal', amount: '5.00', reversalOfEntryId: 'cash-payment' };
+const charge = { id: 'charge', type: 'charge', amount: '10.00' as any, reversalOfEntryId: null };
+const cardPayment = { id: 'card-payment', type: 'payment', amount: '4.00' as any, paymentMethod: 'Tarjeta', reversalOfEntryId: null };
+const cashPayment = { id: 'cash-payment', type: 'payment', amount: '5.00' as any, paymentMethod: 'Efectivo', reversalOfEntryId: null };
+const cardReversal = { id: 'card-reversal', type: 'reversal', amount: '4.00' as any, reversalOfEntryId: 'card-payment' };
+const cashReversal = { id: 'cash-reversal', type: 'reversal', amount: '5.00' as any, reversalOfEntryId: 'cash-payment' };
 const openSession = { id: 'open-session', propertyId: actor.propertyId, status: 'open' };
 
 function commandSetup(selections: unknown[][], returnedEntries: unknown[]) {
   const setup = service(); const inserted: unknown[] = [];
-  setup.tx.select.mockImplementation(() => chain(selections.shift() ?? []));
-  setup.tx.insert.mockImplementation(() => ({ values: vi.fn((value) => { inserted.push(value); const entry = returnedEntries.shift(); return entry ? { returning: vi.fn().mockResolvedValue([entry]) } : Promise.resolve(); }) }));
+  setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
+  setup.tx as any.insert.mockImplementation(() => ({ values: vi.fn((value) => { inserted.push(value); const entry = returnedEntries.shift(); return entry ? { returning: vi.fn().mockResolvedValue([entry]) } : Promise.resolve(); }) }));
   return { ...setup, inserted };
 }
 

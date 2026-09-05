@@ -12,7 +12,7 @@ vi.mock('../auth/authClient.js', () => {
 });
 
 import { AuthRequestError, authRequest } from '../auth/authClient.js';
-import { createReservation, createReservationCancellationError, getReservationAvailability, getReservations, ReservationRequestError } from './reservationsClient.js';
+import { cancelReservation, confirmReservation, createReservation, createReservationCancellationError, dispositionReservation, getReservationAvailability, getReservationDetail, getReservations, ReservationRequestError } from './reservationsClient.js';
 
 beforeEach(() => {
   vi.mocked(authRequest).mockReset();
@@ -40,6 +40,16 @@ describe('reservation client contract', () => {
     vi.mocked(authRequest).mockResolvedValue({ id: 'reservation-id' });
     await createReservation(body, signal);
     expect(authRequest).toHaveBeenCalledWith('/api/reservations', { method: 'POST', body: JSON.stringify(body), signal });
+  });
+  it('uses the exact lifecycle routes and idempotency header', async () => {
+    vi.mocked(authRequest).mockResolvedValue({});
+    await getReservationDetail('reservation-id');
+    await confirmReservation('reservation-id', 'key');
+    await cancelReservation('reservation-id', { reason: 'requested' }, 'key');
+    await dispositionReservation('reservation-id', { disposition: 'no_show', reason: 'absent' }, 'key');
+    expect(authRequest).toHaveBeenNthCalledWith(1, '/api/reservations/reservation-id', { signal: undefined });
+    expect(authRequest).toHaveBeenNthCalledWith(2, '/api/reservations/reservation-id/confirm', { method: 'POST', headers: { 'Idempotency-Key': 'key' }, signal: undefined });
+    expect(authRequest).toHaveBeenNthCalledWith(3, '/api/reservations/reservation-id/cancel', { method: 'POST', body: JSON.stringify({ reason: 'requested' }), headers: { 'Idempotency-Key': 'key' }, signal: undefined });
   });
 
   it.each([[400, false], [401, false], [403, false], [404, true], [409, true]])('normalizes HTTP %s without exposing backend details', async (status, reloadRecommended) => {

@@ -42,7 +42,7 @@ export const PARK_PLAZA_ROOMS: readonly RoomInventoryRoom[] = Object.freeze(floo
 const decimalEquals = (left: string, right: string) => Number(left).toFixed(2) === Number(right).toFixed(2);
 
 export function assertCompatibleCategory(existing: Pick<RoomInventoryCategory, 'name' | 'capacity' | 'baseNightlyRate'>, expected: RoomInventoryCategory): void {
-  if (existing.name !== expected.name || existing.capacity !== expected.capacity || !decimalEquals(existing.baseNightlyRate, expected.baseNightlyRate)) {
+  if (existing.name !== expected.name || existing.capacity !== expected.capacity) {
     throw new Error(`Room category ${expected.code} conflicts with the provisioned definition`);
   }
 }

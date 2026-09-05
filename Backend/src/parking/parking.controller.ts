@@ -18,8 +18,8 @@ export class ParkingController {
 
   @Post()
   @RequirePermissions('parking.create')
-  create(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount) {
-    return this.parkingService.create(actor.propertyId, parseCreateParkingDto(body));
+  create(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount, @Req() request: AuthenticatedRequest) {
+    return this.parkingService.create(actor, parseCreateParkingDto(body), getRequestContext(request));
   }
 
   @Patch(':id')

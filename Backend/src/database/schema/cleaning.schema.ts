@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { properties, rooms } from './hotel.schema.js';
 
 export const cleaningTaskStatus = pgEnum('cleaning_task_status', ['pending', 'in_progress', 'completed', 'approved']);
@@ -32,5 +32,5 @@ export const cleaningCommands = pgTable('cleaning_commands', {
   response: jsonb().$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index('cleaning_commands_key_idx').on(t.propertyId, t.operation, t.idempotencyKey),
+  unique('cleaning_commands_key_unique').on(t.propertyId, t.operation, t.idempotencyKey),
 ]);

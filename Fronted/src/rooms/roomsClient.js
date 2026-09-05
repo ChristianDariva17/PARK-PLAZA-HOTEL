@@ -32,5 +32,11 @@ async function roomRequest(url, options) {
 }
 
 export const getRooms = (signal) => roomRequest('/api/rooms', { signal });
+export const getRoomCategories = (signal) => roomRequest('/api/rooms/categories', { signal });
+export const getRoomAmenities = (signal) => roomRequest('/api/rooms/amenities', { signal });
+export const getCategoryAmenities = (categoryId, signal) => roomRequest(`/api/rooms/categories/${categoryId}/amenities`, { signal });
+export const updateCategoryAmenities = (categoryId, amenityKeys, signal) => roomRequest(`/api/rooms/categories/${categoryId}/amenities`, { method: 'PUT', body: JSON.stringify({ amenityKeys }), signal });
+export const getCategoryAudit = (categoryId, signal) => roomRequest(`/api/rooms/categories/${categoryId}/audit`, { signal });
 export const updateRoom = (roomId, body, signal) => roomRequest(`/api/rooms/${roomId}`, { method: 'PATCH', body: JSON.stringify(body), signal });
+export const updateRoomCategory = (categoryId, body, signal) => roomRequest(`/api/rooms/categories/${categoryId}`, { method: 'PATCH', body: JSON.stringify(body), signal });
 export const setRoomBlocked = (roomId, body, signal) => roomRequest(`/api/rooms/${roomId}/block`, { method: 'PATCH', body: JSON.stringify(body), signal });

@@ -11,36 +11,90 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
     restart: unless-stopped
 
+  setup:
+    build:
+      context: Backend
+      target: runtime
+    env_file: Backend/.env
+    volumes:
+      - ./menu_park_plaza.md:/menu_park_plaza.md:ro
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_SSL: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        node dist/src/database/migrate.js
+        node dist/src/auth/bootstrap-admin.js
+        node dist/src/database/provision-room-inventory.js "$$BOOTSTRAP_PROPERTY_CODE"
+    restart: "no"
+
   api:
-    build: Backend
+    build:
+      context: Backend
+      target: runtime
     env_file: Backend/.env
     environment:
       NODE_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
+      DATABASE_SSL: "false"
+      API_HOST: 0.0.0.0
       API_PORT: 3000
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 10s
     restart: unless-stopped
 
-  frontend:
-    build: Fronted
-    ports:
-      - "5173:80"
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
+
+#  frontend:
+#    build:
+#      context: Fronted
+#    ports:
+#      - "5173:8080"
+#    depends_on:
+#      api:
+#        condition: service_healthy
+#    healthcheck:
+#      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+#      interval: 15s
+#      timeout: 5s
+#      retries: 3
+#      start_period: 5s
+#    restart: unless-stopped
+#
+#  customer-frontend:
+#    build:
+#      context: Fronted-Cliente
+#    ports:
+#      - "5174:8080"
+#    depends_on:
+#      api:
+#        condition: service_healthy
+#    healthcheck:
+#      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+#      interval: 15s
+#      timeout: 5s
+#      retries: 3
+#      start_period: 5s
+#    restart: unless-stopped
 
 volumes:
   postgres_data:

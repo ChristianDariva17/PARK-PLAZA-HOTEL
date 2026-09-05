@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env*
+.git/
+.github/
+.vscode/
+.idea/
+bridge/
+*.log
+npm-debug.log*
+Dockerfile*
+README.md

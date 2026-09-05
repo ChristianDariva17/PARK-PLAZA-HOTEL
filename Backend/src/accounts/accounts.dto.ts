@@ -19,12 +19,18 @@ const updateAccountSchema = z.object({
 }).strict().refine((value) => Object.keys(value).length > 0);
 
 const resetPasswordSchema = z.object({ temporaryPassword: z.string().min(1).max(1024) }).strict();
+const approveGoogleRequestSchema = z.object({
+  roleKey: z.string().trim().min(1).max(64),
+  personnelId: uuid.optional(),
+}).strict();
 
 export type CreateAccountDto = z.output<typeof createAccountSchema>;
 export type UpdateAccountDto = z.output<typeof updateAccountSchema>;
 export type ResetPasswordDto = z.output<typeof resetPasswordSchema>;
+export type ApproveGoogleRequestDto = z.output<typeof approveGoogleRequestSchema>;
 
 export const parseCreateAccountDto = (input: unknown) => parseZodHttp(createAccountSchema, input);
 export const parseUpdateAccountDto = (input: unknown) => parseZodHttp(updateAccountSchema, input);
 export const parseResetPasswordDto = (input: unknown) => parseZodHttp(resetPasswordSchema, input);
+export const parseApproveGoogleRequestDto = (input: unknown) => parseZodHttp(approveGoogleRequestSchema, input);
 export const parseAccountId = (input: unknown) => parseZodHttp(uuid, input, 'Invalid account ID');

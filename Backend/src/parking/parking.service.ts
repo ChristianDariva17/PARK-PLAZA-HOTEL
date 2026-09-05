@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { eq, desc, and, or } from 'drizzle-orm';
-import { Database, DATABASE } from '../database/database.module.js';
+import { eq, desc, and, or, ne } from 'drizzle-orm';
+import { DATABASE, type Database } from '../database/database.module.js';
 import { vehicleRegistrations } from '../database/schema/parking.schema.js';
 import { guests } from '../database/schema/guests.schema.js';
 import { rooms } from '../database/schema/hotel.schema.js';
@@ -21,38 +21,49 @@ export class ParkingService {
     });
   }
 
-  async create(propertyId: string, data: CreateParkingDto) {
-    await this.assertLinks(this.db, propertyId, data);
-    const existing = await this.db.query.vehicleRegistrations.findFirst({
-      where: and(
-        eq(vehicleRegistrations.propertyId, propertyId),
-        eq(vehicleRegistrations.status, 'Dentro'),
-        or(
-          eq(vehicleRegistrations.plate, data.plate),
-          eq(vehicleRegistrations.space, data.space)
+  async create(actor: AuthenticatedAccount, data: CreateParkingDto, context: RequestContext) {
+    return await this.db.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      if (data.stayId) {
+        await this.assertLinks(tx, actor.propertyId, data);
+        const [stay] = await tx.select({ status: stays.status }).from(stays)
+          .where(and(eq(stays.id, data.stayId), eq(stays.propertyId, actor.propertyId))).limit(1);
+        if (!stay || !['active', 'Activa'].includes(stay.status)) throw new BadRequestException('Seleccione una estadía activa.');
+      }
+      const existing = await tx.query.vehicleRegistrations.findFirst({
+        where: and(
+          eq(vehicleRegistrations.propertyId, actor.propertyId),
+          eq(vehicleRegistrations.status, 'Dentro'),
+          or(eq(vehicleRegistrations.plate, data.plate), eq(vehicleRegistrations.space, data.space))
         )
-      )
+      });
+      if (existing) throw new BadRequestException(`El vehículo con placa ${data.plate} o el espacio ${data.space} ya se encuentra ocupado.`);
+      const chargeId = (data.stayId && data.fee > 0)
+        ? (await this.folios.appendAncillaryChargeLocked(tx, actor, { stayId: data.stayId, sourceType: 'parking_entry', sourceId: data.id, amount: data.fee.toString(), reason: 'Parking entry' }, context)).id
+        : null;
+      const [vehicle] = await tx.insert(vehicleRegistrations).values({
+        id: data.id,
+        propertyId: actor.propertyId,
+        stayId: data.stayId || null,
+        clientId: data.clientId || null,
+        roomId: data.roomId || null,
+        originType: data.originType || 'stay',
+        driverName: data.driverName || null,
+        driverPhone: data.driverPhone || null,
+        vehicleColor: data.vehicleColor || null,
+        keysLeft: Boolean(data.keysLeft),
+        entryNotes: data.entryNotes || null,
+        plate: data.plate,
+        space: data.space,
+        fee: data.fee.toString(),
+        vehicleType: data.vehicleType,
+        brandModel: data.brandModel || null,
+        entryResponsible: data.entryResponsible,
+        status: 'Dentro',
+        chargeId,
+      }).returning();
+      return vehicle;
     });
-
-    if (existing) {
-      throw new BadRequestException(`El vehículo con placa ${data.plate} o el espacio ${data.space} ya se encuentra ocupado.`);
-    }
-
-    const [vehicle] = await this.db.insert(vehicleRegistrations).values({
-      id: data.id,
-      propertyId,
-      stayId: data.stayId,
-      clientId: data.clientId,
-      roomId: data.roomId,
-      plate: data.plate,
-      space: data.space,
-      fee: data.fee.toString(),
-      vehicleType: data.vehicleType,
-      brandModel: data.brandModel,
-      entryResponsible: data.entryResponsible,
-      status: 'Dentro',
-    }).returning();
-    return vehicle;
   }
 
   async update(id: string, propertyId: string, payload: UpdateParkingDto) {
@@ -60,11 +71,29 @@ export class ParkingService {
       where: and(eq(vehicleRegistrations.id, id), eq(vehicleRegistrations.propertyId, propertyId)),
     });
     if (!current) throw new NotFoundException('Vehículo no encontrado');
-    await this.assertLinks(this.db, propertyId, {
-      stayId: payload.stayId ?? current.stayId,
-      clientId: payload.clientId ?? current.clientId,
-      roomId: payload.roomId ?? current.roomId,
-    });
+    const targetStayId = payload.stayId !== undefined ? payload.stayId : current.stayId;
+    if (targetStayId) {
+      await this.assertLinks(this.db, propertyId, {
+        stayId: targetStayId,
+        clientId: payload.clientId !== undefined ? payload.clientId : current.clientId,
+        roomId: payload.roomId !== undefined ? payload.roomId : current.roomId,
+      });
+    }
+    const targetPlate = payload.plate ?? current.plate;
+    const targetSpace = payload.space ?? current.space;
+    if (current.status === 'Dentro' && (payload.plate || payload.space)) {
+      const existing = await this.db.query.vehicleRegistrations.findFirst({
+        where: and(
+          eq(vehicleRegistrations.propertyId, propertyId),
+          eq(vehicleRegistrations.status, 'Dentro'),
+          ne(vehicleRegistrations.id, id),
+          or(eq(vehicleRegistrations.plate, targetPlate), eq(vehicleRegistrations.space, targetSpace))
+        ),
+      });
+      if (existing && existing.id !== id) {
+        throw new BadRequestException(`El vehículo con placa ${targetPlate} o el espacio ${targetSpace} ya se encuentra ocupado.`);
+      }
+    }
     const [updated] = await this.db.update(vehicleRegistrations)
       .set({
         ...payload,
@@ -86,13 +115,11 @@ export class ParkingService {
       if (vehicle.status === 'Fuera') {
         if (Number(vehicle.fee) <= 0 && !vehicle.chargeId) return vehicle;
         if (!vehicle.chargeId) throw new ConflictException('Parking exit has no canonical ancillary charge');
-        await this.folios.assertAncillaryChargeReference(tx, actor, { stayId: vehicle.stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, chargeId: vehicle.chargeId });
+        await this.folios.assertParkingChargeReference(tx, actor, { stayId: vehicle.stayId!, sourceId: vehicle.id, amount: vehicle.fee, chargeId: vehicle.chargeId });
         return vehicle;
       }
       if (vehicle.status !== 'Dentro') throw new ConflictException('Vehicle cannot exit from its current status');
-      const chargeId = Number(vehicle.fee) > 0
-        ? (await this.folios.appendAncillaryChargeLocked(tx, actor, { stayId: vehicle.stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, reason: 'Parking exit' }, context)).id
-        : null;
+      const chargeId = vehicle.chargeId;
 
       const [updated] = await tx.update(vehicleRegistrations).set({
         status: 'Fuera',
@@ -127,8 +154,9 @@ export class ParkingService {
   private async assertLinks(
     executor: Pick<Database, 'select'>,
     propertyId: string,
-    data: { stayId: string; clientId: string; roomId: string },
+    data: { stayId?: string | null; clientId?: string | null; roomId?: string | null },
   ) {
+    if (!data.stayId || !data.clientId || !data.roomId) return;
     const [stayRows, guestRows, roomRows, linkedGuestRows] = await Promise.all([
       executor.select({ id: stays.id, roomId: stays.roomId }).from(stays)
         .where(and(eq(stays.id, data.stayId), eq(stays.propertyId, propertyId))).limit(1),

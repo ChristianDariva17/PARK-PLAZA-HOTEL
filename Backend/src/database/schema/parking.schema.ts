@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   numeric,
   pgEnum,
   pgTable,
@@ -18,9 +19,16 @@ export const vehicleStatus = pgEnum('vehicle_status', ['Dentro', 'Fuera', 'Archi
 export const vehicleRegistrations = pgTable('vehicle_registrations', {
   id: varchar('id', { length: 20 }).primaryKey(), // Using varchar to support 'VEH-...'
   propertyId: uuid('property_id').notNull(),
-  stayId: uuid('stay_id').notNull(),
-  clientId: uuid('client_id').notNull(),
-  roomId: uuid('room_id').notNull(),
+  stayId: uuid('stay_id'),
+  clientId: uuid('client_id'),
+  roomId: uuid('room_id'),
+
+  originType: varchar('origin_type', { length: 30 }).notNull().default('stay'),
+  driverName: varchar('driver_name', { length: 150 }),
+  driverPhone: varchar('driver_phone', { length: 50 }),
+  vehicleColor: varchar('vehicle_color', { length: 50 }),
+  keysLeft: boolean('keys_left').notNull().default(false),
+  entryNotes: text('entry_notes'),
 
   plate: varchar('plate', { length: 20 }).notNull(),
   brandModel: varchar('brand_model', { length: 100 }),

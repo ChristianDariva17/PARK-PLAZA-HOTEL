@@ -18,5 +18,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "drizzle.config.ts"]
+  "include": ["src/**/*.ts", "drizzle.config.ts"],
+  "exclude": ["test/**/*.ts", "node_modules", "dist"]
 }

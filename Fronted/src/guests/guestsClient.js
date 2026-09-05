@@ -33,3 +33,5 @@ async function guestRequest(url, options) {
 export const getGuests = (signal) => guestRequest('/api/guests', { signal });
 export const createGuest = (body) => guestRequest('/api/guests', { method: 'POST', body: JSON.stringify(body) });
 export const updateGuest = (guestId, body) => guestRequest(`/api/guests/${guestId}`, { method: 'PATCH', body: JSON.stringify(body) });
+export const archiveGuest = (guestId) => guestRequest(`/api/guests/${guestId}/archive`, { method: 'PATCH' });
+export const reactivateGuest = (guestId) => guestRequest(`/api/guests/${guestId}/reactivate`, { method: 'PATCH' });

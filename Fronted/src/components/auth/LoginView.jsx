@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { KeyRound } from 'lucide-react';
+import GoogleSignInButton from './GoogleSignInButton.jsx';
 
-export default function LoginView({ onLogin }) {
+export default function LoginView({ onLogin, onGoogleLogin }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -15,6 +16,19 @@ export default function LoginView({ onLogin }) {
       await onLogin({ email: form.get('email'), password: form.get('password') });
     } catch (requestError) {
       setError(requestError.message || 'No se pudo iniciar sesión. Intentá nuevamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const result = await onGoogleLogin(credential);
+      if (result?.status === 'pending') setError(result.message);
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudo iniciar sesión con Google. Intentá nuevamente.');
     } finally {
       setSubmitting(false);
     }
@@ -37,6 +51,9 @@ export default function LoginView({ onLogin }) {
           {submitting ? 'Verificando…' : 'Ingresar'}
         </button>
       </form>
+      <div className="auth-divider" aria-hidden="true">o</div>
+      <GoogleSignInButton disabled={submitting} onCredential={handleGoogleCredential} onError={(requestError) => setError(requestError.message)} />
+      <p className="auth-intro">Si todavía no tenés acceso, tu cuenta Google quedará pendiente de aprobación administrativa.</p>
     </section>
   </main>;
 }

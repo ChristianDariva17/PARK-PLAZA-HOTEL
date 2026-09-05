@@ -5,7 +5,8 @@ import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js
 import { DATABASE, type Database } from '../database/database.module.js';
 import { cleaningCommands, cleaningTasks, incidents, rooms } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
-import type { CreateIncidentDto, ProgressCleaningTaskDto, UpdateCleaningTaskDto } from './cleaning.dto.js';
+import type { CreateCleaningTaskDto, CreateIncidentDto, ProgressCleaningTaskDto, UpdateCleaningTaskDto } from './cleaning.dto.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 
 export interface PersistentCleaningTaskResponse {
   id: string;
@@ -33,6 +34,7 @@ export class CleaningService {
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     private readonly audit: AuditService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   async list(propertyId: string): Promise<PersistentCleaningTaskResponse[]> {
@@ -42,6 +44,67 @@ export class CleaningService {
       .where(eq(cleaningTasks.propertyId, propertyId));
 
     return rows.map((task) => this.formatTask(task));
+  }
+
+  async createTask(
+    actor: AuthenticatedAccount,
+    dto: CreateCleaningTaskDto,
+    key: string,
+    context: RequestContext,
+  ): Promise<CleaningCommandResponse> {
+    return this.command(actor, 'cleaning_create', key, async (tx) => {
+      const roomRows = await tx
+        .select()
+        .from(rooms)
+        .where(and(eq(rooms.id, dto.roomId), eq(rooms.propertyId, actor.propertyId)))
+        .limit(1)
+        .for('update', { of: rooms });
+
+      const room = roomRows[0];
+      if (!room) throw new NotFoundException('Room not found');
+
+      const now = new Date();
+      const inserted = await tx
+        .insert(cleaningTasks)
+        .values({
+          propertyId: actor.propertyId,
+          roomId: dto.roomId,
+          status: 'pending',
+          assignedTo: dto.assignedTo || 'Por asignar',
+          reason: dto.reason || 'Check-out completado',
+          observation: dto.observation || null,
+          evidence: [],
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+
+      const task = inserted[0];
+
+      let roomResponse: { id: string; status: string } | undefined = undefined;
+      if (room.status === 'available' || room.status === 'occupied') {
+        await tx.update(rooms).set({ status: 'cleaning' }).where(eq(rooms.id, room.id));
+        roomResponse = { id: room.id, status: 'cleaning' };
+      }
+
+      const response: CleaningCommandResponse = {
+        task: this.formatTask(task),
+        ...(roomResponse ? { room: roomResponse } : {}),
+      };
+
+      await this.audit.record(
+        {
+          ...this.auditBase(actor, context),
+          eventType: 'cleaning.created',
+          subjectType: 'cleaning_task',
+          subjectId: task.id,
+          metadata: { roomId: task.roomId, reason: task.reason, assignedTo: task.assignedTo },
+        },
+        tx,
+      );
+
+      return response;
+    });
   }
 
   async updateTask(
@@ -133,6 +196,7 @@ export class CleaningService {
         .where(eq(cleaningTasks.id, task.id));
 
       let roomResponse: { id: string; status: string } | undefined = undefined;
+      let incidentResponse: { id: string; status: string; blocksRoom: boolean } | undefined = undefined;
 
       if (nextStatus === 'approved') {
         const roomRows = await tx
@@ -147,6 +211,31 @@ export class CleaningService {
           await tx.update(rooms).set({ status: 'available' }).where(eq(rooms.id, room.id));
           roomResponse = { id: room.id, status: 'available' };
         }
+
+        const existingIncident = await tx
+          .select({ id: incidents.id, status: incidents.status, blocksRoom: incidents.blocksRoom })
+          .from(incidents)
+          .where(and(
+            eq(incidents.propertyId, actor.propertyId),
+            eq(incidents.type, 'cleaning'),
+            eq(incidents.referenceId, task.id),
+          ))
+          .limit(1);
+
+        const incident = existingIncident[0] ?? (await tx.insert(incidents).values({
+          propertyId: actor.propertyId,
+          roomId: task.roomId,
+          type: 'cleaning',
+          referenceId: task.id,
+          description: `Limpieza completada y aprobada: ${task.reason}`,
+          priority: 'low',
+          responsible: task.assignedTo,
+          status: 'closed',
+          blocksRoom: false,
+          evidence,
+        }).returning({ id: incidents.id, status: incidents.status, blocksRoom: incidents.blocksRoom }))[0];
+
+        incidentResponse = incident;
       }
 
       const updatedTask = {
@@ -161,6 +250,7 @@ export class CleaningService {
       const response: CleaningCommandResponse = {
         task: this.formatTask(updatedTask),
         ...(roomResponse ? { room: roomResponse } : {}),
+        ...(incidentResponse ? { incident: incidentResponse } : {}),
       };
 
       await this.audit.record(
@@ -273,6 +363,11 @@ export class CleaningService {
         idempotencyKey: key,
         response: response as unknown as Record<string, unknown>,
       });
+
+      this.realtime.emitToProperty(actor.propertyId, 'cleaning:task_updated', response.task);
+      if (response.room) {
+        this.realtime.emitToProperty(actor.propertyId, 'room:status_changed', response.room);
+      }
 
       return response;
     });

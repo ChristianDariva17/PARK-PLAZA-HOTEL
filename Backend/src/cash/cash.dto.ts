@@ -35,7 +35,7 @@ const createCashMovementSchema = z.object({
   concept: z.string().trim().min(1).max(200),
   referenceId: z.string().trim().min(1).max(48).optional(),
   amount: decimalString,
-  method: z.enum(['Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin']),
+  method: z.literal('Efectivo'),
 }).strict();
 
 export type OpenCashSessionDto = z.output<typeof openCashSessionSchema>;
@@ -48,3 +48,4 @@ export const parseCountCashSessionDto = (input: unknown) => parseZodHttp(countCa
 export const parseCloseCashSessionDto = (input: unknown) => parseZodHttp(closeCashSessionSchema, input);
 export const parseCreateCashMovementDto = (input: unknown) => parseZodHttp(createCashMovementSchema, input);
 export const parseSessionId = (input: unknown) => parseZodHttp(uuid, input, 'Invalid cash session ID');
+export const parseIdempotencyKey = (input: unknown) => parseZodHttp(uuid, input, 'Invalid or missing idempotency key');

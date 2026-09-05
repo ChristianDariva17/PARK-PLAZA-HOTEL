@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env*
+.git/
+.github/
+.vscode/
+.idea/
+original_rooms.txt
+script.js
+style.css
+*.log
+npm-debug.log*
+Dockerfile*
+README.md

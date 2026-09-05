@@ -36,7 +36,23 @@ export function adaptCashMovement(dto) {
 }
 
 export const adaptCashMovementsList = (list) => (Array.isArray(list) ? list.map(adaptCashMovement) : []);
-export const CASH_PAYMENT_METHODS = ['Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin'];
+export function adaptCashCount(dto) {
+  if (!dto) return null;
+  return {
+    id: dto.id,
+    sessionId: dto.sessionId,
+    countedAmount: Number(dto.countedAmount),
+    expectedAmount: Number(dto.expectedAmount),
+    difference: Number(dto.difference),
+    note: dto.note ?? '',
+    countedBy: dto.countedBy,
+    kind: dto.kind,
+    createdAt: dto.createdAt,
+  };
+}
+
+export const adaptCashCountsList = (list) => (Array.isArray(list) ? list.map(adaptCashCount) : []);
+export const CASH_PAYMENT_METHODS = ['Efectivo'];
 
 const optionalText = (value) => value?.trim() || undefined;
 

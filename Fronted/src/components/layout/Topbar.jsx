@@ -9,12 +9,11 @@ import { canAccessRoute } from './navigation';
 const TITLES = {
   dashboard: ['Panel operativo', 'Resumen del estado compartido'], habitaciones: ['Habitaciones', 'Mapa y detalle operativo'], reservas: ['Reservas', 'Disponibilidad, precio y adelantos'],
   contratos: ['Contratos', 'Versionado y trazabilidad'], 'checkin-checkout': ['Recepción', 'Check-in y check-out conectados'], finanzas: ['Pagos y cuentas', 'Liquidación y documentos'],
-  clientes: ['Clientes', 'Perfil, historial y fidelización'], limpieza: ['Limpieza', 'Tareas, evidencias y aprobación'], mantenimiento: ['Mantenimiento', 'Tickets y habitaciones bloqueadas'],
+  clientes: ['Clientes', 'Perfil e historial'], limpieza: ['Limpieza', 'Tareas, evidencias y aprobación'], mantenimiento: ['Mantenimiento', 'Tickets y habitaciones bloqueadas'],
   incidencias: ['Incidencias', 'Cola unificada de seguimiento'], evidencias: ['Evidencias', 'Referencias operativas unificadas'], notificaciones: ['Notificaciones', 'Bandeja interna de alertas'],
   'pedidos-qr': ['Pedidos QR', 'Cocina, entrega e inventario'], inventario: ['Inventario', 'Stock, lotes y movimientos'],
   'cocina-bar': ['Cocina y bar', 'Recetas, licores y onzas'], proveedores: ['Proveedores', 'Abastecimiento y costos'], cochera: ['Cochera', 'Vehículos y espacios'],
-  'bar-qr': ['QR de barra', 'Pedidos y pagos originados en barra'], 'terraza-qr': ['QR de terraza', 'Pedidos y pagos originados en terraza'],
-  mascotas: ['Mascotas', 'Alojamiento y cargos'], recreacion: ['Piscina y mirador', 'Accesos QR y aforo'], eventos: ['Eventos', 'Agenda y espacios'], 'calendario-eventos': ['Calendario de eventos', 'Fechas, horarios y espacios'], encuestas: ['Encuestas y lealtad', 'Seguimiento posterior'],
+  mascotas: ['Mascotas', 'Alojamiento y cargos'], recreacion: ['Piscina y mirador', 'Accesos QR y aforo'], eventos: ['Eventos', 'Agenda y espacios'], 'calendario-eventos': ['Calendario de eventos', 'Fechas, horarios y espacios'],
   personal: ['Personal', 'Asistencia y turnos'], caja: ['Caja', 'Apertura y movimientos'], reportes: ['Reportes', 'Indicadores derivados'], roles: ['Roles y permisos', 'Matriz funcional'],
   auditoria: ['Auditoría y seguridad', 'Actividad y controles'], configuracion: ['Configuración', 'Integraciones y respaldos'],
 };

@@ -33,15 +33,23 @@ export const getActiveCashSession = (signal) => request('/api/cash/session/activ
 export const getCashSessions = (signal) => request('/api/cash/sessions', { signal });
 
 export const getCashMovements = (sessionId, signal) => request(`/api/cash/movements/${sessionId}`, { signal });
+export const getCashCounts = (sessionId, signal) => request(`/api/cash/session/${sessionId}/counts`, { signal });
+
+const cashCommand = (url, body, signal) => request(url, {
+  method: 'POST',
+  body: JSON.stringify(body),
+  signal,
+  headers: { 'idempotency-key': globalThis.crypto.randomUUID() },
+});
 
 export const openCashSession = (body, signal) =>
-  request('/api/cash/session/open', { method: 'POST', body: JSON.stringify(body), signal });
+  cashCommand('/api/cash/session/open', body, signal);
 
 export const countCashSession = (sessionId, body, signal) =>
-  request(`/api/cash/session/count/${sessionId}`, { method: 'POST', body: JSON.stringify(body), signal });
+  cashCommand(`/api/cash/session/count/${sessionId}`, body, signal);
 
 export const closeCashSession = (sessionId, body, signal) =>
-  request(`/api/cash/session/close/${sessionId}`, { method: 'POST', body: JSON.stringify(body), signal });
+  cashCommand(`/api/cash/session/close/${sessionId}`, body, signal);
 
 export const createCashMovement = (body, signal) =>
-  request('/api/cash/movements', { method: 'POST', body: JSON.stringify(body), signal });
+  cashCommand('/api/cash/movements', body, signal);

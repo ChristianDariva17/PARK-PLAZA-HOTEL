@@ -21,3 +21,5 @@ export const getAccounts = () => accountsRequest('/api/accounts');
 export const createAccount = (body) => accountsRequest('/api/accounts', { method: 'POST', body: JSON.stringify(body) });
 export const updateAccount = (accountId, body) => accountsRequest(`/api/accounts/${accountId}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const resetAccountPassword = (accountId, temporaryPassword) => accountsRequest(`/api/accounts/${accountId}/reset-password`, { method: 'POST', body: JSON.stringify({ temporaryPassword }) });
+export const approveGoogleRequest = (requestId, body) => accountsRequest(`/api/accounts/google-requests/${requestId}/approve`, { method: 'POST', body: JSON.stringify(body) });
+export const rejectGoogleRequest = (requestId) => accountsRequest(`/api/accounts/google-requests/${requestId}/reject`, { method: 'POST' });

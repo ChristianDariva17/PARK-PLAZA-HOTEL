@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { cashMovements, cashSessions } from '../database/schema/index.js';
+import { cashCommands, cashCounts, cashMovements, cashSessions } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import type {
   CloseCashSessionDto,
@@ -41,6 +41,18 @@ export interface CashMovementResponse {
   responsible: string;
 }
 
+export interface CashCountResponse {
+  id: string;
+  sessionId: string;
+  countedAmount: string;
+  expectedAmount: string;
+  difference: string;
+  note: string;
+  countedBy: string;
+  kind: string;
+  createdAt: string;
+}
+
 @Injectable()
 export class CashService {
   constructor(
@@ -75,13 +87,22 @@ export class CashService {
     return rows.map((r) => this.formatMovement(r));
   }
 
+  async listCounts(propertyId: string, sessionId: string): Promise<CashCountResponse[]> {
+    const rows = await this.database
+      .select()
+      .from(cashCounts)
+      .where(and(eq(cashCounts.propertyId, propertyId), eq(cashCounts.sessionId, sessionId)))
+      .orderBy(cashCounts.createdAt);
+    return rows.map((row) => this.formatCount(row));
+  }
+
   async openSession(
     actor: AuthenticatedAccount,
     dto: OpenCashSessionDto,
+    key: string,
     context: RequestContext,
   ): Promise<CashSessionResponse> {
-    return this.database.transaction(async (tx) => {
-      await acquirePropertyTransactionLock(tx, actor.propertyId);
+    return this.command(actor, 'open', key, async (tx) => {
 
       // Verify no session is currently open
       const active = await tx
@@ -128,10 +149,10 @@ export class CashService {
     actor: AuthenticatedAccount,
     sessionId: string,
     dto: CountCashSessionDto,
+    key: string,
     context: RequestContext,
   ): Promise<CashSessionResponse> {
-    return this.database.transaction(async (tx) => {
-      await acquirePropertyTransactionLock(tx, actor.propertyId);
+    return this.command(actor, 'count', key, async (tx) => {
 
       const rows = await tx
         .select()
@@ -145,14 +166,26 @@ export class CashService {
       if (session.status !== 'open') throw new ConflictException('Cannot count a closed session');
 
       const expectedAmount = await this.calculateExpectedAmount(tx, actor.propertyId, session);
+      const difference = (Number(dto.countedAmount) - expectedAmount).toFixed(2);
+
+      await tx.insert(cashCounts).values({
+        propertyId: actor.propertyId,
+        sessionId: session.id,
+        countedAmount: dto.countedAmount,
+        expectedAmount: expectedAmount.toFixed(2),
+        difference,
+        note: dto.note ?? null,
+        countedByAccountId: actor.accountId,
+        countedBy: actor.email,
+        kind: 'count',
+      });
 
       const updated = await tx
         .update(cashSessions)
         .set({
           countedAmount: dto.countedAmount,
           expectedAmount: expectedAmount.toFixed(2),
-          difference: (Number(dto.countedAmount) - expectedAmount).toFixed(2),
-          notes: dto.note ? `${session.notes ?? ''} [Arqueo: ${dto.note}]`.trim() : session.notes,
+          difference,
           updatedAt: new Date(),
         })
         .where(eq(cashSessions.id, session.id))
@@ -179,10 +212,10 @@ export class CashService {
     actor: AuthenticatedAccount,
     sessionId: string,
     dto: CloseCashSessionDto,
+    key: string,
     context: RequestContext,
   ): Promise<CashSessionResponse> {
-    return this.database.transaction(async (tx) => {
-      await acquirePropertyTransactionLock(tx, actor.propertyId);
+    return this.command(actor, 'close', key, async (tx) => {
 
       const rows = await tx
         .select()
@@ -198,6 +231,18 @@ export class CashService {
       const expectedAmount = await this.calculateExpectedAmount(tx, actor.propertyId, session);
       const difference = Number(dto.countedAmount) - expectedAmount;
 
+      await tx.insert(cashCounts).values({
+        propertyId: actor.propertyId,
+        sessionId: session.id,
+        countedAmount: dto.countedAmount,
+        expectedAmount: expectedAmount.toFixed(2),
+        difference: difference.toFixed(2),
+        note: dto.note ?? null,
+        countedByAccountId: actor.accountId,
+        countedBy: actor.email,
+        kind: 'close',
+      });
+
       const updated = await tx
         .update(cashSessions)
         .set({
@@ -206,7 +251,6 @@ export class CashService {
           countedAmount: dto.countedAmount,
           expectedAmount: expectedAmount.toFixed(2),
           difference: difference.toFixed(2),
-          notes: dto.note ? `${session.notes ?? ''} [Cierre: ${dto.note}]`.trim() : session.notes,
           updatedAt: new Date(),
         })
         .where(eq(cashSessions.id, session.id))
@@ -232,10 +276,10 @@ export class CashService {
   async createMovement(
     actor: AuthenticatedAccount,
     dto: CreateCashMovementDto,
+    key: string,
     context: RequestContext,
   ): Promise<CashMovementResponse> {
-    return this.database.transaction(async (tx) => {
-      await acquirePropertyTransactionLock(tx, actor.propertyId);
+    return this.command(actor, 'movement', key, async (tx) => {
 
       // Verify active open session
       const active = await tx
@@ -290,6 +334,7 @@ export class CashService {
     let current = Number(session.openingAmount);
     for (const mov of movements) {
       const amt = Number(mov.amount);
+      if (mov.method !== 'Efectivo') continue;
       if (mov.type === 'Ingreso') {
         current += amt;
       } else {
@@ -330,6 +375,44 @@ export class CashService {
       createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       responsible: row.responsible,
     };
+  }
+
+  private formatCount(row: any): CashCountResponse {
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      countedAmount: row.countedAmount,
+      expectedAmount: row.expectedAmount,
+      difference: row.difference,
+      note: row.note ?? '',
+      countedBy: row.countedBy,
+      kind: row.kind,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    };
+  }
+
+  private async command<T extends object>(
+    actor: AuthenticatedAccount,
+    operation: string,
+    key: string,
+    run: (tx: any) => Promise<T>,
+  ): Promise<T> {
+    return this.database.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const [receipt] = await tx
+        .select({ response: cashCommands.response })
+        .from(cashCommands)
+        .where(and(
+          eq(cashCommands.propertyId, actor.propertyId),
+          eq(cashCommands.operation, operation),
+          eq(cashCommands.idempotencyKey, key),
+        ))
+        .limit(1);
+      if (receipt) return receipt.response as T;
+      const response = await run(tx);
+      await tx.insert(cashCommands).values({ propertyId: actor.propertyId, operation, idempotencyKey: key, response: response as Record<string, unknown> });
+      return response;
+    });
   }
 
   private auditBase(actor: AuthenticatedAccount, context: RequestContext) {

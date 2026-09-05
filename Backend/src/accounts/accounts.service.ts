@@ -1,14 +1,14 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { CryptoService } from '../auth/crypto.service.js';
 import { PasswordPolicyService } from '../auth/password-policy.service.js';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { getPostgresErrorFields } from '../database/postgres-error.js';
-import { accounts, roles, sessions, staff } from '../database/schema/index.js';
+import { accountIdentities, accounts, googleAccessRequests, roles, sessions, staff } from '../database/schema/index.js';
 import { acquirePropertyThenAccountTransactionLocks, acquirePropertyTransactionLock } from '../database/transaction-policy.js';
-import type { CreateAccountDto, ResetPasswordDto, UpdateAccountDto } from './accounts.dto.js';
+import type { ApproveGoogleRequestDto, CreateAccountDto, ResetPasswordDto, UpdateAccountDto } from './accounts.dto.js';
 import { assertAccountTransitionSafe } from './accounts.safety.js';
 
 @Injectable()
@@ -21,25 +21,31 @@ export class AccountsService {
   ) {}
 
   async list(propertyId: string) {
-    const [accountRows, roleRows, personnelRows] = await Promise.all([
+    const [accountRows, roleRows, personnelRows, requestRows] = await Promise.all([
       this.database.select({
         id: accounts.id, email: accounts.email, status: accounts.status, passwordChangeRequired: accounts.passwordChangeRequired,
+        hasPassword: accounts.passwordHash, googleEmail: accountIdentities.email,
         createdAt: accounts.createdAt, updatedAt: accounts.updatedAt, roleKey: roles.key, roleName: roles.name,
         personnelId: staff.id, personnelFirstName: staff.firstName, personnelLastName: staff.lastName,
       }).from(accounts).innerJoin(roles, eq(accounts.roleId, roles.id)).leftJoin(staff, eq(staff.accountId, accounts.id))
+        .leftJoin(accountIdentities, and(eq(accountIdentities.accountId, accounts.id), eq(accountIdentities.provider, 'google')))
         .where(eq(accounts.propertyId, propertyId)).orderBy(asc(accounts.email)),
       this.database.select({ key: roles.key, name: roles.name }).from(roles).orderBy(asc(roles.name)),
       this.database.select({ id: staff.id, accountId: staff.accountId, firstName: staff.firstName, lastName: staff.lastName })
         .from(staff).where(eq(staff.propertyId, propertyId)).orderBy(asc(staff.lastName), asc(staff.firstName)),
+      this.database.select({ id: googleAccessRequests.id, email: googleAccessRequests.email, displayName: googleAccessRequests.displayName, requestedAt: googleAccessRequests.requestedAt })
+        .from(googleAccessRequests).where(and(eq(googleAccessRequests.propertyId, propertyId), eq(googleAccessRequests.status, 'pending'))).orderBy(desc(googleAccessRequests.requestedAt)),
     ]);
     return {
       accounts: accountRows.map((item) => ({
         id: item.id, email: item.email, status: item.status, passwordChangeRequired: item.passwordChangeRequired,
+        hasPassword: Boolean(item.hasPassword), googleEmail: item.googleEmail,
         createdAt: item.createdAt, updatedAt: item.updatedAt, role: { key: item.roleKey, name: item.roleName },
         personnel: item.personnelId ? { id: item.personnelId, firstName: item.personnelFirstName!, lastName: item.personnelLastName! } : null,
       })),
       roles: roleRows,
       personnel: personnelRows,
+      googleRequests: requestRows,
     };
   }
 
@@ -131,6 +137,52 @@ export class AccountsService {
       if (!changed.length) throw new NotFoundException('Account not found');
       await this.audit.record({ ...this.auditBase(actor, context), eventType: 'account.password_reset', subjectType: 'account', subjectId: accountId }, tx);
       await this.revokeSessions(tx, actor, accountId, 'password_reset', context);
+    });
+  }
+
+  async approveGoogleRequest(actor: AuthenticatedAccount, requestId: string, input: ApproveGoogleRequestDto, context: RequestContext) {
+    try {
+      const accountId = await this.database.transaction(async (tx) => {
+        await acquirePropertyTransactionLock(tx, actor.propertyId);
+        const requests = await tx.select({
+          id: googleAccessRequests.id, email: googleAccessRequests.email, providerSubject: googleAccessRequests.providerSubject,
+          status: googleAccessRequests.status,
+        }).from(googleAccessRequests).where(and(eq(googleAccessRequests.id, requestId), eq(googleAccessRequests.propertyId, actor.propertyId))).limit(1).for('update');
+        const accessRequest = requests[0];
+        if (!accessRequest) throw new NotFoundException('Google access request not found');
+        if (accessRequest.status !== 'pending') throw new ConflictException('Google access request is no longer pending');
+        const role = await tx.select({ id: roles.id }).from(roles).where(eq(roles.key, input.roleKey)).limit(1);
+        if (!role[0]) throw new BadRequestException('Unknown role');
+        const created = await tx.insert(accounts).values({
+          propertyId: actor.propertyId, roleId: role[0].id, email: accessRequest.email, passwordChangeRequired: false, status: 'active',
+        }).returning({ id: accounts.id });
+        const id = created[0]!.id;
+        await tx.insert(accountIdentities).values({ accountId: id, provider: 'google', providerSubject: accessRequest.providerSubject, email: accessRequest.email });
+        if (input.personnelId) await this.claimPersonnel(tx, actor.propertyId, id, input.personnelId);
+        await tx.update(googleAccessRequests).set({
+          status: 'approved', accountId: id, reviewedByAccountId: actor.accountId, reviewedAt: new Date(), updatedAt: new Date(),
+        }).where(eq(googleAccessRequests.id, accessRequest.id));
+        await this.audit.recordMany([
+          { ...this.auditBase(actor, context), eventType: 'account.google_approved', subjectType: 'account', subjectId: id, metadata: { requestId: accessRequest.id, email: accessRequest.email, roleKey: input.roleKey, personnelId: input.personnelId ?? null } },
+          { ...this.auditBase(actor, context), eventType: 'auth.google.registration_approved', subjectType: 'google_access_request', subjectId: accessRequest.id, metadata: { accountId: id } },
+        ], tx);
+        return id;
+      });
+      return (await this.list(actor.propertyId)).accounts.find((item) => item.id === accountId)!;
+    } catch (error) {
+      this.rethrowConstraint(error);
+    }
+  }
+
+  async rejectGoogleRequest(actor: AuthenticatedAccount, requestId: string, context: RequestContext): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const changed = await tx.update(googleAccessRequests).set({
+        status: 'rejected', reviewedByAccountId: actor.accountId, reviewedAt: new Date(), updatedAt: new Date(),
+      }).where(and(eq(googleAccessRequests.id, requestId), eq(googleAccessRequests.propertyId, actor.propertyId), eq(googleAccessRequests.status, 'pending')))
+        .returning({ id: googleAccessRequests.id });
+      if (!changed.length) throw new NotFoundException('Google access request not found or is no longer pending');
+      await this.audit.record({ ...this.auditBase(actor, context), eventType: 'auth.google.registration_rejected', subjectType: 'google_access_request', subjectId: requestId }, tx);
     });
   }
 
