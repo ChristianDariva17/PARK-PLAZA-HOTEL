@@ -16,6 +16,7 @@ export function adaptCleaningTask(dto) {
   return {
     id: dto.id,
     roomId: dto.roomId,
+    stayId: dto.stayId || null,
     status: STATUS_MAP_FROM_API[dto.status] || dto.status,
     assignedTo: dto.assignedTo || 'Por asignar',
     reason: dto.reason || 'Salida de huésped',

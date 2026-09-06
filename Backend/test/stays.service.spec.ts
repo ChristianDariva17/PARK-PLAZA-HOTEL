@@ -4,6 +4,7 @@ import type { AuditService } from '../src/audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../src/auth/auth.types.js';
 import type { Database } from '../src/database/database.module.js';
 import type { FolioService } from '../src/folios/folio.service.js';
+import type { RealtimeGateway } from '../src/realtime/realtime.gateway.js';
 import { StaysService, type StayCommandResponse } from '../src/stays/stays.service.js';
 
 const actor = {
@@ -59,7 +60,8 @@ function lifecycleService(selections: unknown[][], insertReturns: unknown[] = []
   const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const foliosService = { read: vi.fn().mockResolvedValue({ balance: '0.00', settlement: 'open' }) };
-  return { service: new StaysService(database, audit as unknown as AuditService, foliosService as unknown as FolioService), tx, audit, foliosService, insertedValues, updateValues };
+  const realtime = { emitToProperty: vi.fn() };
+  return { service: new StaysService(database, audit as unknown as AuditService, foliosService as unknown as FolioService, realtime as unknown as RealtimeGateway), tx, audit, foliosService, insertedValues, updateValues };
 }
 
 describe('StaysService lifecycle', () => {
@@ -107,7 +109,7 @@ describe('StaysService lifecycle', () => {
     const database = {
       transaction: vi.fn().mockRejectedValue({ code: '23505', constraint: 'stays_one_active_per_reservation_idx' }),
     } as unknown as Database;
-    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService, { read: vi.fn() } as unknown as FolioService);
+    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService, { read: vi.fn() } as unknown as FolioService, { emitToProperty: vi.fn() } as unknown as RealtimeGateway);
 
     await expect(service.checkIn(actor, reservation.id, {}, 'key', context)).rejects.toBeInstanceOf(ConflictException);
   });
@@ -147,6 +149,7 @@ describe('StaysService lifecycle', () => {
       expect.objectContaining({ status: 'completed' }),
       { status: 'cleaning' },
     ]));
+    expect(setup.insertedValues).toContainEqual(expect.objectContaining({ stayId: activeStay.id, roomId: availableRoom.id }));
     expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'stay.checked_out' }), setup.tx);
   });
 
@@ -182,13 +185,22 @@ describe('StaysService lifecycle', () => {
 
   it('requires cleaning completion before returning a checked-out room to available', async () => {
     const checkedOutStay = { id: 'stay-id', reservationId: reservation.id, checkInAt, checkOutAt };
-    const setup = lifecycleService([[], [policy], [{ id: availableRoom.id, status: 'cleaning' }], [checkedOutStay], [{ id: reservation.id, status: 'completed', checkInAt, checkOutAt }], [folio]], [undefined]);
+    const setup = lifecycleService([[], [policy], [{ id: availableRoom.id, status: 'cleaning' }], [checkedOutStay], [{ id: 'task-id', status: 'completed' }], [{ id: reservation.id, status: 'completed', checkInAt, checkOutAt }], [folio]], [undefined]);
 
     const result = await setup.service.cleaningComplete(actor, availableRoom.id, 'key', context);
 
     expect(result.room).toEqual({ id: availableRoom.id, status: 'available' });
     expect(setup.updateValues).toContainEqual({ status: 'available' });
     expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'room.cleaning_completed' }), setup.tx);
+  });
+
+  it('does not release a room when the checked-out stay has no linked cleaning task', async () => {
+    const checkedOutStay = { id: 'stay-id', reservationId: reservation.id, checkInAt, checkOutAt };
+    const setup = lifecycleService([[], [policy], [{ id: availableRoom.id, status: 'cleaning' }], [checkedOutStay], []]);
+
+    await expect(setup.service.cleaningComplete(actor, availableRoom.id, 'key', context)).rejects.toBeInstanceOf(ConflictException);
+
+    expect(setup.updateValues).not.toContainEqual({ status: 'available' });
   });
 
   it('creates a walk-in reservation from the current catalog rate and then creates its stay and minimal folio', async () => {

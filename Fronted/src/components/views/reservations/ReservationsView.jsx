@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../../auth/permissions';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
 import { buildGuestCreateDto } from '../../../guests/guestModel';
 import { formatReservationInstant, formatReservationMoney, RESERVATION_STATUS_LABELS, reservationOperationalStatusToLabel, reservationStatusToLabel } from '../../../reservations/reservationModel';
-import { useHotel } from '../../../state/hotelContext';
+import { useHotel, useHotelCommands } from '../../../state/hotelContext';
 import { Pagination, SortableHeader } from '../../ui/CollectionTable';
 import { Dialog, Drawer } from '../../ui/Overlay';
 import { DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
@@ -21,7 +21,7 @@ const EXTRA_SERVICES = [
 ];
 
 function QuickGuestModal({ open, onClose, onCreated, notify }) {
-  const { guestCommands } = useHotel();
+  const { guestCommands } = useHotelCommands();
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',

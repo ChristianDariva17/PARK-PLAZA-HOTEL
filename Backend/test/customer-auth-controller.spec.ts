@@ -12,7 +12,7 @@ describe('CustomerAuthController cookie boundary', () => {
     const controller = new CustomerAuthController(sessions, config);
     const reply = { setCookie: vi.fn() };
     const response = await controller.exchange({ idToken: 'firebase-token' }, { id: 'request-id', ip: '127.0.0.1', headers: {} } as never, reply as never);
-    expect(reply.setCookie).toHaveBeenCalledWith('pp_customer_session', 'opaque-token', { path: '/api/customer', httpOnly: true, sameSite: 'strict', secure: true, priority: 'high', expires: expiresAt });
+    expect(reply.setCookie).toHaveBeenCalledWith('pp_customer_session', 'opaque-token', { path: '/api', httpOnly: true, sameSite: 'strict', secure: true, priority: 'high', expires: expiresAt });
     expect(response).not.toHaveProperty('token');
     expect(response.customer).not.toHaveProperty('propertyId');
   });

@@ -2,27 +2,19 @@ import { io } from 'socket.io-client';
 
 let socketInstance = null;
 
-export function getCustomerSocket(stayId, propertyId) {
+export function getCustomerSocket() {
   if (!socketInstance) {
     socketInstance = io(window.location.origin, {
-      path: '/socket.io',
+      path: '/api/socket.io',
       transports: ['websocket', 'polling'],
       autoConnect: true,
-      auth: {
-        stayId,
-        propertyId,
-      },
-      query: {
-        stayId,
-        propertyId,
-      },
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
     });
 
     socketInstance.on('connect', () => {
-      console.log('[Customer WebSocket] Conectado en vivo a la estadía:', stayId);
+      console.log('[Customer WebSocket] Conectado al portal.');
     });
 
     socketInstance.on('connection:ack', (ack) => {

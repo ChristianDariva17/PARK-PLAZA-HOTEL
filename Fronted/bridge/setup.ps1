@@ -8,7 +8,6 @@ $projectRoot = Split-Path -Parent $bridgeRoot
 $wrapperSource = Join-Path $SdkRoot "C#\lib\x86\libzkfpcsharp.dll"
 $vendorDirectory = Join-Path $bridgeRoot "vendor"
 $configPath = Join-Path $bridgeRoot "bridge.config.json"
-$envPath = Join-Path $projectRoot ".env.local"
 $listenerUrl = "http://127.0.0.1:17345/"
 
 if (-not (Test-Path -LiteralPath $wrapperSource)) {
@@ -33,12 +32,21 @@ if (-not (Test-Path -LiteralPath $configPath)) {
     [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $token = [Convert]::ToBase64String($bytes)
     $config = Get-Content -LiteralPath (Join-Path $bridgeRoot "bridge.config.json.example") -Raw | ConvertFrom-Json
-    $config.ApiToken = $token
+    $config.CapabilitySecret = $token
     $config | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configPath -Encoding UTF8
-    @("VITE_ZK_BRIDGE_URL=http://127.0.0.1:17345", "VITE_ZK_BRIDGE_TOKEN=$token") | Set-Content -LiteralPath $envPath -Encoding UTF8
-    "Created bridge.config.json and .env.local with a shared local token."
+    "Created bridge.config.json. Set BIOMETRIC_BRIDGE_CAPABILITY_SECRET to the same value in the backend environment."
 } else {
-    "bridge.config.json already exists; it was not replaced. Keep .env.local synchronized with its ApiToken."
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    if (-not $config.CapabilitySecret) {
+        $bytes = New-Object byte[] 32
+        [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+        $config | Add-Member -NotePropertyName CapabilitySecret -NotePropertyValue ([Convert]::ToBase64String($bytes))
+        $config.PSObject.Properties.Remove("ApiToken")
+        $config | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configPath -Encoding UTF8
+        "Updated bridge.config.json with a new CapabilitySecret. Set BIOMETRIC_BRIDGE_CAPABILITY_SECRET to the same value in the backend environment."
+    } else {
+        "bridge.config.json already exists; ensure CapabilitySecret matches BIOMETRIC_BRIDGE_CAPABILITY_SECRET in the backend environment."
+    }
 }
 
 "Copied the vendor wrapper. Native x86 runtime must remain installed in Windows."

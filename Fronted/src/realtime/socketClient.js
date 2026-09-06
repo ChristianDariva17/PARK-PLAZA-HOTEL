@@ -6,7 +6,7 @@ const connectionListeners = new Set();
 export function getSocket() {
   if (!socketInstance) {
     socketInstance = io(window.location.origin, {
-      path: '/socket.io',
+      path: '/api/socket.io',
       transports: ['websocket', 'polling'],
       withCredentials: true,
       autoConnect: true,

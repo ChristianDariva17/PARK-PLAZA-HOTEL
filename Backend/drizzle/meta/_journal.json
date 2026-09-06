@@ -116,6 +116,7 @@
       { "idx": 39, "version": "7", "when": 1788299000000, "tag": "0039_audit_property_time_index", "breakpoints": true },
       { "idx": 40, "version": "7", "when": 1788301000000, "tag": "0040_attendance_qr_geofence", "breakpoints": true },
       { "idx": 41, "version": "7", "when": 1788305000000, "tag": "0041_flexible_parking_visitors", "breakpoints": true },
-      { "idx": 42, "version": "7", "when": 1788309000000, "tag": "0042_flexible_pets_visitors", "breakpoints": true }
+      { "idx": 42, "version": "7", "when": 1788309000000, "tag": "0042_flexible_pets_visitors", "breakpoints": true },
+      { "idx": 43, "version": "7", "when": 1788312600000, "tag": "0043_cleaning_tasks_stays", "breakpoints": true }
   ]
 }

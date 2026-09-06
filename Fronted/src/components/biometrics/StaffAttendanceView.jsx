@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { usePermissions } from '../../auth/authContext.js';
 import { PERMISSIONS } from '../../auth/permissions.js';
 import { formatMoney } from '../../domain/hotelModel.js';
-import { useHotel } from '../../state/hotelContext.js';
+import { useHotel, useHotelCommands } from '../../state/hotelContext.js';
 import { Dialog, Tabs, TabPanel } from '../ui/Overlay.jsx';
 import { DataTable, DetailGrid, MetricStrip, PageHeader, SectionHeader, StatusBadge } from '../views/SharedViewParts.jsx';
 import { BiometricPanel } from './BiometricPanel.jsx';
@@ -19,7 +19,7 @@ const run = (execute, action, notify, title, message) => {
 };
 
 function StaffEditor({ person, onClose, notify }) {
-  const { execute } = useHotel();
+  const { execute } = useHotelCommands();
   const [form, setForm] = useState(person ? { ...person } : { documentNumber: '', name: '', role: '', area: '', phone: '', email: '', salary: 0, shift: '', attendance: 'Pendiente', overtimeHours: 0 });
   const submit = (event) => { event.preventDefault(); const action = person ? { type: 'STAFF_UPDATE', staffId: person.id, payload: form } : { type: 'STAFF_CREATE', payload: form }; if (run(execute, action, notify, person ? 'Personal actualizado' : 'Personal registrado', 'El DNI fue validado entre registros no archivados.')) onClose(); };
   return <form className="form-grid" onSubmit={submit}><label>DNI<input required value={form.documentNumber} onChange={(event) => setForm({ ...form, documentNumber: event.target.value })} /></label><label>Nombre completo<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Cargo<input value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} /></label><label>Área<input value={form.area} onChange={(event) => setForm({ ...form, area: event.target.value })} /></label><label>Teléfono<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label><label>Correo<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Sueldo referencial<input type="number" min="0" value={form.salary} onChange={(event) => setForm({ ...form, salary: event.target.value })} /></label><label>Turno descriptivo<input value={form.shift} onChange={(event) => setForm({ ...form, shift: event.target.value })} /></label><div className="form-actions span-2"><button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button><button className="btn btn-primary">Guardar personal</button></div></form>;

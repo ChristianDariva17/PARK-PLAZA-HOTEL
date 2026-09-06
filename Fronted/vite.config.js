@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:3000',
-      '/socket.io': {
+      '/api/socket.io': {
         target: 'http://127.0.0.1:3000',
         ws: true,
       },
+      '/api': 'http://127.0.0.1:3000',
     },
   },
 })

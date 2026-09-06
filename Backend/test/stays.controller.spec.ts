@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { REQUIRED_PERMISSIONS } from '../src/auth/decorators/require-permissions.decorator.js';
 import type { AuthenticatedAccount } from '../src/auth/auth.types.js';
@@ -10,7 +11,7 @@ const actor = {
   permissions: ['stays.read', 'stays.check_in', 'stays.check_out', 'cleaning.progress'], sessionId: 'session-id', passwordChangeRequired: false,
 } satisfies AuthenticatedAccount;
 const request = { auth: actor, id: 'request-id', ip: '127.0.0.1', headers: { 'user-agent': 'test-agent' } };
-const key = '6ba7b811-9dad-41d1-80b4-00c04fd430c8';
+const key = randomUUID();
 const roomId = '550e8400-e29b-41d4-a716-446655440000';
 const guestId = '6ba7b810-9dad-41d1-80b4-00c04fd430c8';
 

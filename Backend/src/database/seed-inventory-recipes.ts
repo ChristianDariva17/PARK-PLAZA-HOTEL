@@ -116,7 +116,7 @@ export async function seedInventoryAndRecipes(): Promise<void> {
 
   const pool = new Pool({
     connectionString: databaseUrlFromEnv(env),
-    ssl: env.DATABASE_SSL ? { rejectUnauthorized: false } : false,
+    ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false,
   });
 
   const db = drizzle(pool);

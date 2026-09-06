@@ -47,7 +47,7 @@ describe('DynamicQrService', () => {
   const propertyId = '11111111-1111-4111-8111-111111111111';
 
   beforeEach(() => {
-    service = new DynamicQrService();
+    service = new DynamicQrService(Buffer.alloc(32, 1).toString('base64'));
   });
 
   it('generates a valid signed kiosk token', () => {

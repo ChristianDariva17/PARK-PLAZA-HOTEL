@@ -25,6 +25,8 @@ export const environmentSchema = z.object({
   AUTH_LOGIN_MAX_DELAY_MS: z.coerce.number().int().min(0).max(60000).default(4000),
   AUTH_LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   AUTH_LOGIN_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+  ATTENDANCE_QR_SECRET: z.string().min(32),
+  BIOMETRIC_BRIDGE_CAPABILITY_SECRET: z.string().min(32),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_REGISTRATION_PROPERTY_ID: z.string().uuid().optional(),
   CUSTOMER_PORTAL_PROPERTY_ID: z.string().uuid(),

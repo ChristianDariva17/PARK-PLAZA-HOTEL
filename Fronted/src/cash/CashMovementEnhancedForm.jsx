@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useHotel } from '../state/hotelContext';
+import { useHotelCommands } from '../state/hotelContext';
 import { useActionPermission } from '../components/auth/useActionPermission';
 import { CASH_PAYMENT_METHODS } from './cashModel';
 import { formatMoney } from '../domain/hotelModel';
@@ -31,7 +31,7 @@ export const VOUCHER_TYPES = [
 ];
 
 export function CashMovementEnhancedForm({ initialPreset, onClose, notify }) {
-  const { cashCommands } = useHotel();
+  const { cashCommands } = useHotelCommands();
   const allowed = useActionPermission('CASH_MOVEMENT');
 
   const [type, setType] = useState(initialPreset?.type || 'Egreso');

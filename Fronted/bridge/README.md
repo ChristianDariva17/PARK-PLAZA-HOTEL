@@ -1,6 +1,6 @@
 # Bridge local ZKTeco ZK9500
 
-Servicio Windows x86 para ZKFinger Standard SDK 5.3.0.33. Expone una API HTTP versionada sólo en `127.0.0.1`, exige un token local y nunca devuelve imágenes ni templates biométricos.
+Servicio Windows x86 para ZKFinger Standard SDK 5.3.0.33. Expone una API HTTP versionada sólo en `127.0.0.1`, exige capacidades efímeras emitidas por el backend y nunca devuelve imágenes ni templates biométricos.
 
 ## Arquitectura
 
@@ -19,7 +19,7 @@ cd "C:\Users\crist\Downloads\prototipo park plaza\bridge"
 .\setup.ps1
 ```
 
-El script copia únicamente el wrapper administrado x86 a `bridge\vendor` ignorado, genera `bridge.config.json`, crea `.env.local` para Vite con el mismo token y reserva `http://127.0.0.1:17345/` para el usuario actual. La reserva puede exigir ejecutar `setup.ps1` una vez como administrador. No incorpora binarios vendor al proyecto. Si Vite usa otro puerto, agregá su origen exacto a `AllowedOrigins`.
+El script copia únicamente el wrapper administrado x86 a `bridge\vendor` ignorado, genera `bridge.config.json` y reserva `http://127.0.0.1:17345/` para el usuario actual. Configurá `BIOMETRIC_BRIDGE_CAPABILITY_SECRET` en el backend con el mismo `CapabilitySecret` del bridge. La reserva puede exigir ejecutar `setup.ps1` una vez como administrador. No incorpora binarios vendor al proyecto. Si Vite usa otro puerto, agregá su origen exacto a `AllowedOrigins`.
 
 ## Ejecución
 
@@ -39,7 +39,7 @@ DPAPI usa el usuario de Windows que ejecuta el bridge. Cambiar de usuario impide
 
 ## Contrato HTTP v1
 
-Todas las rutas requieren `X-Bridge-Token`. Los errores usan `{ "error": { "code": "...", "message": "..." } }`.
+Todas las rutas requieren `X-Bridge-Capability`, una capacidad firmada por el backend y válida durante un minuto. Las capacidades de enrolamiento y verificación se limitan a una única operación y a su sujeto; las consultas posteriores de esa operación requieren la misma capacidad. Los errores usan `{ "error": { "code": "...", "message": "..." } }`.
 
 - `GET /api/v1/health`: salud del proceso y resumen del dispositivo.
 - `GET /api/v1/device`: SDK, conexión, cantidad e índice del lector.

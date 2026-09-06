@@ -14,6 +14,9 @@
     "migrate": "tsx src/database/migrate.ts",
     "bootstrap:admin": "tsx src/auth/bootstrap-admin.ts",
     "provision:rooms": "tsx src/database/provision-room-inventory.ts",
+    "db:test-query": "tsx src/database/test-query.js",
+    "db:init-suppliers": "tsx src/database/init-suppliers.js",
+    "db:init-contracts": "tsx src/database/init-contracts.js",
     "test": "vitest run --exclude test/database.integration.spec.ts",
     "test:integration": "vitest run test/database.integration.spec.ts"
   },

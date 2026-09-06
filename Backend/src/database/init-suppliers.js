@@ -1,7 +1,11 @@
+import 'dotenv/config';
 import pg from 'pg';
+import { databaseUrlFromEnv, validateEnv } from '../config/environment.js';
 
+const env = validateEnv(process.env);
 const pool = new pg.Pool({
-  connectionString: 'postgresql://park_plaza:Dariva2026Develop@127.0.0.1:5433/park_plaza',
+  connectionString: databaseUrlFromEnv(env),
+  ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false,
 });
 
 async function main() {

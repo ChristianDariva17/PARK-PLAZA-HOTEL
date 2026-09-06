@@ -4,7 +4,7 @@ import { getCustomerSocket, subscribeCustomerEvent } from '../realtime/customerS
 export function useCustomerSocket(stayId, propertyId, eventName, onEvent) {
   useEffect(() => {
     if (!stayId) return;
-    getCustomerSocket(stayId, propertyId);
+    getCustomerSocket();
   }, [stayId, propertyId]);
 
   useEffect(() => {

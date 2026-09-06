@@ -1,14 +1,18 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Req } from '@nestjs/common';
 import { AttendanceService } from './attendance.service.js';
+import { BridgeCapabilityService } from './bridge-capability.service.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
 import { getRequestContext } from '../auth/request-context.js';
-import { parseReportManualAttendanceDto, parseSubmitCorrectionDto, parseApproveCorrectionDto, parseReportBiometricAttendanceDto, parseReportQrAttendanceDto } from './attendance.dto.js';
+import { parseBridgeCapabilityDto, parseReportManualAttendanceDto, parseSubmitCorrectionDto, parseApproveCorrectionDto, parseReportBiometricAttendanceDto, parseReportQrAttendanceDto } from './attendance.dto.js';
 
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly bridgeCapabilities: BridgeCapabilityService,
+  ) {}
 
   @Get('events')
   @RequirePermissions('staff.attendance.read')
@@ -50,6 +54,27 @@ export class AttendanceController {
       parseReportBiometricAttendanceDto(body),
       getRequestContext(request)
     );
+  }
+
+  @Post('biometric/capability')
+  async issueBiometricCapability(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount) {
+    const request = parseBridgeCapabilityDto(body);
+    if (request.operation === 'health') {
+      if (!actor.permissions.some((permission) => ['guests.biometric', 'staff.biometric', 'staff.attendance'].includes(permission))) {
+        throw new ForbiddenException('Insufficient permissions');
+      }
+      return this.bridgeCapabilities.issue('health');
+    }
+
+    const required = request.subjectType === 'client'
+      ? ['guests.biometric']
+      : request.operation === 'enroll'
+        ? ['staff.biometric']
+        : ['staff.biometric', 'staff.attendance'];
+    if (!required.every((permission) => actor.permissions.includes(permission))) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    return this.bridgeCapabilities.issue(request.operation, { type: request.subjectType, id: request.subjectId });
   }
 
   @Post('corrections')

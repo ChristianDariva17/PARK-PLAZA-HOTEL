@@ -99,6 +99,7 @@ export class StaysService {
       await tx.insert(cleaningTasks).values({
         propertyId: actor.propertyId,
         roomId: room.id,
+        stayId: stay.id,
         status: 'pending',
         assignedTo: 'Por asignar',
         reason: 'Check-out completado',
@@ -129,13 +130,18 @@ export class StaysService {
         .where(and(eq(stays.roomId, room.id), eq(stays.propertyId, actor.propertyId), eq(stays.status, 'checked_out'))).orderBy(desc(stays.checkOutAt)).limit(1);
       const latestStay = stayRows[0];
       if (!latestStay?.checkOutAt) throw new ConflictException('No checked-out stay is available for this room');
+      const taskRows = await tx.select({ id: cleaningTasks.id, status: cleaningTasks.status }).from(cleaningTasks)
+        .where(and(eq(cleaningTasks.propertyId, actor.propertyId), eq(cleaningTasks.roomId, room.id), eq(cleaningTasks.stayId, latestStay.id)))
+        .limit(1).for('update', { of: cleaningTasks });
+      const task = taskRows[0];
+      if (!task || task.status === 'approved') throw new ConflictException('The checked-out stay has no pending cleaning task');
       const reservationRows = await tx.select({ id: reservations.id, status: reservations.status, checkInAt: reservations.checkInAt, checkOutAt: reservations.checkOutAt }).from(reservations)
         .where(and(eq(reservations.id, latestStay.reservationId), eq(reservations.propertyId, actor.propertyId))).limit(1);
       const reservation = reservationRows[0];
       if (!reservation || reservation.status !== 'completed') throw new ConflictException('Room checkout state is invalid');
       const folio = await this.findFolio(tx, latestStay.id, actor.propertyId);
       await tx.update(rooms).set({ status: 'available' }).where(eq(rooms.id, room.id));
-      await tx.update(cleaningTasks).set({ status: 'approved', completedAt: new Date(), updatedAt: new Date() }).where(and(eq(cleaningTasks.roomId, room.id), eq(cleaningTasks.propertyId, actor.propertyId)));
+      await tx.update(cleaningTasks).set({ status: 'approved', completedAt: new Date(), updatedAt: new Date() }).where(eq(cleaningTasks.id, task.id));
       const response: StayCommandResponse = { stay: { id: latestStay.id, reservationId: latestStay.reservationId, roomId: room.id, status: 'checked_out', checkInAt: latestStay.checkInAt.toISOString(), checkOutAt: latestStay.checkOutAt.toISOString() }, folio, reservation: { id: reservation.id, status: reservation.status, checkInAt: reservation.checkInAt.toISOString(), checkOutAt: reservation.checkOutAt.toISOString() }, room: { id: room.id, status: 'available' } };
       await this.audit.record({ ...this.auditBase(actor, context), eventType: 'room.cleaning_completed', subjectType: 'room', subjectId: room.id, metadata: { roomId: room.id, status: 'available' } }, tx);
       return response;

@@ -1,5 +1,6 @@
+import { authRequest } from '../../auth/authClient.js';
+
 const bridgeUrl = (import.meta.env.VITE_ZK_BRIDGE_URL || 'http://127.0.0.1:17345').replace(/\/$/, '');
-const bridgeToken = import.meta.env.VITE_ZK_BRIDGE_TOKEN || '';
 const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
 
 let healthCache = null;
@@ -21,8 +22,19 @@ const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
   }, { once: true });
 });
 
-async function request(path, { method = 'GET', body, signal, timeoutMs = 5000 } = {}) {
-  if (!bridgeToken) throw new ZkBridgeError('bridge_not_configured', 'VITE_ZK_BRIDGE_TOKEN is not configured.');
+async function issueCapability(operation, subject, signal) {
+  try {
+    return await authRequest('/api/attendance/biometric/capability', {
+      method: 'POST',
+      body: JSON.stringify({ operation, ...(subject ? { subjectType: subject.subjectType, subjectId: subject.subjectId } : {}) }),
+      signal,
+    });
+  } catch {
+    throw new ZkBridgeError('bridge_capability_unavailable', 'No se pudo autorizar la operación biométrica.');
+  }
+}
+
+async function request(path, capability, { method = 'GET', body, signal, timeoutMs = 5000 } = {}) {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -34,7 +46,7 @@ async function request(path, { method = 'GET', body, signal, timeoutMs = 5000 } 
       body: body ? JSON.stringify(body) : undefined,
       headers: {
         'Content-Type': 'application/json',
-        'X-Bridge-Token': bridgeToken,
+        'X-Bridge-Capability': capability.token,
       },
       signal: controller.signal,
       cache: 'no-store',
@@ -54,14 +66,15 @@ async function request(path, { method = 'GET', body, signal, timeoutMs = 5000 } 
 
 export function getBridgeHealth({ signal, force = false } = {}) {
   if (!force && healthCache && Date.now() - healthCache.createdAt < 5000) return Promise.resolve(healthCache.value);
-  return request('/api/v1/health', { signal }).then((value) => {
+  return issueCapability('health', undefined, signal).then((capability) => request('/api/v1/health', capability, { signal })).then((value) => {
     healthCache = { createdAt: Date.now(), value };
     return value;
   });
 }
 
 export async function runBiometricOperation(kind, subject, { signal, onProgress, timeoutMs = 30000 } = {}) {
-  let operation = await request(`/api/v1/${kind}`, {
+  const capability = await issueCapability(kind, subject, signal);
+  let operation = await request(`/api/v1/${kind}`, capability, {
     method: 'POST',
     body: { ...subject, timeoutMs },
     signal,
@@ -71,12 +84,12 @@ export async function runBiometricOperation(kind, subject, { signal, onProgress,
   try {
     while (!terminalStatuses.has(operation.status)) {
       await delay(450, signal);
-      operation = await request(`/api/v1/operations/${operation.operationId}`, { signal });
+      operation = await request(`/api/v1/operations/${operation.operationId}`, capability, { signal });
       onProgress?.(operation);
     }
   } catch (error) {
     if (signal?.aborted && operation.operationId) {
-      request(`/api/v1/operations/${operation.operationId}`, { method: 'DELETE', timeoutMs: 2000 }).catch(() => {});
+      request(`/api/v1/operations/${operation.operationId}`, capability, { method: 'DELETE', timeoutMs: 2000 }).catch(() => {});
     }
     throw error;
   }

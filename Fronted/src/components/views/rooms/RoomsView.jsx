@@ -4,7 +4,7 @@ import { usePermissions } from '../../../auth/authContext';
 import { PERMISSIONS } from '../../../auth/permissions';
 import { ROOM_STATUSES } from '../../../domain/hotelModel';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
-import { useHotel } from '../../../state/hotelContext';
+import { useHotel, useHotelCommands } from '../../../state/hotelContext';
 import { Pagination, RowActions, SortableHeader } from '../../ui/CollectionTable';
 import { Dialog, Drawer } from '../../ui/Overlay';
 import { EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
@@ -40,7 +40,7 @@ function getCategoryIcon(categoryName = '') {
 }
 
 function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
-  const { roomCommands } = useHotel();
+  const { roomCommands } = useHotelCommands();
   const [form, setForm] = useState({ number: room.number, floor: room.floor, categoryId: room.categoryId });
   const [saving, setSaving] = useState(false);
 
@@ -172,7 +172,7 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
 }
 
 function CategoryForm({ category, onClose, notify, initialTab = 'details', onAmenitiesUpdated }) {
-  const { roomCommands } = useHotel();
+  const { roomCommands } = useHotelCommands();
   const [tab, setTab] = useState(initialTab);
   const [form, setForm] = useState({
     name: category?.name || '',
@@ -511,7 +511,7 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
 }
 
 function BlockForm({ operation, onClose, notify }) {
-  const { roomCommands } = useHotel();
+  const { roomCommands } = useHotelCommands();
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
 

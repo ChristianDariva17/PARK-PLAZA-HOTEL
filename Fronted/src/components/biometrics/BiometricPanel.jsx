@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../auth/permissions.js';
 import { getBridgeHealth, runBiometricOperation } from '../../integrations/biometrics/zkBridgeClient.js';
 
 const errorMessages = {
-  bridge_not_configured: 'La integración local no está configurada en este navegador.',
+  bridge_capability_unavailable: 'No se pudo autorizar la operación biométrica para esta sesión.',
   bridge_unavailable: 'El bridge local no está disponible. Iniciá el servicio y volvé a consultar.',
   bridge_timeout: 'El bridge no respondió dentro del tiempo esperado.',
   unauthorized: 'El token local no coincide con la configuración del bridge.',

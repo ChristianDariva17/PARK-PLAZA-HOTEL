@@ -41,6 +41,6 @@ export class CustomerAuthController {
   }
 
   private cookieOptions(expires?: Date) {
-    return { path: '/api/customer', httpOnly: true, sameSite: 'strict' as const, secure: this.config.get('NODE_ENV', { infer: true }) === 'production', priority: 'high' as const, ...(expires ? { expires } : {}) };
+    return { path: '/api', httpOnly: true, sameSite: 'strict' as const, secure: this.config.get('NODE_ENV', { infer: true }) === 'production', priority: 'high' as const, ...(expires ? { expires } : {}) };
   }
 }

@@ -4,7 +4,7 @@ import { usePermissions } from "../../../auth/authContext";
 import { PERMISSIONS } from "../../../auth/permissions";
 import { GUEST_DOCUMENT_TYPES } from "../../../guests/guestModel";
 import { useCollectionTable } from "../../../hooks/useCollectionTable";
-import { useHotel } from "../../../state/hotelContext";
+import { useHotel, useHotelCommands } from "../../../state/hotelContext";
 import { Pagination, SortableHeader } from "../../ui/CollectionTable";
 import { FormWizard } from "../../ui/FormWizard";
 import { Dialog, Drawer } from "../../ui/Overlay";
@@ -82,7 +82,7 @@ function ClientAvatar({ name }) {
 }
 
 function CustomerForm({ client, onClose, notify }) {
-  const { guestCommands } = useHotel();
+  const { guestCommands } = useHotelCommands();
   const { can } = usePermissions();
   const allowed = can(
     client ? PERMISSIONS.guestsUpdate : PERMISSIONS.guestsCreate,

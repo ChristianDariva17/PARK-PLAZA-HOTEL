@@ -18,6 +18,7 @@ namespace ParkPlaza.Zk9500Bridge
         public Dictionary<string, object> Result { get; set; }
         public string ErrorCode { get; set; }
         public string ErrorMessage { get; set; }
+        public string CapabilityId { get; set; }
         public CancellationTokenSource Cancellation { get; set; }
         public Task Worker { get; set; }
     }
@@ -35,7 +36,7 @@ namespace ParkPlaza.Zk9500Bridge
             this.audit = audit;
         }
 
-        public OperationRecord Start(string kind, string subjectType, string subjectId, int timeoutMs)
+        public OperationRecord Start(string kind, string subjectType, string subjectId, int timeoutMs, string capabilityId)
         {
             OperationRecord operation;
             lock (sync)
@@ -52,6 +53,7 @@ namespace ParkPlaza.Zk9500Bridge
                     SubjectId = subjectId,
                     Status = "queued",
                     CreatedAt = DateTime.UtcNow.ToString("o"),
+                    CapabilityId = capabilityId,
                     Cancellation = new CancellationTokenSource()
                 };
                 operations[operation.Id] = operation;

@@ -49,8 +49,8 @@ import { adaptPetResponse, buildPetCreateDto, buildPetUpdateDto } from '../pets/
 import { fetchVehicles, createVehicle, updateVehicle, exitVehicle, archiveVehicle, ParkingRequestError } from '../parking/parkingClient.js';
 import { adaptVehicleResponse, buildVehicleCreateDto, buildVehicleUpdateDto } from '../parking/parkingModel.js';
 
-import { HotelStateContext } from './hotelContext.js';
-export { useHotel, HotelStateContext } from './hotelContext.js';
+import { HotelCommandsContext, HotelStateContext } from './hotelContext.js';
+export { HotelCommandsContext, HotelStateContext, useHotel, useHotelCommands } from './hotelContext.js';
 import { hotelReducer, validateHotelAction } from './hotelReducer.js';
 import { loadOperationalRecords, runConfirmedOperationalRequest } from './operationalRequestPolicy.js';
 
@@ -1598,6 +1598,6 @@ export function HotelProvider({ children }) {
   const parkingCommands = useMemo(() => ({ execute: runParkingCommand, reload: reloadParkingRecords }), [reloadParkingRecords, runParkingCommand]);
   const petCommands = useMemo(() => ({ execute: runPetCommand, reload: reloadPetRecords }), [reloadPetRecords, runPetCommand]);
 
-  const value = useMemo(() => ({ state, dispatch: execute, execute, guestCommands, roomCommands, reservationCommands, stayCommands, cleaningCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands }), [cleaningCommands, execute, guestCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands, reservationCommands, roomCommands, stayCommands, state]);
-  return <HotelStateContext.Provider value={value}>{children}</HotelStateContext.Provider>;
+  const commands = useMemo(() => ({ dispatch: execute, execute, guestCommands, roomCommands, reservationCommands, stayCommands, cleaningCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands }), [cleaningCommands, execute, guestCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands, reservationCommands, roomCommands, stayCommands]);
+  return <HotelCommandsContext.Provider value={commands}><HotelStateContext.Provider value={state}>{children}</HotelStateContext.Provider></HotelCommandsContext.Provider>;
 }

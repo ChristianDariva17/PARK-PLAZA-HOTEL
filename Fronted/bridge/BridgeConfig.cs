@@ -8,7 +8,7 @@ namespace ParkPlaza.Zk9500Bridge
     internal sealed class BridgeConfig
     {
         public int Port { get; set; }
-        public string ApiToken { get; set; }
+        public string CapabilitySecret { get; set; }
         public string[] AllowedOrigins { get; set; }
         public string DataDirectory { get; set; }
         public int DefaultTimeoutMs { get; set; }
@@ -22,8 +22,8 @@ namespace ParkPlaza.Zk9500Bridge
             BridgeConfig config = new JavaScriptSerializer().Deserialize<BridgeConfig>(File.ReadAllText(path));
             if (config == null) throw new InvalidOperationException("bridge.config.json is invalid.");
             if (config.Port < 1024 || config.Port > 65535) throw new InvalidOperationException("Port must be between 1024 and 65535.");
-            if (String.IsNullOrWhiteSpace(config.ApiToken) || config.ApiToken.Length < 24 || config.ApiToken.IndexOf("change", StringComparison.OrdinalIgnoreCase) >= 0)
-                throw new InvalidOperationException("ApiToken must be a private random value of at least 24 characters.");
+            if (String.IsNullOrWhiteSpace(config.CapabilitySecret) || config.CapabilitySecret.Length < 32 || config.CapabilitySecret.IndexOf("change", StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new InvalidOperationException("CapabilitySecret must be a private random value of at least 32 characters.");
             if (config.AllowedOrigins == null || config.AllowedOrigins.Length == 0)
                 throw new InvalidOperationException("AllowedOrigins must contain at least one exact development origin.");
             if (config.DefaultTimeoutMs < 5000 || config.DefaultTimeoutMs > 120000) config.DefaultTimeoutMs = 30000;

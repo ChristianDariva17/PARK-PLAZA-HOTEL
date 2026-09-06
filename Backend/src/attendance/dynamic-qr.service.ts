@@ -9,13 +9,17 @@ interface QrPayload {
 
 @Injectable()
 export class DynamicQrService {
-  // Secret key for signing rotating tokens (fallback to a steady runtime key)
-  private readonly secretKey = process.env.ATTENDANCE_QR_SECRET || process.env.JWT_SECRET || 'park-plaza-attendance-secret-key-2026';
-  
+  private readonly secretKey: string;
+
   // Anti-replay cache: stores consumed nonces with timestamp to prevent duplicate punches
   private readonly consumedNonces = new Map<string, number>();
 
-  constructor() {
+  constructor(secretKey = process.env.ATTENDANCE_QR_SECRET) {
+    if (!secretKey || secretKey.length < 32) {
+      throw new Error('ATTENDANCE_QR_SECRET must contain at least 32 characters');
+    }
+    this.secretKey = secretKey;
+
     // Purge expired nonces every 2 minutes
     setInterval(() => {
       const cutoff = Date.now() - 60000;

@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { cleaningCommands, cleaningTasks, incidents, rooms } from '../database/schema/index.js';
+import { cleaningCommands, cleaningTasks, incidents, rooms, stays } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import type { CreateCleaningTaskDto, CreateIncidentDto, ProgressCleaningTaskDto, UpdateCleaningTaskDto } from './cleaning.dto.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
@@ -12,6 +12,7 @@ export interface PersistentCleaningTaskResponse {
   id: string;
   propertyId: string;
   roomId: string;
+  stayId: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'approved';
   assignedTo: string;
   reason: string;
@@ -185,6 +186,35 @@ export class CleaningService {
       else if (task.status === 'in_progress') nextStatus = 'completed';
       else nextStatus = 'approved';
 
+      let roomResponse: { id: string; status: string } | undefined = undefined;
+      let incidentResponse: { id: string; status: string; blocksRoom: boolean } | undefined = undefined;
+      let room: { id: string; status: string } | undefined = undefined;
+
+      if (nextStatus === 'approved' && task.stayId) {
+        const stayRows = await tx
+          .select({ id: stays.id })
+          .from(stays)
+          .where(and(
+            eq(stays.id, task.stayId),
+            eq(stays.propertyId, actor.propertyId),
+            eq(stays.roomId, task.roomId),
+            eq(stays.status, 'checked_out'),
+          ))
+          .limit(1)
+          .for('update', { of: stays });
+
+        if (!stayRows[0]) throw new ConflictException('Cleaning task is not linked to a checked-out stay');
+
+        const roomRows = await tx
+          .select({ id: rooms.id, status: rooms.status })
+          .from(rooms)
+          .where(and(eq(rooms.id, task.roomId), eq(rooms.propertyId, actor.propertyId)))
+          .limit(1)
+          .for('update', { of: rooms });
+
+        room = roomRows[0];
+      }
+
       const now = new Date();
       const startedAt = nextStatus === 'in_progress' ? now : task.startedAt;
       const completedAt = nextStatus === 'completed' ? now : task.completedAt;
@@ -195,19 +225,8 @@ export class CleaningService {
         .set({ status: nextStatus, startedAt, completedAt, evidence, updatedAt: now })
         .where(eq(cleaningTasks.id, task.id));
 
-      let roomResponse: { id: string; status: string } | undefined = undefined;
-      let incidentResponse: { id: string; status: string; blocksRoom: boolean } | undefined = undefined;
-
       if (nextStatus === 'approved') {
-        const roomRows = await tx
-          .select({ id: rooms.id, status: rooms.status })
-          .from(rooms)
-          .where(and(eq(rooms.id, task.roomId), eq(rooms.propertyId, actor.propertyId)))
-          .limit(1)
-          .for('update', { of: rooms });
-
-        const room = roomRows[0];
-        if (room && room.status === 'cleaning') {
+        if (room?.status === 'cleaning') {
           await tx.update(rooms).set({ status: 'available' }).where(eq(rooms.id, room.id));
           roomResponse = { id: room.id, status: 'available' };
         }
@@ -378,6 +397,7 @@ export class CleaningService {
       id: task.id,
       propertyId: task.propertyId,
       roomId: task.roomId,
+      stayId: task.stayId ?? null,
       status: task.status,
       assignedTo: task.assignedTo,
       reason: task.reason,

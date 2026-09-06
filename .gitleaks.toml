@@ -1,0 +1,16 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gcp-api-key"
+
+  [[rules.allowlists]]
+  description = "Firebase client API keys identify a public project; their Google Cloud restrictions are managed separately."
+  paths = ['''(^|/)Fronted-Cliente/src/firebase\.js$''']
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Firebase client API keys identify a public project; their Google Cloud restrictions are managed separately."
+  paths = ['''(^|/)Fronted-Cliente/src/firebase\.js$''']

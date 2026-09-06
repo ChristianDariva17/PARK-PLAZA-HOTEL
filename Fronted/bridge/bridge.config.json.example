@@ -1,6 +1,6 @@
 {
   "Port": 17345,
-  "ApiToken": "change-this-with-setup-script",
+  "CapabilitySecret": "change-this-with-backend-shared-secret",
   "AllowedOrigins": [
     "http://localhost:5173",
     "http://127.0.0.1:5173"

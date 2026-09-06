@@ -5,17 +5,16 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Inject, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 import { createHash } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { accounts, roles, sessions } from '../database/schema/index.js';
+import { accounts, customerAccounts, customerReservations, customerSessions, roles, sessions, stays } from '../database/schema/index.js';
+import type { Environment } from '../config/environment.js';
 
 @WebSocketGateway({
-  cors: {
-    origin: true,
-    credentials: true,
-  },
+  path: '/api/socket.io',
   namespace: '/',
   pingTimeout: 30000,
   pingInterval: 10000,
@@ -26,13 +25,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(RealtimeGateway.name);
 
-  constructor(@Inject(DATABASE) private readonly database: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly database: Database,
+    private readonly config: ConfigService<Environment, true>,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
       const cookieHeader = client.handshake.headers.cookie;
       const cookies = this.parseCookies(cookieHeader);
-      const sessionToken = cookies['pp_session'] || client.handshake.auth?.token || client.handshake.query?.token;
+      const sessionToken = cookies[this.config.get('AUTH_COOKIE_NAME', { infer: true })];
 
       if (sessionToken && typeof sessionToken === 'string') {
         const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
@@ -79,39 +81,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
       }
 
-      // Guest / Customer portal connection via stayId or propertyId
-      const stayId = client.handshake.auth?.stayId || client.handshake.query?.stayId;
-      const propertyId = client.handshake.auth?.propertyId || client.handshake.query?.propertyId;
-
-      if (stayId && typeof stayId === 'string') {
-        const stayRoom = `stay:${stayId}`;
-        await client.join(stayRoom);
-        if (propertyId && typeof propertyId === 'string') {
-          await client.join(`property:${propertyId}`);
+      const customerToken = cookies[this.config.get('CUSTOMER_COOKIE_NAME', { infer: true })];
+      if (customerToken) {
+        const customer = await this.resolveCustomer(customerToken);
+        if (customer) {
+          const activeStays = await this.resolveCustomerActiveStays(customer.customerAccountId, customer.propertyId);
+          if (activeStays.length > 0) {
+            await Promise.all(activeStays.map((stayId) => client.join(`stay:${stayId}`)));
+            this.logger.log(`[Customer Connected] Socket ${client.id} joined ${activeStays.length} authorized stay room(s)`);
+            client.emit('connection:ack', { status: 'connected', type: 'customer', stayIds: activeStays });
+            return;
+          }
         }
-        this.logger.log(`[Guest Connected] Socket ${client.id} joined room: ${stayRoom}`);
-        client.emit('connection:ack', {
-          status: 'connected',
-          type: 'guest',
-          stayId,
-        });
-        return;
       }
 
-      // Anonymous / Guest general broadcast
-      if (propertyId && typeof propertyId === 'string') {
-        await client.join(`property:${propertyId}`);
-        this.logger.log(`[Public Connected] Socket ${client.id} joined property:${propertyId}`);
-        client.emit('connection:ack', { status: 'connected', type: 'public', propertyId });
-        return;
-      }
-
-      this.logger.log(`[Socket Connected] Socket ${client.id} connected globally.`);
-      client.emit('connection:ack', { status: 'connected', type: 'anonymous' });
+      this.logger.warn(`[Socket Rejected] Socket ${client.id} did not provide an authorized session`);
+      client.emit('connection:ack', { status: 'rejected' });
+      client.disconnect(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       this.logger.warn(`[Socket Error] Connection handler error for ${client.id}: ${message}`);
-      client.emit('connection:ack', { status: 'connected', type: 'fallback' });
+      client.disconnect(true);
     }
   }
 
@@ -120,7 +110,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /**
-   * Emits an event to all sockets in a specific property (staff & guests)
+   * Emits an event to authenticated staff in a property.
    */
   emitToProperty(propertyId: string, event: string, payload: unknown) {
     if (!this.server) return;
@@ -149,6 +139,41 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   emitToAll(event: string, payload: unknown) {
     if (!this.server) return;
     this.server.emit(event, payload);
+  }
+
+  private async resolveCustomer(token: string) {
+    const now = new Date();
+    const idleCutoff = new Date(now.getTime() - this.config.get('CUSTOMER_SESSION_IDLE_HOURS', { infer: true }) * 3_600_000);
+    const rows = await this.database.select({
+      customerAccountId: customerAccounts.id,
+      propertyId: customerReservations.propertyId,
+      lastSeenAt: customerSessions.lastSeenAt,
+    }).from(customerSessions)
+      .innerJoin(customerAccounts, eq(customerSessions.customerAccountId, customerAccounts.id))
+      .innerJoin(customerReservations, eq(customerReservations.customerAccountId, customerAccounts.id))
+      .where(and(
+        eq(customerSessions.tokenHash, createHash('sha256').update(token).digest('hex')),
+        isNull(customerSessions.revokedAt),
+        gt(customerSessions.expiresAt, now),
+        gt(customerSessions.lastSeenAt, idleCutoff),
+        eq(customerAccounts.status, 'active'),
+      ))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  private async resolveCustomerActiveStays(customerAccountId: string, propertyId: string): Promise<string[]> {
+    const rows = await this.database.select({ id: stays.id }).from(customerReservations)
+      .innerJoin(stays, and(
+        eq(stays.reservationId, customerReservations.reservationId),
+        eq(stays.propertyId, customerReservations.propertyId),
+      ))
+      .where(and(
+        eq(customerReservations.customerAccountId, customerAccountId),
+        eq(customerReservations.propertyId, propertyId),
+        eq(stays.status, 'active'),
+      ));
+    return rows.map((row) => row.id);
   }
 
   private parseCookies(cookieHeader?: string): Record<string, string> {

@@ -20,6 +20,12 @@ export const reportBiometricAttendanceDto = z.object({
 });
 export const parseReportBiometricAttendanceDto = (data: unknown) => reportBiometricAttendanceDto.parse(data);
 
+export const bridgeCapabilityDto = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('health') }),
+  z.object({ operation: z.enum(['enroll', 'verify']), subjectType: z.enum(['client', 'employee']), subjectId: z.string().uuid() }),
+]);
+export const parseBridgeCapabilityDto = (data: unknown) => bridgeCapabilityDto.parse(data);
+
 export const submitCorrectionDto = z.object({
   attendanceEventId: z.string().uuid(),
   correctionType: z.string().trim().min(1).max(64),
@@ -44,4 +50,3 @@ export const reportQrAttendanceDto = z.object({
   idempotencyKey: z.string().uuid(),
 });
 export const parseReportQrAttendanceDto = (data: unknown) => reportQrAttendanceDto.parse(data);
-
