@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { createUserWithEmailAndPassword, onAuthStateChanged, reload, sendEmailVerification, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { ApiError, endCustomerSession, exchangeFirebaseToken, getCustomerSession } from './api';
 import { auth, googleProvider } from './firebase';
+import { disconnectCustomerSocket } from './realtime/customerSocketClient.js';
 
 const AuthContext = createContext(null);
 
@@ -25,6 +26,7 @@ export const AuthProvider = ({ children }) => {
     const key = firebaseUser?.uid ?? 'backend-session';
     if (synchronizedUid.current === key) return Promise.resolve();
     if (pendingSynchronization.current?.key === key) return pendingSynchronization.current.promise;
+    if (synchronizedUid.current && synchronizedUid.current !== key) disconnectCustomerSocket();
     setStatus('loading');
     setError('');
     const promise = (async () => {
@@ -49,6 +51,7 @@ export const AuthProvider = ({ children }) => {
         setCustomer(null);
         synchronizedUid.current = null;
         if (!firebaseUser && requestError instanceof ApiError && requestError.status === 401) {
+          disconnectCustomerSocket();
           setStatus('anonymous');
           return;
         }
@@ -69,6 +72,7 @@ export const AuthProvider = ({ children }) => {
   }), [synchronize]);
 
   const completeSignIn = async (operation) => {
+    disconnectCustomerSocket();
     const credential = await operation;
     await synchronize(credential.user);
     return credential;
@@ -86,6 +90,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     loggingOut.current = true;
     setStatus('loading');
+    disconnectCustomerSocket();
     const results = await Promise.allSettled([endCustomerSession(), signOut(auth)]);
     loggingOut.current = false;
     synchronizedUid.current = null;

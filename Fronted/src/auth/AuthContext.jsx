@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { changePasswordRequest, getInitialSession, getSession, googleLoginRequest, loginRequest, logoutRequest, resetInitialSession, subscribeUnauthorized } from './authClient.js';
 import { AuthStateContext } from './authContext.js';
+import { disconnectSocket } from '../realtime/socketClient.js';
 
 const INITIAL_STATE = { status: 'checking', account: null, permissions: [], error: null };
 
@@ -34,11 +35,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => subscribeUnauthorized(() => {
+    disconnectSocket();
     resetInitialSession();
     applySession(null);
   }), []);
 
   const login = async ({ email, password }) => {
+    disconnectSocket();
     await loginRequest(email, password);
     const session = await getSession();
     if (!session) throw new Error('No se pudo confirmar la sesión iniciada. Intentá nuevamente.');
@@ -47,6 +50,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithGoogle = async (credential) => {
+    disconnectSocket();
     const result = await googleLoginRequest(credential);
     if (result.status === 'pending') return result;
     const session = await getSession();
@@ -59,6 +63,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setLoggingOut(true);
     try {
+      disconnectSocket();
       await logoutRequest();
       resetInitialSession();
       applySession(null);
@@ -74,6 +79,7 @@ export function AuthProvider({ children }) {
 
   const changePassword = async ({ currentPassword, newPassword }) => {
     await changePasswordRequest(currentPassword, newPassword);
+    disconnectSocket();
     resetInitialSession();
     applySession(null);
   };

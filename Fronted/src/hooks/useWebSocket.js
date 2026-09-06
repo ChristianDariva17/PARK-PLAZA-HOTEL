@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addConnectionListener, getSocket, subscribeToEvent } from '../realtime/socketClient.js';
+import { addConnectionListener, connectSocket, getSocket, subscribeToEvent } from '../realtime/socketClient.js';
 
 /**
  * Hook to manage real-time WebSocket connection and event subscriptions.
@@ -13,6 +13,7 @@ export function useWebSocket(eventName, onEvent) {
   const [status, setStatus] = useState('connecting');
 
   useEffect(() => {
+    connectSocket();
     const unsubscribeConn = addConnectionListener((connected, stat) => {
       setIsConnected(connected);
       setStatus(stat);

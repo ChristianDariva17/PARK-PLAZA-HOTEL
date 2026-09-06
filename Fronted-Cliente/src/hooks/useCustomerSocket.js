@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
-import { getCustomerSocket, subscribeCustomerEvent } from '../realtime/customerSocketClient.js';
+import { useAuth } from '../AuthContext.jsx';
+import { connectCustomerSocket, subscribeCustomerEvent } from '../realtime/customerSocketClient.js';
 
-export function useCustomerSocket(stayId, propertyId, eventName, onEvent) {
+export function useCustomerSocket(eventName, onEvent) {
+  const { customer, status } = useAuth();
+
   useEffect(() => {
-    if (!stayId) return;
-    getCustomerSocket();
-  }, [stayId, propertyId]);
+    if (status !== 'authenticated' || !customer) return;
+    connectCustomerSocket();
+  }, [customer, status]);
 
   useEffect(() => {
     if (!eventName || !onEvent) return;

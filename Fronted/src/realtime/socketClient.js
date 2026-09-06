@@ -4,12 +4,16 @@ let socketInstance = null;
 const connectionListeners = new Set();
 
 export function getSocket() {
+  return socketInstance;
+}
+
+export function connectSocket() {
   if (!socketInstance) {
     socketInstance = io(window.location.origin, {
       path: '/api/socket.io',
       transports: ['websocket', 'polling'],
       withCredentials: true,
-      autoConnect: true,
+      autoConnect: false,
       reconnection: true,
       reconnectionAttempts: 15,
       reconnectionDelay: 1500,
@@ -37,11 +41,21 @@ export function getSocket() {
     });
   }
 
+  if (!socketInstance.connected) socketInstance.connect();
   return socketInstance;
 }
 
+export function disconnectSocket() {
+  if (!socketInstance) return;
+
+  socketInstance.removeAllListeners();
+  socketInstance.disconnect();
+  socketInstance = null;
+}
+
 export function subscribeToEvent(event, callback) {
-  const socket = getSocket();
+  const socket = socketInstance;
+  if (!socket) return () => {};
   socket.on(event, callback);
 
   return () => {

@@ -58,6 +58,27 @@ describe('RealtimeGateway', () => {
     expect(socket.disconnect).not.toHaveBeenCalled();
   });
 
+  it('keeps consecutive staff connections isolated to their newly authenticated rooms', async () => {
+    const database = {
+      select: vi.fn()
+        .mockReturnValueOnce(query([{ accountId: 'staff-a', propertyId: 'property-a', email: 'a@example.com', roleKey: 'reception', accountStatus: 'active' }]))
+        .mockReturnValueOnce(query([{ accountId: 'staff-b', propertyId: 'property-b', email: 'b@example.com', roleKey: 'kitchen', accountStatus: 'active' }])),
+    } as any;
+    const gateway = new RealtimeGateway(database, config());
+    const staffA = client('pp_session=staff-a');
+    const staffB = client('pp_session=staff-b');
+
+    await gateway.handleConnection(staffA);
+    await gateway.handleConnection(staffB);
+
+    expect(staffA.join).toHaveBeenCalledWith('property:property-a');
+    expect(staffA.join).toHaveBeenCalledWith('property:property-a:role:reception');
+    expect(staffB.join).toHaveBeenCalledWith('property:property-b');
+    expect(staffB.join).toHaveBeenCalledWith('property:property-b:role:kitchen');
+    expect(staffB.join).not.toHaveBeenCalledWith('property:property-a');
+    expect(staffB.join).not.toHaveBeenCalledWith('property:property-a:role:reception');
+  });
+
   it('joins only active stays owned by the authenticated customer', async () => {
     const customerQuery = query([{ customerAccountId: 'customer-1', propertyId: 'property-1', lastSeenAt: new Date() }]);
     const stayQuery = {

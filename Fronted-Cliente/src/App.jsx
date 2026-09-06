@@ -630,7 +630,7 @@ const Rooms = () => {
     fetchAmenities();
   }, [fetchAmenities]);
 
-  useCustomerSocket('', '', 'room:amenities_updated', (payload) => {
+  useCustomerSocket('room:amenities_updated', (payload) => {
     console.log('[Customer WebSocket] Amenities actualizadas:', payload);
     if (payload?.categoryAmenities) {
       setAmenitiesCatalog(payload.categoryAmenities);
@@ -671,7 +671,7 @@ const Rooms = () => {
   }, [criteria.checkIn, criteria.checkOut, criteria.guests]);
 
   // Real-time synchronization via WebSocket
-  useCustomerSocket('', '', 'room:category_updated', (payload) => {
+  useCustomerSocket('room:category_updated', (payload) => {
     console.log('[Customer WebSocket] Tarifas o categorías actualizadas:', payload);
     if (criteria.checkIn && criteria.checkOut) {
       getAvailability({
@@ -697,7 +697,7 @@ const Rooms = () => {
     }
   });
 
-  useCustomerSocket('', '', 'room:status_changed', (payload) => {
+  useCustomerSocket('room:status_changed', (payload) => {
     console.log('[Customer WebSocket] Disponibilidad de habitación actualizada:', payload);
     if (criteria.checkIn && criteria.checkOut) {
       getAvailability({
@@ -1171,7 +1171,7 @@ const AmenityPage = ({ data }) => {
   }, [loadConfig]);
 
   // Real-time synchronization via WebSocket
-  useCustomerSocket('', '', 'amenity:config_updated', (updated) => {
+  useCustomerSocket('amenity:config_updated', (updated) => {
     if (updated && updated.amenityKey === amenityKey) {
       setDynamicConfig(updated);
     }

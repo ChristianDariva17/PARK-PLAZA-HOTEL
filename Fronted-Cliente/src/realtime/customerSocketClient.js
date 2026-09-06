@@ -3,11 +3,15 @@ import { io } from 'socket.io-client';
 let socketInstance = null;
 
 export function getCustomerSocket() {
+  return socketInstance;
+}
+
+export function connectCustomerSocket() {
   if (!socketInstance) {
     socketInstance = io(window.location.origin, {
       path: '/api/socket.io',
       transports: ['websocket', 'polling'],
-      autoConnect: true,
+      autoConnect: false,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
@@ -22,7 +26,16 @@ export function getCustomerSocket() {
     });
   }
 
+  if (!socketInstance.connected) socketInstance.connect();
   return socketInstance;
+}
+
+export function disconnectCustomerSocket() {
+  if (!socketInstance) return;
+
+  socketInstance.removeAllListeners();
+  socketInstance.disconnect();
+  socketInstance = null;
 }
 
 export function subscribeCustomerEvent(event, callback) {
