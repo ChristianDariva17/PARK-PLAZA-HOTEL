@@ -51,7 +51,7 @@ test('preserves typed portal error codes and falls back for generic errors', () 
       { message: 'The request could not be completed.', details: { code: 'CUSTOMER_CANCELLATION_INELIGIBLE' } },
       'Error al cancelar el pedido.',
     ),
-    'Código: CUSTOMER_CANCELLATION_INELIGIBLE',
+    'Código de error: CUSTOMER_CANCELLATION_INELIGIBLE',
   );
   assert.equal(formatRoomServiceError(new Error('Network unavailable'), 'Error al cancelar el pedido.'), 'Network unavailable');
   assert.equal(formatRoomServiceError(null, 'Error al cancelar el pedido.'), 'Error al cancelar el pedido.');

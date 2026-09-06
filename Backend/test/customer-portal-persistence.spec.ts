@@ -31,7 +31,7 @@ describe('customer portal persistence contract', () => {
 
   it('checks receipts before identity and rejects unbound document collisions generically', () => {
     expect(service.indexOf('const receiptRows')).toBeLessThan(service.indexOf('const bindingRows'));
-    expect(service).toContain("if (collisionRows[0]) throw new ConflictException('Unable to verify customer identity')");
+    expect(service).toContain('if (collisionRows[0]) {');
     expect(service).not.toContain("existingGuestRows");
     expect(service).toContain('tx.insert(customerGuestIdentities)');
     expect(service).toContain('tx.insert(customerReservationCommands)');

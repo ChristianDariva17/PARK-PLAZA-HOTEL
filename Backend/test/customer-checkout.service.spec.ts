@@ -8,6 +8,7 @@ const stayId = '550e8400-e29b-41d4-a716-446655440000';
 const orderId = '550e8400-e29b-41d4-a716-446655440001';
 const key = '550e8400-e29b-41d4-a716-446655440002';
 const dto = { stayId, deliveryMode: 'Room' as const, paymentMode: 'room_charge' as const, items: [{ menuItemId: '550e8400-e29b-41d4-a716-446655440003', quantity: 2 }], note: '' };
+const realtime = { emitToProperty: vi.fn(), emitToStay: vi.fn() };
 
 function query(value: unknown) {
   const chain: any = {};
@@ -46,7 +47,7 @@ function createOrderHarness(selections: unknown[][]) {
 describe('customer checkout settlement behavior', () => {
   it('rejects unsupported payment before opening a transaction', async () => {
     const db = { transaction: vi.fn() } as unknown as Database;
-    const service = new RestaurantService(db, {} as FolioService, {} as any);
+    const service = new RestaurantService(db, {} as FolioService, realtime as any);
 
     await expect(service.createCustomerOrder(customer, { ...dto, paymentMode: 'online' }, key)).rejects.toMatchObject({
       status: 422,
@@ -56,7 +57,7 @@ describe('customer checkout settlement behavior', () => {
   });
 
   it('uses current sellable menu prices rather than caller-controlled values', async () => {
-    const service = new RestaurantService({} as Database, {} as FolioService, {} as any);
+    const service = new RestaurantService({} as Database, {} as FolioService, realtime as any);
     const firstItem = dto.items[0];
     if (!firstItem) throw new Error('Checkout fixture requires one item');
     const tx = { select: vi.fn()
@@ -72,7 +73,7 @@ describe('customer checkout settlement behavior', () => {
 
   it('creates an order only after the customer has an authorized active stay', async () => {
     const harness = createOrderHarness([[], [{ id: stayId }], [{ id: dto.items[0]!.menuItemId, name: 'Tea', status: 'active', isPublished: true, isAvailable: true, salePrice: '12.50' }], []]);
-    const service = new RestaurantService(harness.db, {} as FolioService, {} as any);
+    const service = new RestaurantService(harness.db, {} as FolioService, realtime as any);
 
     await expect(service.createCustomerOrder(customer, dto, key)).resolves.toMatchObject({ code: 'ORDER_CREATED', order: { stayId } });
     expect(harness.inserts).toEqual(expect.arrayContaining([
@@ -85,7 +86,7 @@ describe('customer checkout settlement behavior', () => {
 
   it('rejects a reservation-only or otherwise unauthorized stay without mutation', async () => {
     const harness = createOrderHarness([[], []]);
-    const service = new RestaurantService(harness.db, {} as FolioService, {} as any);
+    const service = new RestaurantService(harness.db, {} as FolioService, realtime as any);
 
     await expect(service.createCustomerOrder(customer, dto, key)).rejects.toMatchObject({
       status: 403,
@@ -95,7 +96,7 @@ describe('customer checkout settlement behavior', () => {
   });
 
   it('normalizes item ordering into one canonical idempotency fingerprint', () => {
-    const service = new RestaurantService({} as Database, {} as FolioService, {} as any);
+    const service = new RestaurantService({} as Database, {} as FolioService, realtime as any);
     const first = [{ menuItemId: 'a', quantity: 1 }, { menuItemId: 'b', variantId: 'v', quantity: 2 }];
     const second = [...first].reverse();
     const canonical = (items: any[]) => (service as any).fingerprint({ customer: customer.customerAccountId, property: customer.propertyId, ...dto, items: (service as any).normalizedItems(items) });
@@ -105,7 +106,7 @@ describe('customer checkout settlement behavior', () => {
 
   it('rejects a changed semantic payload for an existing command key', async () => {
     const harness = transactionWith([[{ fingerprint: 'stored-fingerprint', response: { status: 201, body: {} } }]]);
-    const service = new RestaurantService(harness.db, {} as FolioService, {} as any);
+    const service = new RestaurantService(harness.db, {} as FolioService, realtime as any);
 
     await expect((service as any).findReceipt(harness.tx, customer, 'create', key, 'changed-fingerprint')).rejects.toMatchObject({
       status: 409,
@@ -116,11 +117,11 @@ describe('customer checkout settlement behavior', () => {
   });
 
   it('replays a matching cancellation receipt without another order mutation', async () => {
-    const service = new RestaurantService({} as Database, {} as FolioService, {} as any);
+    const service = new RestaurantService({} as Database, {} as FolioService, realtime as any);
     const fingerprint = (service as any).fingerprint({ customer: customer.customerAccountId, property: customer.propertyId, command: 'cancel', orderId, reasonCode: 'changed_mind' });
     const replay = { version: 1, outcome: 'accepted', code: 'ORDER_CANCELLED', order: { id: orderId, status: 'Cancelado' } };
     const harness = transactionWith([[{ fingerprint, response: { status: 200, body: replay } }]]);
-    const replayService = new RestaurantService(harness.db, {} as FolioService, {} as any);
+    const replayService = new RestaurantService(harness.db, {} as FolioService, realtime as any);
 
     await expect(replayService.cancelCustomerOrder(customer, orderId, { reasonCode: 'changed_mind' }, key)).resolves.toEqual(replay);
     expect(harness.updates).toEqual([]);
@@ -129,7 +130,7 @@ describe('customer checkout settlement behavior', () => {
 
   it('rejects an unowned cancellation before any mutation', async () => {
     const harness = transactionWith([[], []]);
-    const service = new RestaurantService(harness.db, {} as FolioService, {} as any);
+    const service = new RestaurantService(harness.db, {} as FolioService, realtime as any);
 
     await expect(service.cancelCustomerOrder(customer, orderId, { reasonCode: 'changed_mind' }, key)).rejects.toMatchObject({
       status: 404,
@@ -143,7 +144,7 @@ describe('customer checkout settlement behavior', () => {
     const deliveredOrder = { id: orderId, propertyId: customer.propertyId, stayId, status: 'Entregado' };
     const harness = transactionWith([[], [{ orderId }], [deliveredOrder], [{ id: stayId }]]);
     const folios = { postRestaurantCharge: vi.fn(), reverseRestaurantCharge: vi.fn() } as unknown as FolioService;
-    const service = new RestaurantService(harness.db, folios, {} as any);
+    const service = new RestaurantService(harness.db, folios, realtime as any);
 
     await expect(service.cancelCustomerOrder(customer, orderId, { reasonCode: 'other' }, key)).rejects.toMatchObject({
       status: 409,
@@ -158,7 +159,7 @@ describe('customer checkout settlement behavior', () => {
     const pendingOrder = { id: orderId, propertyId: customer.propertyId, stayId, status: 'Pedido recibido' };
     const harness = transactionWith([[], [{ orderId }], [pendingOrder], [{ id: stayId }]]);
     const folios = { postRestaurantCharge: vi.fn(), reverseRestaurantCharge: vi.fn() } as unknown as FolioService;
-    const service = new RestaurantService(harness.db, folios, {} as any);
+    const service = new RestaurantService(harness.db, folios, realtime as any);
 
     await expect(service.cancelCustomerOrder(customer, orderId, { reasonCode: 'duplicate_order' }, key)).resolves.toMatchObject({
       code: 'ORDER_CANCELLED',

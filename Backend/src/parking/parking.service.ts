@@ -154,7 +154,7 @@ export class ParkingService {
   private async assertLinks(
     executor: Pick<Database, 'select'>,
     propertyId: string,
-    data: { stayId?: string | null; clientId?: string | null; roomId?: string | null },
+    data: { stayId?: string | null | undefined; clientId?: string | null | undefined; roomId?: string | null | undefined },
   ) {
     if (!data.stayId || !data.clientId || !data.roomId) return;
     const [stayRows, guestRows, roomRows, linkedGuestRows] = await Promise.all([

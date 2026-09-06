@@ -33,9 +33,9 @@ export class RestaurantController {
   }
 
   @Get('internal/menu')
-  @RequirePermissions('orders.read')
+  @RequirePermissions('kitchen.create', 'kitchen.update', 'kitchen.archive')
   listInternalMenu(@CurrentAccount() actor: AuthenticatedAccount) {
-    return this.restaurant.listMenu(actor.propertyId);
+    return this.restaurant.listManagedMenu(actor.propertyId);
   }
 
   @Post('menu')

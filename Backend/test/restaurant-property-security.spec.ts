@@ -24,7 +24,7 @@ function setup(selections: unknown[][]) {
   };
   const database = { transaction: vi.fn((run: (transaction: typeof tx) => unknown) => run(tx)) } as unknown as Database;
   const audit = { record: vi.fn() } as unknown as AuditService;
-  return { service: new RestaurantService(database, {} as FolioService, audit), tx };
+  return { service: new RestaurantService(database, {} as FolioService, { emitToProperty: vi.fn(), emitToStay: vi.fn() } as any), tx };
 }
 
 describe('Restaurant property reference enforcement', () => {
@@ -49,7 +49,7 @@ describe('Restaurant property reference enforcement', () => {
   });
 
   it('rejects foreign or unavailable menu references when editing an existing local order', async () => {
-    const { service, tx } = setup([[], [{ id: 'order', propertyId: actor.propertyId, status: 'Pedido recibido', version: 1 }], []]);
+    const { service, tx } = setup([[{ id: 'order', propertyId: actor.propertyId, status: 'Pedido recibido', version: 1 }], []]);
     await expect(service.updateOrder(actor, 'order', {
       idempotencyKey: 'idempotency-update',
       expectedVersion: 1,

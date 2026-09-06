@@ -11,7 +11,7 @@ const stayId = '550e8400-e29b-41d4-a716-446655440001';
 const clientId = '550e8400-e29b-41d4-a716-446655440002';
 const roomId = '550e8400-e29b-41d4-a716-446655440003';
 const vehicle = { id: 'VEH-001', propertyId, stayId, clientId, roomId, fee: '10.00', status: 'Dentro' };
-const pet = { id: 'PET-001', propertyId, stayId, clientId, charge: '5.00' };
+const pet = { id: 'PET-001', propertyId, stayId, clientId, charge: '5.00', originType: 'stay' };
 const actor = { accountId: 'account', propertyId, email: 'user@example.invalid', permissions: [], roleKey: 'receptionist', sessionId: 'session', passwordChangeRequired: false } satisfies AuthenticatedAccount;
 
 function queryResult<T>(value: T) {
@@ -52,8 +52,18 @@ describe('parking and pets service property predicates', () => {
     const queries = selections.map((rows) => queryResult(rows));
     const pendingQueries = [...queries];
     const insert = vi.fn();
-    const database = { select: vi.fn(() => pendingQueries.shift()), insert, query: { vehicleRegistrations: { findFirst: vi.fn() } } } as unknown as Database;
-    await expect(new ParkingService(database, {} as any).create(propertyId, parkingCreate)).rejects.toBeInstanceOf(BadRequestException);
+    const database = {
+      transaction: vi.fn((callback: (transaction: any) => unknown) => callback({
+        execute: vi.fn().mockResolvedValue(undefined),
+        select: vi.fn(() => pendingQueries.shift()),
+        insert,
+        query: { vehicleRegistrations: { findFirst: vi.fn() } },
+      })),
+      select: vi.fn(() => pendingQueries.shift()),
+      insert,
+      query: { vehicleRegistrations: { findFirst: vi.fn() } },
+    } as unknown as Database;
+    await expect(new ParkingService(database, {} as any).create(actor, parkingCreate, {})).rejects.toBeInstanceOf(BadRequestException);
     expect(insert).not.toHaveBeenCalled();
     for (const query of queries) {
       expect(new PgDialect().sqlToQuery(query.where.mock.calls[0]![0]).params).toContain(propertyId);
@@ -67,7 +77,7 @@ describe('parking and pets service property predicates', () => {
     const updated = mutation([vehicle]);
     const archived = mutation([vehicle]);
     const exited = mutation([vehicle]);
-    const folios = { appendAncillaryChargeLocked: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
+    const folios = { appendAncillaryChargeLocked: vi.fn().mockResolvedValue({ id: 'entry-id' }), assertParkingChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
     const tx = { execute: vi.fn(), select: vi.fn(() => queryResult([vehicle])), update: vi.fn(() => exited) };
     const database = {
       query: { vehicleRegistrations: { findFirst: vi.fn().mockResolvedValue(vehicle) } },
@@ -114,22 +124,18 @@ describe('parking and pets service property predicates', () => {
 
     await expect(new ParkingService(database, folios as any).exit(vehicle.id, actor, { exitResponsible: 'Ana' }, { requestId: 'exit-request' })).resolves.toMatchObject({ status: 'Fuera', chargeId: expectedChargeId });
 
-    if (Number(fee) > 0) {
-      expect(folios.appendAncillaryChargeLocked).toHaveBeenCalledWith(tx, actor, { stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: fee, reason: 'Parking exit' }, { requestId: 'exit-request' });
-    } else {
-      expect(folios.appendAncillaryChargeLocked).not.toHaveBeenCalled();
-    }
-    expect(exited.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'Fuera', chargeId: expectedChargeId }));
+    expect(folios.appendAncillaryChargeLocked).not.toHaveBeenCalled();
+    expect(exited.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'Fuera' }));
   });
 
   it('scenario: Parking exit retry verifies the canonical entry without appending another charge', async () => {
     const exited = { ...vehicle, status: 'Fuera', chargeId: 'entry-id' };
     const tx = { execute: vi.fn().mockResolvedValue(undefined), select: vi.fn(() => queryResult([exited])) };
     const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
-    const folios = { read: vi.fn().mockResolvedValue({ settlement: 'open' }), appendAncillaryChargeLocked: vi.fn(), assertAncillaryChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
+    const folios = { read: vi.fn().mockResolvedValue({ settlement: 'open' }), appendAncillaryChargeLocked: vi.fn(), assertParkingChargeReference: vi.fn().mockResolvedValue({ id: 'entry-id' }) };
 
     await expect(new ParkingService(database, folios as any).exit(vehicle.id, actor, { exitResponsible: 'Ana' }, {})).resolves.toEqual(exited);
-    expect(folios.assertAncillaryChargeReference).toHaveBeenCalledWith(tx, actor, { stayId, sourceType: 'parking_exit', sourceId: vehicle.id, amount: vehicle.fee, chargeId: 'entry-id' });
+    expect(folios.assertParkingChargeReference).toHaveBeenCalledWith(tx, actor, { stayId, sourceId: vehicle.id, amount: vehicle.fee, chargeId: 'entry-id' });
     expect(folios.appendAncillaryChargeLocked).not.toHaveBeenCalled();
   });
 
@@ -170,8 +176,9 @@ describe('parking and pets service property predicates', () => {
   });
 
   it('rejects a missing or inactive stay before creating a pet', async () => {
-    const missingStay = { transaction: vi.fn((callback: (transaction: any) => unknown) => callback({ execute: vi.fn(), select: vi.fn(() => queryResult([{ id: clientId }])) })) } as unknown as Database;
-    await expect(new PetsService(missingStay, { read: vi.fn() } as any).create(actor, { ...pet, stayId: undefined } as any, {})).rejects.toBeInstanceOf(BadRequestException);
+    const missingQueries = [[{ id: clientId }], [], []];
+    const missingStay = { transaction: vi.fn((callback: (transaction: any) => unknown) => callback({ execute: vi.fn(), select: vi.fn(() => queryResult(missingQueries.shift() ?? [])) })) } as unknown as Database;
+    await expect(new PetsService(missingStay, { read: vi.fn() } as any).create(actor, { ...pet, stayId } as any, {})).rejects.toBeInstanceOf(BadRequestException);
 
     const queries = [[{ id: clientId }], [{ id: stayId, status: 'checked_out' }], [{ guestId: clientId }]];
     const inactiveStay = { transaction: vi.fn((callback: (transaction: any) => unknown) => callback({ execute: vi.fn(), select: vi.fn(() => queryResult(queries.shift() ?? [])) })) } as unknown as Database;

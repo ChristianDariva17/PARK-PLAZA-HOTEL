@@ -1,10 +1,11 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, date, foreignKey, index, integer, numeric, pgEnum, pgTable, primaryKey, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, date, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { guests } from './guests.schema.js';
 import { properties, rooms } from './hotel.schema.js';
 
 export const ACTIVE_RESERVATION_STATUSES = ['pending', 'confirmed', 'checked_in'] as const;
 export const reservationStatus = pgEnum('reservation_status', [...ACTIVE_RESERVATION_STATUSES, 'completed', 'cancelled', 'no_show', 'expired']);
+export type ReservationCommandReceipt = Record<string, unknown>;
 
 export const reservations = pgTable('reservations', {
   id: uuid().defaultRandom().primaryKey(), propertyId: uuid('property_id').notNull(),
@@ -17,6 +18,8 @@ export const reservations = pgTable('reservations', {
   checkOutAt: timestamp('check_out_at', { withTimezone: true }).notNull(),
   guestCount: integer('guest_count').notNull(), nightlyRate: numeric('nightly_rate', { precision: 14, scale: 2 }).notNull(),
   totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull(),
+  statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
+  statusReason: varchar('status_reason', { length: 1000 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   foreignKey({ name: 'reservations_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
@@ -30,6 +33,22 @@ export const reservations = pgTable('reservations', {
   index('reservations_room_dates_idx').on(t.roomId, t.checkIn, t.checkOut),
   index('reservations_room_interval_idx').on(t.roomId, t.checkInAt, t.checkOutAt),
   index('reservations_primary_guest_idx').on(t.primaryGuestId),
+]);
+
+export const reservationCommands = pgTable('reservation_commands', {
+  id: uuid().defaultRandom().primaryKey(),
+  propertyId: uuid('property_id').notNull(),
+  reservationId: uuid('reservation_id').notNull(),
+  operation: varchar({ length: 24 }).notNull(),
+  idempotencyKey: uuid('idempotency_key').notNull(),
+  fingerprint: varchar({ length: 64 }).notNull(),
+  response: jsonb().$type<ReservationCommandReceipt>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique('reservation_commands_property_key_unique').on(t.propertyId, t.idempotencyKey),
+  foreignKey({ name: 'reservation_commands_property_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
+  foreignKey({ name: 'reservation_commands_reservation_property_fkey', columns: [t.reservationId, t.propertyId], foreignColumns: [reservations.id, reservations.propertyId] }).onDelete('cascade'),
+  index('reservation_commands_reservation_idx').on(t.reservationId, t.createdAt),
 ]);
 
 export const reservationGuests = pgTable('reservation_guests', {

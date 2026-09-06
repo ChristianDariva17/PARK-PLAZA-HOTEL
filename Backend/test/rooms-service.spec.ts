@@ -29,7 +29,8 @@ function mutationService(current: RoomRow | null = row) {
   const tx = { execute: vi.fn().mockResolvedValue(undefined), select: vi.fn(() => selected), update: vi.fn(() => update), insert: vi.fn() };
   const database = { transaction: vi.fn((callback) => callback(tx)) } as unknown as Database;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  return { service: new RoomsService(database, audit), tx, selected, update, audit };
+  const realtime = { emitToProperty: vi.fn(), emitToStay: vi.fn() };
+  return { service: new RoomsService(database, audit, realtime as any), tx, selected, update, audit };
 }
 
 describe('RoomsService', () => {

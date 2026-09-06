@@ -224,5 +224,6 @@ export const orderItems = pgTable('order_items', {
 }, (t) => [
   foreignKey({ name: 'order_items_order_property_fkey', columns: [t.orderId, t.propertyId], foreignColumns: [orders.id, orders.propertyId] }).onDelete('cascade'),
   foreignKey({ name: 'order_items_menu_item_property_fkey', columns: [t.menuItemId, t.propertyId], foreignColumns: [menuItems.id, menuItems.propertyId] }).onDelete('restrict'),
+  foreignKey({ name: 'order_items_variant_property_item_fkey', columns: [t.menuItemVariantId, t.propertyId, t.menuItemId], foreignColumns: [menuItemVariants.id, menuItemVariants.propertyId, menuItemVariants.menuItemId] }).onDelete('restrict'),
   index('order_items_order_idx').on(t.orderId),
 ]);

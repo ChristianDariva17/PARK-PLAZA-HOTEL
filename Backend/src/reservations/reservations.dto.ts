@@ -6,6 +6,8 @@ const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5
 const utcTimestamp = z.string().regex(UTC_TIMESTAMP_PATTERN).refine((value) => !Number.isNaN(Date.parse(value)) && new Date(value).toISOString() === value);
 const positiveGuestCount = z.number().finite().int().positive().max(Number.MAX_SAFE_INTEGER);
 const queryGuestCount = z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(positiveGuestCount);
+const idempotencyKey = z.string().uuid();
+const reason = z.string().trim().min(1);
 
 const createReservationSchema = z.object({
   roomId: z.string().uuid(),
@@ -26,3 +28,6 @@ export type AvailabilityQuery = z.output<typeof availabilityQuerySchema>;
 
 export const parseCreateReservationDto = (input: unknown) => parseZodHttp(createReservationSchema, input);
 export const parseAvailabilityQuery = (input: unknown) => parseZodHttp(availabilityQuerySchema, input, 'Invalid availability query');
+export const parseIdempotencyKey = (input: unknown) => parseZodHttp(idempotencyKey, input, 'Invalid or missing idempotency key');
+export const parseCancelReservationDto = (input: unknown) => parseZodHttp(z.object({ reason }).strict(), input);
+export const parseDispositionReservationDto = (input: unknown) => parseZodHttp(z.object({ disposition: z.literal('no_show'), reason }).strict(), input);

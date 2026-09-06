@@ -11,6 +11,7 @@ import {
   customerReservations,
   inventoryItems,
   inventoryLedger,
+  menuItemVariants,
   menuItemIngredients,
   menuItems,
   orderItems,
@@ -105,15 +106,18 @@ export class RestaurantService {
   ) {}
 
   // ─── Menu ────────────────────────────────────────────────────────────────────
-  async listMenu(propertyId: string) {
+  private async listMenuRecords(propertyId: string, includeHidden: boolean) {
     const items = await this.db.select().from(menuItems).where(eq(menuItems.propertyId, propertyId)).orderBy(menuItems.name);
     const allIngredients = items.length
       ? await this.db.select().from(menuItemIngredients).where(inArray(menuItemIngredients.menuItemId, items.map((i) => i.id)))
       : [];
+    const allVariants = items.length
+      ? await this.db.select().from(menuItemVariants).where(inArray(menuItemVariants.menuItemId, items.map((i) => i.id)))
+      : [];
     const allInventory = await this.db.select().from(inventoryItems).where(eq(inventoryItems.propertyId, propertyId));
     const invMap = new Map(allInventory.map((i) => [i.id, i]));
 
-    return items.map((item) => {
+    return items.filter((item) => includeHidden || (item.status === 'active' && item.isPublished && item.isAvailable)).map((item) => {
       const itemIngs = allIngredients.filter((ing) => ing.menuItemId === item.id);
       let calculatedCost = 0;
       for (const ing of itemIngs) {
@@ -130,6 +134,7 @@ export class RestaurantService {
       return {
         ...item,
         ingredients: itemIngs,
+        variants: allVariants.filter((variant) => variant.menuItemId === item.id && (includeHidden || (variant.status === 'active' && variant.isPublished && variant.isAvailable && variant.price !== null))),
         costSummary: {
           recipeCost: Math.round(calculatedCost * 100) / 100,
           grossMarginPercent,
@@ -140,8 +145,27 @@ export class RestaurantService {
     });
   }
 
+  async listMenu(propertyId: string) {
+    return this.listMenuRecords(propertyId, false);
+  }
+
+  async listManagedMenu(propertyId: string) {
+    return this.listMenuRecords(propertyId, true);
+  }
+
   async createMenuItem(actor: AuthenticatedAccount, dto: CreateMenuItemDto, _ctx: unknown) {
     return this.db.transaction(async (tx) => {
+      if (dto.ingredients.length) {
+        const inventoryIds = dto.ingredients.map((ingredient) => ingredient.inventoryItemId);
+        const inventoryRows = await tx.select({ id: inventoryItems.id }).from(inventoryItems).where(and(
+          inArray(inventoryItems.id, inventoryIds),
+          eq(inventoryItems.propertyId, actor.propertyId),
+          eq(inventoryItems.status, 'active'),
+        ));
+        if (inventoryRows.length !== new Set(inventoryIds).size) {
+          throw new BadRequestException('Todos los insumos deben estar activos en la propiedad autenticada.');
+        }
+      }
       const duplicate = await tx.select({ id: menuItems.id }).from(menuItems)
         .where(and(eq(menuItems.propertyId, actor.propertyId), eq(menuItems.name, dto.name.trim()), eq(menuItems.status, 'active')));
       if (duplicate.length) throw new ConflictException('Ya existe un item de menu activo con ese nombre.');
@@ -173,6 +197,7 @@ export class RestaurantService {
     return this.db.transaction(async (tx) => {
       const [existing] = await tx.select().from(menuItems).where(and(eq(menuItems.id, itemId), eq(menuItems.propertyId, actor.propertyId)));
       if (!existing) throw new NotFoundException('Item de menu no encontrado.');
+      if (existing.managementMode === 'imported') throw new ConflictException('Los items importados solo se modifican mediante el importador.');
       if (existing.status === 'archived') throw new BadRequestException('Reactiva el item antes de editarlo.');
       await tx.delete(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, itemId));
       if (dto.ingredients.length) {
@@ -199,6 +224,7 @@ export class RestaurantService {
   async archiveMenuItem(actor: AuthenticatedAccount, itemId: string, dto: ArchiveDto) {
     const [existing] = await this.db.select().from(menuItems).where(and(eq(menuItems.id, itemId), eq(menuItems.propertyId, actor.propertyId)));
     if (!existing) throw new NotFoundException('Item de menu no encontrado.');
+    if (existing.managementMode === 'imported') throw new ConflictException('Los items importados solo se modifican mediante el importador.');
     if (existing.status === 'archived') throw new ConflictException('El item ya esta archivado.');
     const [updated] = await this.db.update(menuItems).set({ status: 'archived', updatedAt: new Date() }).where(eq(menuItems.id, itemId)).returning();
     return updated;
@@ -414,7 +440,14 @@ export class RestaurantService {
       if (!['Pedido recibido', 'Confirmado'].includes(order.status)) throw new BadRequestException('El pedido ya no se puede editar.');
 
       const menuIds = dto.items.map((i) => i.menuItemId);
-      const menuRows = await tx.select().from(menuItems).where(inArray(menuItems.id, menuIds));
+      const menuRows = await tx.select().from(menuItems).where(and(
+        inArray(menuItems.id, menuIds),
+        eq(menuItems.propertyId, actor.propertyId),
+        eq(menuItems.status, 'active'),
+      ));
+      if (menuRows.length !== new Set(menuIds).size) {
+        throw new BadRequestException('Items de menu no encontrados, fuera de la propiedad o archivados.');
+      }
       let total = 0;
       const lines = dto.items.map((item) => {
         const menu = menuRows.find((m) => m.id === item.menuItemId)!;
@@ -511,14 +544,14 @@ export class RestaurantService {
         await tx.update(orderItems).set({ status: 'listo' }).where(eq(orderItems.orderId, orderId));
       }
 
-      if (nextStatus === 'Entregado') {
-        await tx.update(orderItems).set({ status: 'entregado' }).where(eq(orderItems.orderId, orderId));
-      }
-
       if (order.stayId && order.status === 'Listo' && nextStatus === 'Entregado') {
         const stay = (await tx.select({ id: stays.id }).from(stays).where(and(eq(stays.id, order.stayId), eq(stays.propertyId, actor.propertyId), eq(stays.status, 'active'))).limit(1).for('update', { of: stays }))[0];
         if (!stay) throw new ConflictException('The linked stay is not active in this property.');
         await this.folios.postRestaurantCharge(tx, actor, stay.id, order.id, order.total, context);
+      }
+
+      if (nextStatus === 'Entregado') {
+        await tx.update(orderItems).set({ status: 'entregado' }).where(eq(orderItems.orderId, orderId));
       }
       const accountingStage = nextStatus === 'Pagado' ? 'Pagado' : order.accountingStage;
       const [updated] = await tx.update(orders).set({ status: nextStatus, inventoryStage, accountingStage, updatedAt: new Date() }).where(eq(orders.id, orderId)).returning();

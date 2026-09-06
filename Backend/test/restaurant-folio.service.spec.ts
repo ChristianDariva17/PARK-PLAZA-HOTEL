@@ -26,12 +26,12 @@ function setup(selections: unknown[][]) {
   };
   const db = { transaction: vi.fn((run: (transaction: typeof tx) => unknown) => run(tx)) } as unknown as Database;
   const folios = { postRestaurantCharge: vi.fn(), reverseRestaurantCharge: vi.fn() } as unknown as FolioService;
-  return { service: new RestaurantService(db, folios), folios, updates };
+  return { service: new RestaurantService(db, folios, { emitToProperty: vi.fn(), emitToStay: vi.fn() } as any), folios, updates };
 }
 
 describe('Restaurant folio posting behavior', () => {
   it('posts one charge only for same-property Listo to Entregado and never advances linked Entregado to Pagado', async () => {
-    const ready = setup([[delivered], [], [{ id: 'stay' }], [{ ...delivered, status: 'Entregado' }]]);
+    const ready = setup([[delivered], [], [{ id: 'stay' }], [{ ...delivered, status: 'Entregado' }], [{ ...delivered, status: 'Entregado' }], []]);
     await ready.service.advanceOrder(actor, delivered.id, { expectedStatus: 'Listo' }, context);
     expect(ready.folios.postRestaurantCharge).toHaveBeenCalledWith(expect.anything(), actor, 'stay', 'order', '12.50', context);
     expect(ready.updates).toContainEqual(expect.objectContaining({ status: 'Entregado' }));

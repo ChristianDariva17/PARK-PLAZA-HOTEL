@@ -23,7 +23,7 @@ describe('FolioService financial command behavior', () => {
       { id: 'payment', type: 'payment', amount: '5.00' as any, reversalOfEntryId: null },
       { id: 'reversal', type: 'reversal', amount: '5.00' as any, reversalOfEntryId: 'payment' },
     ]];
-    setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
+    (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
 
     await expect(setup.service.read(setup.tx as any, actor.propertyId, 'stay')).resolves.toMatchObject({ balance: '12.50', entries: expect.arrayContaining([expect.objectContaining({ id: 'charge' })]) });
   });
@@ -46,7 +46,7 @@ describe('FolioService financial command behavior', () => {
 
   it('replays a compatible ancillary source with its real UUID without a second audit', async () => {
     const setup = service();
-    setup.tx as any.select.mockImplementation(() => chain([]));
+    (setup.tx as any).select.mockImplementation(() => chain([]));
     const insert = vi.spyOn(setup.service as any, 'insert').mockResolvedValue({ id: '8e6c4ee6-555d-58ed-9015-6fce38b513ea' });
     await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-1', amount: '8.00' as any, reason: 'Parking exit' }, context)).resolves.toEqual({ id: '8e6c4ee6-555d-58ed-9015-6fce38b513ea' });
     expect(insert).toHaveBeenCalledOnce();
@@ -55,17 +55,17 @@ describe('FolioService financial command behavior', () => {
   it('scenario: Post-settlement ancillary posting is rejected before a ledger insert', async () => {
     const setup = service();
     const selections = [[], [], [{ id: 'stay', settlement: 'settled', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], []];
-    setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
+    (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
 
     await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'pet_charge', sourceId: 'PET-1', amount: '5.00' as any, reason: 'Pet lodging charge' }, context)).rejects.toBeInstanceOf(ConflictException);
-    expect(setup.tx as any.insert).not.toHaveBeenCalled();
+    expect((setup.tx as any).insert).not.toHaveBeenCalled();
   });
 
   it('scenario: Checkout contention uses the locked stay before the ancillary insert', async () => {
     const setup = commandSetup([[], [], [stayRow], [folioRow], []], [{ id: 'entry-id' }]);
 
     await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00' as any, reason: 'Parking exit' }, context)).resolves.toEqual({ id: 'entry-id' });
-    expect(setup.tx as any.select.mock.results[2]!.value.for).toHaveBeenCalledWith('update', expect.anything());
+    expect((setup.tx as any).select.mock.results[2]!.value.for).toHaveBeenCalledWith('update', expect.anything());
     expect(setup.inserted).toContainEqual(expect.objectContaining({ sourceType: 'parking_exit', sourceId: 'VEH-LOCK', amount: '8.00' as any }));
   });
 
@@ -135,8 +135,8 @@ const openSession = { id: 'open-session', propertyId: actor.propertyId, status: 
 
 function commandSetup(selections: unknown[][], returnedEntries: unknown[]) {
   const setup = service(); const inserted: unknown[] = [];
-  setup.tx as any.select.mockImplementation(() => chain(selections.shift() ?? []));
-  setup.tx as any.insert.mockImplementation(() => ({ values: vi.fn((value) => { inserted.push(value); const entry = returnedEntries.shift(); return entry ? { returning: vi.fn().mockResolvedValue([entry]) } : Promise.resolve(); }) }));
+  (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
+  (setup.tx as any).insert.mockImplementation(() => ({ values: vi.fn((value) => { inserted.push(value); const entry = returnedEntries.shift(); return entry ? { returning: vi.fn().mockResolvedValue([entry]) } : Promise.resolve(); }) }));
   return { ...setup, inserted };
 }
 

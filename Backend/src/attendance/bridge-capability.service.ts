@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 export type BridgeCapabilityOperation = 'health' | 'enroll' | 'verify';
 
@@ -10,6 +10,8 @@ interface BridgeCapabilityPayload {
   exp: number;
   jti: string;
 }
+
+export interface VerifiedBridgeCapability extends BridgeCapabilityPayload {}
 
 @Injectable()
 export class BridgeCapabilityService {
@@ -30,6 +32,30 @@ export class BridgeCapabilityService {
     };
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     return { token: `${encoded}.${this.sign(encoded)}`, expiresAt: expiresAt.toISOString() };
+  }
+
+  verify(token: string, operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }) {
+    const [encoded, signature] = token.split('.');
+    if (!encoded || !signature) throw new Error('Invalid bridge capability');
+    const expected = this.sign(encoded);
+    const actualBytes = Buffer.from(signature);
+    const expectedBytes = Buffer.from(expected);
+    if (actualBytes.length !== expectedBytes.length || !timingSafeEqual(actualBytes, expectedBytes)) {
+      throw new Error('Invalid bridge capability');
+    }
+    let payload: VerifiedBridgeCapability;
+    try {
+      payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as VerifiedBridgeCapability;
+    } catch {
+      throw new Error('Invalid bridge capability');
+    }
+    if (payload.op !== operation || payload.exp <= Math.floor(Date.now() / 1000)) {
+      throw new Error('Expired or mismatched bridge capability');
+    }
+    if (subject && (payload.st !== subject.type || payload.sid !== subject.id)) {
+      throw new Error('Bridge capability subject mismatch');
+    }
+    return payload;
   }
 
   private sign(value: string) {

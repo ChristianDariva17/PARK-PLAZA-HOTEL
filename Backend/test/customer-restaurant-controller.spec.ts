@@ -38,7 +38,7 @@ describe('CustomerRestaurantController authentication boundary', () => {
     try {
       controller.create({ deliveryMode: 'Room' }, '550e8400-e29b-41d4-a716-446655440002', request);
     } catch (error) {
-      expect(error).toMatchObject({ status: 400, response: { version: 1, outcome: 'rejected', code: 'STAY_ID_REQUIRED' } });
+      expect(error).toMatchObject({ status: 400, response: { version: 1, outcome: 'rejected', code: 'TARGET_ACCOUNT_REQUIRED' } });
     }
     expect(restaurant.createCustomerOrder).not.toHaveBeenCalled();
   });

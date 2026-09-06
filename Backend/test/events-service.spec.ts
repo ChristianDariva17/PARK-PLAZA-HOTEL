@@ -45,7 +45,10 @@ describe('EventsService', () => {
     audit = { record: vi.fn() };
     folio = {}; // FolioService is intentionally decoupled, we don't expect calls to it.
 
-    service = new EventsService(db, audit, folio);
+    service = new EventsService(db, audit, folio, {
+      emitToProperty: vi.fn(),
+      emitToStay: vi.fn(),
+    } as any);
   });
 
   describe('Lifecycle Machine', () => {

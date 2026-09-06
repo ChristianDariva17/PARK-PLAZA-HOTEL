@@ -29,9 +29,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error({
         requestId: request.id,
         exceptionType: exception instanceof Error ? exception.constructor.name : typeof exception,
-        message: exception instanceof Error ? exception.message : String(exception),
-        cause: (exception as any)?.cause ? String((exception as any).cause?.message || (exception as any).cause) : undefined,
-        stack: exception instanceof Error ? exception.stack : undefined,
       });
     }
 
