@@ -1,6 +1,6 @@
-ALTER TABLE "suppliers" ADD COLUMN "rating" integer DEFAULT 5;--> statement-breakpoint
-ALTER TABLE "suppliers" ADD COLUMN "rating_notes" text;--> statement-breakpoint
-CREATE TABLE "purchase_orders" (
+ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "rating" integer DEFAULT 5;--> statement-breakpoint
+ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "rating_notes" text;--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "purchase_orders" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"property_id" uuid NOT NULL,
 	"supplier_id" uuid NOT NULL,
@@ -23,8 +23,14 @@ CREATE TABLE "purchase_orders" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_property_id_properties_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_purchase_orders_property_isolation" ON "purchase_orders" USING btree ("id","property_id");--> statement-breakpoint
-CREATE INDEX "idx_purchase_orders_supplier" ON "purchase_orders" USING btree ("property_id","supplier_id");--> statement-breakpoint
-CREATE INDEX "idx_purchase_orders_status" ON "purchase_orders" USING btree ("property_id","status");
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_property_id_properties_id_fk') THEN
+    ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_property_id_properties_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE no action ON UPDATE no action;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_supplier_id_suppliers_id_fk') THEN
+    ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_purchase_orders_property_isolation" ON "purchase_orders" USING btree ("id","property_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_purchase_orders_supplier" ON "purchase_orders" USING btree ("property_id","supplier_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_purchase_orders_status" ON "purchase_orders" USING btree ("property_id","status");

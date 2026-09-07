@@ -17,7 +17,8 @@ export interface VerifiedBridgeCapability extends BridgeCapabilityPayload {}
 export class BridgeCapabilityService {
   private readonly secret: string;
 
-  constructor(secret = process.env.BIOMETRIC_BRIDGE_CAPABILITY_SECRET) {
+  constructor() {
+    const secret = process.env.BIOMETRIC_BRIDGE_CAPABILITY_SECRET;
     if (!secret || secret.length < 32) throw new Error('BIOMETRIC_BRIDGE_CAPABILITY_SECRET must contain at least 32 characters');
     this.secret = secret;
   }

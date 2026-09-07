@@ -1,12 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { BridgeCapabilityService } from '../src/attendance/bridge-capability.service.js';
 
 const secret = 'biometric-bridge-test-secret-at-least-32-characters';
 
 describe('BridgeCapabilityService', () => {
+  beforeEach(() => {
+    process.env.BIOMETRIC_BRIDGE_CAPABILITY_SECRET = secret;
+  });
+
+  it('does not request constructor dependencies from Nest', () => {
+    expect(Reflect.getMetadata('design:paramtypes', BridgeCapabilityService)).toBeUndefined();
+  });
+
   it('issues a signed, subject-bound capability that expires in one minute', () => {
-    const result = new BridgeCapabilityService(secret).issue('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' });
+    const result = new BridgeCapabilityService().issue('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' });
     const [payload, signature] = result.token.split('.');
     const decoded = JSON.parse(Buffer.from(payload!, 'base64url').toString('utf8'));
 
@@ -16,7 +24,7 @@ describe('BridgeCapabilityService', () => {
   });
 
   it('rejects an expired capability', () => {
-    const service = new BridgeCapabilityService(secret);
+    const service = new BridgeCapabilityService();
     const issued = service.issue('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' });
     const [payload, signature] = issued.token.split('.');
     const expiredPayload = Buffer.from(JSON.stringify({

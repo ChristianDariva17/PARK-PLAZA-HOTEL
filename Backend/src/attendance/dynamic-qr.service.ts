@@ -14,7 +14,8 @@ export class DynamicQrService {
   // Anti-replay cache: stores consumed nonces with timestamp to prevent duplicate punches
   private readonly consumedNonces = new Map<string, number>();
 
-  constructor(secretKey = process.env.ATTENDANCE_QR_SECRET) {
+  constructor() {
+    const secretKey = process.env.ATTENDANCE_QR_SECRET;
     if (!secretKey || secretKey.length < 32) {
       throw new Error('ATTENDANCE_QR_SECRET must contain at least 32 characters');
     }

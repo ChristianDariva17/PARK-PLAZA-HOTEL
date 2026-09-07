@@ -47,7 +47,12 @@ describe('DynamicQrService', () => {
   const propertyId = '11111111-1111-4111-8111-111111111111';
 
   beforeEach(() => {
-    service = new DynamicQrService(Buffer.alloc(32, 1).toString('base64'));
+    process.env.ATTENDANCE_QR_SECRET = Buffer.alloc(32, 1).toString('base64');
+    service = new DynamicQrService();
+  });
+
+  it('does not request constructor dependencies from Nest', () => {
+    expect(Reflect.getMetadata('design:paramtypes', DynamicQrService)).toBeUndefined();
   });
 
   it('generates a valid signed kiosk token', () => {
