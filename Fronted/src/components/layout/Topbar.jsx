@@ -5,6 +5,7 @@ import { getAccountInitials, getRoleLabel } from '../../auth/authContext';
 import { usePermissions } from '../../auth/authContext';
 import { PERMISSIONS } from '../../auth/permissions';
 import { canAccessRoute } from './navigation';
+import { useHotelSearchState } from '../../state/hotelContext';
 
 const TITLES = {
   dashboard: ['Panel operativo', 'Resumen del estado compartido'], habitaciones: ['Habitaciones', 'Mapa y detalle operativo'], reservas: ['Reservas', 'Disponibilidad, precio y adelantos'],
@@ -18,8 +19,9 @@ const TITLES = {
   auditoria: ['Auditoría y seguridad', 'Actividad y controles'], configuracion: ['Configuración', 'Integraciones y respaldos'],
 };
 
-export default function Topbar({ currentView, state, notifications, menuOpen, onMenu, onNavigate, onRead, onReadAll, account }) {
+export default function Topbar({ currentView, notifications, menuOpen, onMenu, onNavigate, onRead, onReadAll, account }) {
   const { can } = usePermissions();
+  const searchState = useHotelSearchState();
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -86,6 +88,6 @@ export default function Topbar({ currentView, state, notifications, menuOpen, on
       {can(PERMISSIONS.reservationsCreate) ? <button className="btn btn-primary topbar-cta" onClick={() => onNavigate('reservas', { type: 'create-reservation' })}><CalendarPlus size={17} /><span>Nueva reserva</span></button> : null}
        <div className="topbar-profile"><span className="topbar-avatar">{getAccountInitials(account.email)}</span><span><strong>{account.email}</strong><small>{getRoleLabel(account.role)}</small></span></div>
     </div>
-    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} state={state} onNavigate={onNavigate} can={can} />
+    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} state={searchState} onNavigate={onNavigate} can={can} />
   </header>;
 }

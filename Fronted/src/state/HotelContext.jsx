@@ -49,8 +49,8 @@ import { adaptPetResponse, buildPetCreateDto, buildPetUpdateDto } from '../pets/
 import { fetchVehicles, createVehicle, updateVehicle, exitVehicle, archiveVehicle, ParkingRequestError } from '../parking/parkingClient.js';
 import { adaptVehicleResponse, buildVehicleCreateDto, buildVehicleUpdateDto } from '../parking/parkingModel.js';
 
-import { HotelCommandsContext, HotelStateContext } from './hotelContext.js';
-export { HotelCommandsContext, HotelStateContext, useHotel, useHotelCommands } from './hotelContext.js';
+import { HotelCommandsContext, HotelSearchStateContext, HotelShellStateContext, HotelStateContext } from './hotelContext.js';
+export { HotelCommandsContext, HotelSearchStateContext, HotelShellStateContext, HotelStateContext, useHotel, useHotelCommands, useHotelSearchState, useHotelShellState } from './hotelContext.js';
 import { hotelReducer, validateHotelAction } from './hotelReducer.js';
 import { loadOperationalRecords, runConfirmedOperationalRequest } from './operationalRequestPolicy.js';
 
@@ -1597,7 +1597,17 @@ export function HotelProvider({ children }) {
   const cashCommands = useMemo(() => ({ reload: reloadCash, loadDetails: loadCashSessionDetails, open: openCashSessionCommand, count: countCashSessionCommand, close: closeCashSessionCommand, move: createCashMovementCommand }), [openCashSessionCommand, countCashSessionCommand, closeCashSessionCommand, createCashMovementCommand, loadCashSessionDetails, reloadCash]);
   const parkingCommands = useMemo(() => ({ execute: runParkingCommand, reload: reloadParkingRecords }), [reloadParkingRecords, runParkingCommand]);
   const petCommands = useMemo(() => ({ execute: runPetCommand, reload: reloadPetRecords }), [reloadPetRecords, runPetCommand]);
+  const shellState = useMemo(() => ({
+    orders: state.orders,
+    notifications: state.notifications,
+  }), [state.orders, state.notifications]);
+  const searchState = useMemo(() => ({
+    clients: state.clients,
+    reservations: state.reservations,
+    rooms: state.rooms,
+    orders: state.orders,
+  }), [state.clients, state.reservations, state.rooms, state.orders]);
 
   const commands = useMemo(() => ({ dispatch: execute, execute, guestCommands, roomCommands, reservationCommands, stayCommands, cleaningCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands }), [cleaningCommands, execute, guestCommands, incidentCommands, maintenanceCommands, cashCommands, parkingCommands, petCommands, restaurantCommands, menuManagementCommands, inventoryCommands, reservationCommands, roomCommands, stayCommands]);
-  return <HotelCommandsContext.Provider value={commands}><HotelStateContext.Provider value={state}>{children}</HotelStateContext.Provider></HotelCommandsContext.Provider>;
+  return <HotelCommandsContext.Provider value={commands}><HotelShellStateContext.Provider value={shellState}><HotelSearchStateContext.Provider value={searchState}><HotelStateContext.Provider value={state}>{children}</HotelStateContext.Provider></HotelSearchStateContext.Provider></HotelShellStateContext.Provider></HotelCommandsContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth, usePermissions } from './auth/authContext';
 import { permissionForRoute } from './auth/permissions';
 import LoginView, { SessionCheckingView, SessionErrorView } from './components/auth/LoginView';
@@ -8,7 +8,7 @@ import { VALID_ROUTES } from './components/layout/navigation';
 import Toast from './components/layout/Toast';
 import Topbar from './components/layout/Topbar';
 import { useHashRoute } from './hooks/useHashRoute';
-import { useHotel } from './state/hotelContext';
+import { useHotelCommands, useHotelShellState } from './state/hotelContext';
 import { isAdminContractAdmitted } from './contracts/admission.js';
 
 const named = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
@@ -79,18 +79,20 @@ function ContractBlockedView({ route }) {
   return <section className="route-error" role="status" aria-live="polite"><h2>Contrato Backend no verificado</h2><p>El módulo {route} permanece visible, pero no muestra datos ni acciones hasta que su contrato Backend sea aprobado y verificado.</p></section>;
 }
 
-import { useWebSocket } from './hooks/useWebSocket';
+import { useWebSocket, useWebSocketEvents } from './hooks/useWebSocket';
 
 function HotelShell() {
   const { account, loggingOut, logout } = useAuth();
   const { can } = usePermissions();
-  const { state, execute, roomCommands } = useHotel();
+  const shellState = useHotelShellState();
+  const { execute, roomCommands } = useHotelCommands();
   const authorizedRoutes = useMemo(() => new Set([...VALID_ROUTES].filter((route) => can(permissionForRoute(route)))), [can]);
   const fallbackRoute = authorizedRoutes.values().next().value || '';
   const [currentView, hashNavigate] = useHashRoute(VALID_ROUTES, fallbackRoute);
   const [navigationIntent, setNavigationIntent] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const roomReloadTimerRef = useRef(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const notify = useCallback((title, message = '', type = 'success') => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -109,23 +111,21 @@ function HotelShell() {
     notify('🍽️ Nuevo Pedido Entrante', `Comanda #${order.id?.slice(0, 8) || ''} recibida en cocina.`, 'info');
   });
 
-  useWebSocket('room:updated', (room) => {
-    console.log('[WebSocket] Habitación actualizada:', room);
-    notify('🏨 Habitación Actualizada', `Habitación ${room?.number || ''} sincronizada en vivo`, 'info');
-    roomCommands?.reload?.().catch(() => {});
-  });
+  const scheduleRoomReload = useCallback((room) => {
+    console.log('[WebSocket] Cambio de habitación:', room);
+    notify('🏨 Habitación actualizada', `Habitación ${room?.number || ''} sincronizada en vivo`, 'info');
+    if (roomReloadTimerRef.current) window.clearTimeout(roomReloadTimerRef.current);
+    roomReloadTimerRef.current = window.setTimeout(() => {
+      roomReloadTimerRef.current = null;
+      roomCommands?.reload?.().catch(() => {});
+    }, 100);
+  }, [notify, roomCommands]);
 
-  useWebSocket('room:status_changed', (room) => {
-    console.log('[WebSocket] Cambio de estado de habitación:', room);
-    notify('🏨 Estado de Habitación', `Habitación ${room?.number || ''}: ${room?.status || ''}`, 'info');
-    roomCommands?.reload?.().catch(() => {});
-  });
+  useWebSocketEvents(['room:updated', 'room:status_changed', 'room:category_updated'], scheduleRoomReload);
 
-  useWebSocket('room:category_updated', (payload) => {
-    console.log('[WebSocket] Categoría de habitación actualizada:', payload);
-    notify('✨ Tarifa/Categoría Actualizada', `Categoría ${payload?.category?.name || ''} actualizada en tiempo real`, 'info');
-    roomCommands?.reload?.().catch(() => {});
-  });
+  useEffect(() => () => {
+    if (roomReloadTimerRef.current) window.clearTimeout(roomReloadTimerRef.current);
+  }, []);
 
   const navigate = useCallback((route, intent = null) => {
     setNavigationIntent(intent ? { ...intent, route, id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}` } : null);
@@ -140,7 +140,7 @@ function HotelShell() {
   }, [execute, notify]);
   const routeAuthorized = authorizedRoutes.has(currentView);
   const View = VIEW_COMPONENTS[currentView] || DashboardView;
-  const pendingOrders = state.orders.filter((order) => !['Entregado', 'Pagado', 'Cancelado'].includes(order.status)).length;
+  const pendingOrders = shellState.orders.filter((order) => !['Entregado', 'Pagado', 'Cancelado'].includes(order.status)).length;
   const routeIntent = navigationIntent?.route === currentView ? navigationIntent : null;
   const handleLogout = async () => {
     try {
@@ -149,7 +149,7 @@ function HotelShell() {
       notify('No se pudo cerrar la sesión', 'Intentá nuevamente.', 'error');
     }
   };
-  return <div className="app-layout"><a className="skip-link" href="#main-content">Saltar al contenido</a><Sidebar currentView={currentView} navigate={navigate} pendingOrdersCount={pendingOrders} open={sidebarOpen} onClose={closeSidebar} account={account} onLogout={handleLogout} loggingOut={loggingOut} /><div className="main-content"><Topbar currentView={currentView} state={state} notifications={state.notifications} menuOpen={sidebarOpen} onMenu={() => setSidebarOpen(true)} onNavigate={navigate} onRead={(notificationId) => runSilent({ type: 'NOTIFICATION_READ', notificationId })} onReadAll={(notificationIds) => runSilent({ type: 'NOTIFICATIONS_READ_AUTHORIZED', notificationIds })} account={account} /><main id="main-content" tabIndex="-1">{routeAuthorized ? isAdminContractAdmitted(currentView) ? <RouteErrorBoundary key={currentView}><Suspense fallback={<div className="route-loading" role="status" aria-live="polite">Cargando módulo…</div>}><View navigate={navigate} notify={notify} navigationIntent={routeIntent} consumeNavigationIntent={consumeNavigationIntent} /></Suspense></RouteErrorBoundary> : <ContractBlockedView route={currentView} /> : <div className="route-error" role="alert"><h2>Acceso denegado</h2><p>No tenés permiso para abrir este módulo.</p>{fallbackRoute ? <button className="btn btn-primary" onClick={() => navigate(fallbackRoute)}>Ir a un módulo autorizado</button> : null}</div>}</main></div><Toast toasts={toasts} removeToast={(id) => setToasts((items) => items.filter((item) => item.id !== id))} /></div>;
+  return <div className="app-layout"><a className="skip-link" href="#main-content">Saltar al contenido</a><Sidebar currentView={currentView} navigate={navigate} pendingOrdersCount={pendingOrders} open={sidebarOpen} onClose={closeSidebar} account={account} onLogout={handleLogout} loggingOut={loggingOut} /><div className="main-content"><Topbar currentView={currentView} notifications={shellState.notifications} menuOpen={sidebarOpen} onMenu={() => setSidebarOpen(true)} onNavigate={navigate} onRead={(notificationId) => runSilent({ type: 'NOTIFICATION_READ', notificationId })} onReadAll={(notificationIds) => runSilent({ type: 'NOTIFICATIONS_READ_AUTHORIZED', notificationIds })} account={account} /><main id="main-content" tabIndex="-1">{routeAuthorized ? isAdminContractAdmitted(currentView) ? <RouteErrorBoundary key={currentView}><Suspense fallback={<div className="route-loading" role="status" aria-live="polite">Cargando módulo…</div>}><View navigate={navigate} notify={notify} navigationIntent={routeIntent} consumeNavigationIntent={consumeNavigationIntent} /></Suspense></RouteErrorBoundary> : <ContractBlockedView route={currentView} /> : <div className="route-error" role="alert"><h2>Acceso denegado</h2><p>No tenés permiso para abrir este módulo.</p>{fallbackRoute ? <button className="btn btn-primary" onClick={() => navigate(fallbackRoute)}>Ir a un módulo autorizado</button> : null}</div>}</main></div><Toast toasts={toasts} removeToast={(id) => setToasts((items) => items.filter((item) => item.id !== id))} /></div>;
 }
 
 export default function App() {

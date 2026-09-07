@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { addConnectionListener, connectSocket, getSocket, subscribeToEvent } from '../realtime/socketClient.js';
 
 /**
@@ -9,8 +9,15 @@ import { addConnectionListener, connectSocket, getSocket, subscribeToEvent } fro
  * @returns {{ isConnected: boolean, status: string, socket: any }}
  */
 export function useWebSocket(eventName, onEvent) {
+  return useWebSocketEvents(eventName ? [eventName] : [], onEvent);
+}
+
+export function useWebSocketEvents(eventNames, onEvent) {
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState('connecting');
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+  const eventKey = eventNames.join('\0');
 
   useEffect(() => {
     connectSocket();
@@ -22,12 +29,14 @@ export function useWebSocket(eventName, onEvent) {
     return unsubscribeConn;
   }, []);
 
-  useEffect(() => {
-    if (!eventName || !onEvent) return;
+  const handleEvent = useCallback((...args) => onEventRef.current?.(...args), []);
 
-    const unsubscribe = subscribeToEvent(eventName, onEvent);
-    return unsubscribe;
-  }, [eventName, onEvent]);
+  useEffect(() => {
+    if (!eventKey || !onEventRef.current) return undefined;
+
+    const unsubscribers = eventKey.split('\0').map((eventName) => subscribeToEvent(eventName, handleEvent));
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [eventKey, handleEvent]);
 
   return {
     isConnected,

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { eventsClient } from './eventsClient';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocketEvents } from '../hooks/useWebSocket';
+
+const EVENT_REFRESH_NAMES = ['event:created', 'event:confirmed', 'event:status_changed', 'event:cancelled', 'event:updated', 'event:archived'];
 
 export function useEventsResource() {
   const [spaces, setSpaces] = useState([]);
@@ -19,6 +21,8 @@ export function useEventsResource() {
     page: 1,
     pageSize: 20
   });
+  const eventsRequestRef = useRef({ generation: 0, controller: null });
+  const refreshTimerRef = useRef(null);
 
   const loadSpaces = useCallback(async (signal) => {
     try {
@@ -31,21 +35,30 @@ export function useEventsResource() {
     }
   }, []);
 
-  const loadEvents = useCallback(async (currentFilters, signal) => {
+  const loadEvents = useCallback(async (currentFilters, signal, generation) => {
     setLoading(true);
     setError(null);
     try {
       const data = await eventsClient.getEvents(currentFilters, signal);
+      if (generation !== eventsRequestRef.current.generation || signal.aborted) return;
       setEvents(data.items || []);
       setTotal(data.total || 0);
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (generation === eventsRequestRef.current.generation && err.name !== 'AbortError') {
         setError(err.message || 'Error loading events');
       }
     } finally {
-      setLoading(false);
+      if (generation === eventsRequestRef.current.generation) setLoading(false);
     }
   }, []);
+
+  const startEventsLoad = useCallback((currentFilters) => {
+    const request = eventsRequestRef.current;
+    request.controller?.abort();
+    request.generation += 1;
+    request.controller = new AbortController();
+    loadEvents(currentFilters, request.controller.signal, request.generation);
+  }, [loadEvents]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,26 +67,30 @@ export function useEventsResource() {
   }, [loadSpaces]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadEvents(filters, controller.signal);
-    return () => controller.abort();
-  }, [filters, loadEvents]);
+    startEventsLoad(filters);
+    const controller = eventsRequestRef.current.controller;
+    return () => controller?.abort();
+  }, [filters, startEventsLoad]);
 
   const updateFilters = useCallback((newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters, page: newFilters.page || 1 }));
   }, []);
 
   const refresh = useCallback(() => {
-    loadEvents(filters);
-  }, [filters, loadEvents]);
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      startEventsLoad(filters);
+    }, 100);
+  }, [filters, startEventsLoad]);
 
   // Real-time synchronization
-  useWebSocket('event:created', refresh);
-  useWebSocket('event:confirmed', refresh);
-  useWebSocket('event:status_changed', refresh);
-  useWebSocket('event:cancelled', refresh);
-  useWebSocket('event:updated', refresh);
-  useWebSocket('event:archived', refresh);
+  useWebSocketEvents(EVENT_REFRESH_NAMES, refresh);
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    eventsRequestRef.current.controller?.abort();
+  }, []);
 
   return {
     spaces,
