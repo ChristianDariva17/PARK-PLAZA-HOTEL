@@ -46,23 +46,10 @@ function ElapsedBadge({ createdAt }) {
   const isUrgent = elapsedMins >= 20;
   const isWarning = elapsedMins >= 10 && elapsedMins < 20;
 
-  const bg = isUrgent ? '#FEE2E2' : isWarning ? '#FEF3C7' : '#DCFCE7';
-  const color = isUrgent ? '#B91C1C' : isWarning ? '#B45309' : '#15803D';
-  const border = isUrgent ? '#FCA5A5' : isWarning ? '#FDE047' : '#86EFAC';
+  const tone = isUrgent ? 'danger' : isWarning ? 'warning' : 'success';
 
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 4,
-      padding: '2px 8px',
-      borderRadius: 12,
-      background: bg,
-      border: `1px solid ${border}`,
-      color: color,
-      fontSize: 11,
-      fontWeight: 800
-    }}>
+    <span className={`elapsed-badge elapsed-badge-${tone}`}>
       <Clock size={11} /> {elapsedMins} min
     </span>
   );
@@ -70,11 +57,11 @@ function ElapsedBadge({ createdAt }) {
 
 function MetricCard({ icon: Icon, label, value, color }) {
   return (
-    <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '18px 22px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', flex: 1, minWidth: 180 }}>
-      <div style={{ background: `${color}15`, borderRadius: 12, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon size={24} color={color} /></div>
-      <div>
-        <div style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>{value}</div>
-        <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2, fontWeight: 500 }}>{label}</div>
+    <div className="module-metric-card" style={{ '--metric-accent': color }}>
+      <div className="module-metric-icon"><Icon size={24} /></div>
+      <div className="module-metric-content">
+        <div className="module-metric-value">{value}</div>
+        <div className="module-metric-label">{label}</div>
       </div>
     </div>
   );

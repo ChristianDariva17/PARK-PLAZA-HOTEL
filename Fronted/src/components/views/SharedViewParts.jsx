@@ -33,7 +33,7 @@ export function StatusBadge({ children }) {
 }
 
 export function EmptyState({ title = 'Sin resultados', description = 'No hay registros que coincidan con los filtros actuales.' }) {
-  return <div className="empty-state"><Search size={48} className="empty-state-icon" aria-hidden="true" /><h3>{title}</h3><p>{description}</p></div>;
+  return <div className="empty-state state-panel state-empty"><Search size={48} className="empty-state-icon" aria-hidden="true" /><h3>{title}</h3><p>{description}</p></div>;
 }
 
 export function SectionHeader({ eyebrow, title, description, action, id }) {

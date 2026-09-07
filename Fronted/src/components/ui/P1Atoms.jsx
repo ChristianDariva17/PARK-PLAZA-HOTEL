@@ -32,63 +32,41 @@ export function P1Button({ variant = 'primary', className = '', style = {}, chil
 
 export function P1Input({ label, type = 'text', className = '', style = {}, helperText, error, ...props }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...style }} className={className}>
+    <div style={style} className={`form-field ${className}`}>
       {label && (
-        <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-navy, #1E3A8A)', letterSpacing: '0.01em' }}>
+        <label className="form-label" htmlFor={props.id}>
           {label}
         </label>
       )}
       <input 
         type={type} 
-        style={{
-          width: '100%',
-          padding: '10px 14px',
-          border: error ? '1.5px solid var(--color-danger, #DC2626)' : '1px solid var(--color-border, #E5E7EB)',
-          borderRadius: 10,
-          background: 'var(--color-surface, #FFFFFF)',
-          color: 'var(--color-text, #111827)',
-          fontSize: 14,
-          outline: 'none',
-          boxSizing: 'border-box',
-          transition: 'border-color 0.2s, box-shadow 0.2s',
-          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-        }}
+        className={`form-control${error ? ' has-error' : ''}`}
+        aria-invalid={error ? 'true' : undefined}
         {...props} 
       />
-      {helperText && <span style={{ fontSize: 11.5, color: 'var(--color-muted, #6B7280)' }}>{helperText}</span>}
-      {error && <span style={{ fontSize: 11.5, color: 'var(--color-danger, #DC2626)', fontWeight: 600 }}>{error}</span>}
+      {helperText && <span className="form-helper">{helperText}</span>}
+      {error && <span className="form-error" role="alert">{error}</span>}
     </div>
   );
 }
 
 export function P1Select({ label, className = '', style = {}, helperText, error, children, ...props }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...style }} className={className}>
+    <div style={style} className={`form-field ${className}`}>
       {label && (
-        <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-navy, #1E3A8A)', letterSpacing: '0.01em' }}>
+        <label className="form-label" htmlFor={props.id}>
           {label}
         </label>
       )}
       <select 
-        style={{
-          width: '100%',
-          padding: '10px 14px',
-          border: error ? '1.5px solid var(--color-danger, #DC2626)' : '1px solid var(--color-border, #E5E7EB)',
-          borderRadius: 10,
-          background: 'var(--color-surface, #FFFFFF)',
-          color: 'var(--color-text, #111827)',
-          fontSize: 14,
-          outline: 'none',
-          boxSizing: 'border-box',
-          cursor: 'pointer',
-          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-        }}
+        className={`form-control${error ? ' has-error' : ''}`}
+        aria-invalid={error ? 'true' : undefined}
         {...props} 
       >
         {children}
       </select>
-      {helperText && <span style={{ fontSize: 11.5, color: 'var(--color-muted, #6B7280)' }}>{helperText}</span>}
-      {error && <span style={{ fontSize: 11.5, color: 'var(--color-danger, #DC2626)', fontWeight: 600 }}>{error}</span>}
+      {helperText && <span className="form-helper">{helperText}</span>}
+      {error && <span className="form-error" role="alert">{error}</span>}
     </div>
   );
 }
