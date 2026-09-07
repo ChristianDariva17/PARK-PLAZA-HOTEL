@@ -1,9 +1,11 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 
 @Public()
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(@Inject(DATABASE) private readonly database: Database) {}

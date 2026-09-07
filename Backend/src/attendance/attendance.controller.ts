@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Param, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AttendanceService } from './attendance.service.js';
 import { BridgeCapabilityService } from './bridge-capability.service.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
@@ -57,6 +58,7 @@ export class AttendanceController {
   }
 
   @Post('biometric/capability')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async issueBiometricCapability(@Body() body: unknown, @CurrentAccount() actor: AuthenticatedAccount) {
     const request = parseBridgeCapabilityDto(body);
     if (request.operation === 'health') {

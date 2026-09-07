@@ -72,6 +72,12 @@ The initial `npm install` creates the lockfile required by the Docker build's re
 
 Expected public endpoints: `GET http://localhost:3000/api/health/live`, `GET http://localhost:3000/api/health/ready`, and `POST http://localhost:3000/api/auth/login`. Authenticated endpoints include `GET /api/auth/session`, `POST /api/auth/logout`, `POST /api/auth/change-password`, and the permission-protected `/api/accounts` administration routes. PostgreSQL is available to host tools only at `127.0.0.1:5433`; containers continue to use `postgres:5432`.
 
+## Security maintenance
+
+Run `npm run audit:production` to fail on high and critical production dependency advisories.
+
+As of September 2026, `npm audit --omit=dev` reports two moderate Fastify advisories: `GHSA-w2qp-rph6-63g4` and `GHSA-3m5p-2c4r-xxw2`. Their automated remediation upgrades `@nestjs/platform-fastify` to Nest 12. This project intentionally remains on Nest 11, so the advisories are an accepted, documented risk until a separately planned framework migration is approved. Do not use `npm audit fix --force` to bypass that decision.
+
 ## Verification
 
 ```powershell

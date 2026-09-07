@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { getRequestContext } from '../auth/request-context.js';
@@ -15,6 +16,7 @@ export class CustomerAuthController {
   constructor(private readonly sessions: CustomerAuthService, private readonly config: ConfigService<Environment, true>) {}
 
   @Post('session')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   async exchange(@Body() body: unknown, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     const result = await this.sessions.exchange(parseFirebaseExchangeDto(body).idToken, getRequestContext(request));
