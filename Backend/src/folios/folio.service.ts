@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import { DATABASE, type Database } from '../database/database.module.js';
@@ -9,19 +10,12 @@ import { acquirePropertyTransactionLock } from '../database/transaction-policy.j
 import type { FolioChargeDto, FolioPaymentDto, FolioReversalDto } from './folio.dto.js';
 
 const cents = (amount: string) => BigInt(amount.replace('.', ''));
-const money = (amount: bigint) => `${amount / 100n}.${(amount < 0n ? -amount : amount) % 100n}`.replace(/\.(\d)$/, '.0$1');
-const signed = (entry: { type: string; amount: string; reversalOfEntryId: string | null }, originals: Map<string, string>) => {
-  const value = cents(entry.amount);
-  if (entry.type === 'charge') return value;
-  if (entry.type === 'payment') return -value;
-  return originals.get(entry.reversalOfEntryId || '') === 'payment' ? value : -value;
-};
 
 @Injectable()
 export class FolioService {
   constructor(@Inject(DATABASE) private readonly database: Database, private readonly audit: AuditService) {}
 
-  async get(propertyId: string, stayId: string) { return this.read(this.database, propertyId, stayId); }
+  async get(propertyId: string, stayId: string, page = { offset: 0, limit: 50 }) { return this.read(this.database, propertyId, stayId, false, page); }
 
   async charge(actor: AuthenticatedAccount, stayId: string, dto: FolioChargeDto, key: string, context: RequestContext) {
     return this.database.transaction(async (tx) => {
@@ -107,17 +101,21 @@ export class FolioService {
     return entry;
   }
 
-  async read(tx: any, propertyId: string, stayId: string, lock = false): Promise<any> {
+  async read(tx: any, propertyId: string, stayId: string, lock = false, page = { offset: 0, limit: 50 }): Promise<any> {
     let query = tx.select().from(stays).where(and(eq(stays.id, stayId), eq(stays.propertyId, propertyId))).limit(1);
     if (lock) query = query.for('update', { of: stays });
     const stay = (await query)[0];
     if (!stay) throw new NotFoundException('Stay not found');
     const folio = (await tx.select().from(folios).where(and(eq(folios.stayId, stayId), eq(folios.propertyId, propertyId))).limit(1))[0];
     if (!folio) throw new ConflictException('Stay folio is unavailable');
-    const entries = await tx.select().from(folioEntries).where(and(eq(folioEntries.stayId, stayId), eq(folioEntries.propertyId, propertyId))).orderBy(asc(folioEntries.createdAt));
-    const types = new Map<string, string>(entries.map((entry: any) => [entry.id, entry.type]));
-    const balance = entries.reduce((total: bigint, entry: any) => total + signed(entry, types), 0n);
-    return { folio: { id: folio.id, stayId, openingBalance: '0.00' }, entries, balance: money(balance), settlement: stay.settlement, receivable: stay.receivableAmount ? { amount: stay.receivableAmount, reason: stay.receivableReason } : null };
+    const where = and(eq(folioEntries.stayId, stayId), eq(folioEntries.propertyId, propertyId));
+    const originalEntries = alias(folioEntries, 'original_folio_entries');
+    const [summary] = await tx.select({
+      balance: sql<string>`coalesce(sum(case when ${folioEntries.type} = 'charge' then ${folioEntries.amount} when ${folioEntries.type} = 'payment' then -${folioEntries.amount} when ${originalEntries.type} = 'payment' then ${folioEntries.amount} else -${folioEntries.amount} end), 0)`,
+      total: sql<number>`count(*)::integer`,
+    }).from(folioEntries).leftJoin(originalEntries, eq(folioEntries.reversalOfEntryId, originalEntries.id)).where(where);
+    const entries = await tx.select().from(folioEntries).where(where).orderBy(desc(folioEntries.createdAt)).limit(page.limit).offset(page.offset);
+    return { folio: { id: folio.id, stayId, openingBalance: '0.00' }, entries, balance: summary.balance, page: { ...page, total: summary.total }, settlement: stay.settlement, receivable: stay.receivableAmount ? { amount: stay.receivableAmount, reason: stay.receivableReason } : null };
   }
 
   private async insert(tx: any, actor: AuthenticatedAccount, stayId: string, input: any, context: RequestContext, current?: any) {

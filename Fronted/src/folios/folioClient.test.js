@@ -16,7 +16,7 @@ describe('folio request policy', () => {
     await createFolioCharge('stay-id', { amount: '2.00', description: 'Minibar' }, '00000000-0000-4000-8000-000000000001');
     await createFolioPayment('stay-id', { amount: '2.00', method: 'Tarjeta' }, '00000000-0000-4000-8000-000000000002');
     await reverseFolioEntry('stay-id', 'entry-id', { reason: 'Correction' }, '00000000-0000-4000-8000-000000000003');
-    expect(authRequest).toHaveBeenNthCalledWith(1, '/api/stays/stay-id/folio', { signal: undefined });
+    expect(authRequest).toHaveBeenNthCalledWith(1, '/api/stays/stay-id/folio?offset=0&limit=50', { signal: undefined });
     expect(authRequest).toHaveBeenNthCalledWith(2, '/api/stays/stay-id/folio/charges', expect.objectContaining({ headers: { 'Idempotency-Key': '00000000-0000-4000-8000-000000000001' } }));
     expect(authRequest).toHaveBeenNthCalledWith(3, '/api/stays/stay-id/folio/payments', expect.objectContaining({ body: JSON.stringify({ amount: '2.00', method: 'Tarjeta' }) }));
     expect(authRequest).toHaveBeenNthCalledWith(4, '/api/stays/stay-id/folio/entries/entry-id/reverse', expect.objectContaining({ method: 'POST' }));

@@ -103,7 +103,8 @@ describe('PostgreSQL readiness', () => {
         to_regclass('public.folio_entries') is not null
           and exists (select 1 from pg_constraint where conname = 'folio_entries_property_source_unique')
           and exists (select 1 from pg_constraint where conname = 'folio_entries_property_idempotency_unique')
-          and exists (select 1 from pg_indexes where indexname = 'folio_entries_one_reversal_idx')
+           and exists (select 1 from pg_indexes where indexname = 'folio_entries_one_reversal_idx')
+           and exists (select 1 from pg_indexes where indexname = 'folio_entries_property_stay_created_idx')
           and exists (select 1 from pg_constraint where conname = 'cash_movements_property_reference_unique') as folio_ready,
         exists (select 1 from information_schema.columns where table_name = 'cleaning_tasks' and column_name = 'stay_id')
           and exists (select 1 from pg_constraint where conname = 'cleaning_tasks_stay_property_fkey')
@@ -742,6 +743,27 @@ describe('PostgreSQL financial folio invariants', () => {
       expect(replay).toEqual(first);
       const entries = await client.query<{ id: string }>('SELECT id FROM folio_entries WHERE property_id = $1 AND source_type = $2 AND source_id = $3', [fixture.propertyId, 'parking_exit', 'VEH-TEST']);
       expect(entries.rows).toEqual([{ id: first.id }]);
+    });
+  });
+
+  it('calculates the complete immutable ledger while paginating the returned history', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const suffix = uniqueHex();
+      const fixture: StayFixture = { propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(), primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(), propertyCode: `inv-fp-${suffix.slice(0, 25)}`, roomNumber: `fp-${suffix.slice(0, 13)}`, reservationId: randomUUID(), stayId: randomUUID() };
+      const roleId = randomUUID(); const accountId = randomUUID(); const folioId = randomUUID();
+      await insertStayDependencies(client, fixture);
+      await client.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3)', [roleId, `folio_page_${suffix}`, 'Folio Page Test Role']);
+      await client.query('INSERT INTO accounts (id, property_id, role_id, email, password_hash) VALUES ($1, $2, $3, $4, $5)', [accountId, fixture.propertyId, roleId, `folio-page-${suffix}@example.invalid`, 'integration-test-only']);
+      await client.query(`INSERT INTO folios (id, property_id, stay_id, opening_balance) VALUES ($1, $2, $3, '0.00')`, [folioId, fixture.propertyId, fixture.stayId]);
+      const chargeId = randomUUID(); const paymentId = randomUUID();
+      await client.query(`INSERT INTO folio_entries (id, property_id, folio_id, stay_id, type, amount, source_type, source_id, idempotency_key, actor_account_id, created_at, reversal_of_entry_id) VALUES
+        ($1, $2, $3, $4, 'charge', '12.50', 'manual_charge', $5, $6, $7, now() - interval '2 minutes', null),
+        ($8, $2, $3, $4, 'payment', '5.00', 'manual_payment', $9, $10, $7, now() - interval '1 minute', null),
+        ($11, $2, $3, $4, 'reversal', '5.00', 'manual_reversal', $12, $13, $7, now(), $14)`, [chargeId, fixture.propertyId, folioId, fixture.stayId, randomUUID(), randomUUID(), accountId, paymentId, randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), paymentId]);
+      const database = drizzle(client, { schema });
+      const folios = new FolioService(database, { record: async () => undefined } as never);
+
+      await expect(folios.read(database, fixture.propertyId, fixture.stayId, false, { offset: 1, limit: 1 })).resolves.toMatchObject({ balance: '12.50', entries: [expect.any(Object)], page: { offset: 1, limit: 1, total: 3 } });
     });
   });
 

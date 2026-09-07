@@ -53,7 +53,7 @@ export const folioEntries = pgTable('folio_entries', {
   check('folio_entries_payment_method_check', sql`${t.paymentMethod} IS NULL OR ${t.paymentMethod} IN ('Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin')`),
   unique('folio_entries_property_source_unique').on(t.propertyId, t.sourceType, t.sourceId),
   unique('folio_entries_property_idempotency_unique').on(t.propertyId, t.idempotencyKey),
-  uniqueIndex('folio_entries_one_reversal_idx').on(t.reversalOfEntryId).where(sql`${t.reversalOfEntryId} IS NOT NULL`), index('folio_entries_stay_created_idx').on(t.stayId, t.createdAt),
+  uniqueIndex('folio_entries_one_reversal_idx').on(t.reversalOfEntryId).where(sql`${t.reversalOfEntryId} IS NOT NULL`), index('folio_entries_stay_created_idx').on(t.stayId, t.createdAt), index('folio_entries_property_stay_created_idx').on(t.propertyId, t.stayId, t.createdAt),
 ]);
 
 export const stayCommands = pgTable('stay_commands', {

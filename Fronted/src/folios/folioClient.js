@@ -11,7 +11,7 @@ async function request(url, options) {
   }
 }
 const command = (stayId, path, body, idempotencyKey = key()) => request(`/api/stays/${stayId}/folio/${path}`, { method: 'POST', body: JSON.stringify(body), headers: { 'Idempotency-Key': idempotencyKey } });
-export const getFolio = (stayId, signal) => request(`/api/stays/${stayId}/folio`, { signal });
+export const getFolio = (stayId, { offset = 0, limit = 50 } = {}, signal) => request(`/api/stays/${stayId}/folio?${new URLSearchParams({ offset, limit })}`, { signal });
 export const createFolioCharge = (stayId, body, idempotencyKey) => command(stayId, 'charges', body, idempotencyKey);
 export const createFolioPayment = (stayId, body, idempotencyKey) => command(stayId, 'payments', body, idempotencyKey);
 export const reverseFolioEntry = (stayId, entryId, body, idempotencyKey) => command(stayId, `entries/${entryId}/reverse`, body, idempotencyKey);

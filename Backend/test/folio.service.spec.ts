@@ -18,7 +18,7 @@ function service() {
 describe('FolioService financial command behavior', () => {
   it('derives the signed balance from immutable charge, payment, and reversal history', async () => {
     const setup = service();
-    const selections = [[{ id: 'stay', settlement: 'open', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], [
+    const selections = [[{ id: 'stay', settlement: 'open', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], [{ balance: '12.50', total: 3 }], [
       { id: 'charge', type: 'charge', amount: '12.50' as any, reversalOfEntryId: null },
       { id: 'payment', type: 'payment', amount: '5.00' as any, reversalOfEntryId: null },
       { id: 'reversal', type: 'reversal', amount: '5.00' as any, reversalOfEntryId: 'payment' },
@@ -26,6 +26,17 @@ describe('FolioService financial command behavior', () => {
     (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
 
     await expect(setup.service.read(setup.tx as any, actor.propertyId, 'stay')).resolves.toMatchObject({ balance: '12.50', entries: expect.arrayContaining([expect.objectContaining({ id: 'charge' })]) });
+  });
+
+  it('calculates the full ledger balance in SQL while returning only the requested history page', async () => {
+    const setup = service();
+    const selections = [[stayRow], [folioRow], [{ balance: '125.00', total: 125 }], [{ id: 'entry-76', type: 'charge', amount: '1.00' }]];
+    (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
+
+    await expect(setup.service.read(setup.tx as any, actor.propertyId, 'stay', false, { offset: 75, limit: 25 })).resolves.toMatchObject({ balance: '125.00', entries: [{ id: 'entry-76' }], page: { offset: 75, limit: 25, total: 125 } });
+    expect((setup.tx as any).select.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ balance: expect.anything(), total: expect.anything() }));
+    expect((setup.tx as any).select.mock.results[3]?.value.limit).toHaveBeenCalledWith(25);
+    expect((setup.tx as any).select.mock.results[3]?.value.offset).toHaveBeenCalledWith(75);
   });
 
   it('returns an idempotent retry without inserting another charge and rejects missing property stays before writes', async () => {
@@ -54,7 +65,7 @@ describe('FolioService financial command behavior', () => {
 
   it('scenario: Post-settlement ancillary posting is rejected before a ledger insert', async () => {
     const setup = service();
-    const selections = [[], [], [{ id: 'stay', settlement: 'settled', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], []];
+    const selections = [[], [], [{ id: 'stay', settlement: 'settled', receivableAmount: null, receivableReason: null }], [{ id: 'folio' }], [{ balance: '0.00', total: 0 }], []];
     (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
 
     await expect(setup.service.appendAncillaryChargeLocked(setup.tx as any, actor, { stayId: 'stay', sourceType: 'pet_charge', sourceId: 'PET-1', amount: '5.00' as any, reason: 'Pet lodging charge' }, context)).rejects.toBeInstanceOf(ConflictException);
@@ -135,14 +146,25 @@ const openSession = { id: 'open-session', propertyId: actor.propertyId, status: 
 
 function commandSetup(selections: unknown[][], returnedEntries: unknown[]) {
   const setup = service(); const inserted: unknown[] = [];
-  (setup.tx as any).select.mockImplementation(() => chain(selections.shift() ?? []));
+  (setup.tx as any).select.mockImplementation((fields?: { balance?: unknown }) => chain(fields?.balance ? [summaryFor(selections[0] as any[] ?? [])] : selections.shift() ?? []));
   (setup.tx as any).insert.mockImplementation(() => ({ values: vi.fn((value) => { inserted.push(value); const entry = returnedEntries.shift(); return entry ? { returning: vi.fn().mockResolvedValue([entry]) } : Promise.resolve(); }) }));
   return { ...setup, inserted };
 }
 
 function chain(value: unknown) {
   const query: any = {};
-  for (const method of ['from', 'where', 'limit', 'for', 'orderBy']) query[method] = vi.fn(() => query);
+  for (const method of ['from', 'leftJoin', 'where', 'limit', 'offset', 'for', 'orderBy']) query[method] = vi.fn(() => query);
   query.then = (resolve: (result: unknown) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(value).then(resolve, reject);
   return query;
+}
+
+function summaryFor(entries: any[]) {
+  const types = new Map(entries.map((entry) => [entry.id, entry.type]));
+  const balance = entries.reduce((total, entry) => {
+    const amount = BigInt(entry.amount.replace('.', ''));
+    if (entry.type === 'charge') return total + amount;
+    if (entry.type === 'payment') return total - amount;
+    return total + (types.get(entry.reversalOfEntryId) === 'payment' ? amount : -amount);
+  }, 0n);
+  return { balance: `${balance / 100n}.${(balance < 0n ? -balance : balance) % 100n}`.replace(/\.(\d)$/, '.0$1'), total: entries.length };
 }

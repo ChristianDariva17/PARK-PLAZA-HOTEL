@@ -5,6 +5,7 @@ import { CreditCard, DollarSign, PlusCircle, RefreshCw, AlertTriangle, CheckCirc
 
 export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFolioChange }) {
   const [folio, setFolio] = useState(null);
+  const [offset, setOffset] = useState(0);
   const [activeTab, setActiveTab] = useState('pay'); // 'pay' | 'charge' | 'history'
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(PAYMENT_METHODS[0]);
@@ -16,14 +17,14 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
 
   const refresh = useCallback(async () => {
     try {
-      const next = await getFolio(stayId);
+      const next = await getFolio(stayId, { offset });
       setFolio(next);
       onFolioChange?.(next);
       return next;
     } catch (failure) {
       setError(failure.message);
     }
-  }, [onFolioChange, stayId]);
+  }, [offset, onFolioChange, stayId]);
 
   useEffect(() => {
     refresh();
@@ -50,7 +51,7 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
         amount: validateFolioAmount(payAmount),
         method,
       });
-      await refresh();
+      if (offset) setOffset(0); else await refresh();
       setAmount('');
     } catch (failure) {
       setError(failure.message || 'No se pudo registrar el pago.');
@@ -69,7 +70,7 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
         amount: validateFolioAmount(amount),
         description: description.trim(),
       });
-      await refresh();
+      if (offset) setOffset(0); else await refresh();
       setAmount('');
       setDescription('');
     } catch (failure) {
@@ -85,7 +86,7 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
     setError('');
     try {
       await reverseFolioEntry(stayId, entry.id, { reason: reversalReason.trim() });
-      await refresh();
+      if (offset) setOffset(0); else await refresh();
       setReversingEntryId(null);
       setReversalReason('');
     } catch (failure) {
@@ -194,7 +195,7 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
             gap: 5,
           }}
         >
-          <History size={14} /> Historial ({folio?.entries?.length || 0})
+          <History size={14} /> Historial ({folio?.page?.total || 0})
         </button>
       </div>
 
@@ -382,6 +383,13 @@ export default function FolioPanel({ stayId, canCharge, canPay, canReverse, onFo
                 </div>
               );
             })
+          )}
+          {(folio?.page?.total || 0) > folio?.page?.limit && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6 }}>
+              <button type="button" className="btn btn-sm btn-outline" disabled={busy || offset === 0} onClick={() => setOffset(Math.max(0, offset - folio.page.limit))}>Más recientes</button>
+              <span style={{ color: '#64748B', fontSize: 11 }}>{offset + 1}-{Math.min(offset + folio.page.limit, folio.page.total)} de {folio.page.total}</span>
+              <button type="button" className="btn btn-sm btn-outline" disabled={busy || offset + folio.page.limit >= folio.page.total} onClick={() => setOffset(offset + folio.page.limit)}>Anteriores</button>
+            </div>
           )}
         </div>
       )}
