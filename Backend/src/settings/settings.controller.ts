@@ -6,12 +6,12 @@ import { CurrentAccount } from '../auth/decorators/current-account.decorator.js'
 import type { AuthenticatedAccount } from '../auth/auth.types.js';
 import { z } from 'zod';
 
-const settingsUpdateSchema = z.object({
+export const settingsUpdateSchema = z.object({
   name: z.string().max(160).optional(),
   timezone: z.string().max(64).optional(),
   currency: z.string().length(3).optional(),
-  dayUseStart: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/).optional(),
-  dayUseEnd: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/).optional(),
+  dayUseStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  dayUseEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   dayUseMinimumMinutes: z.number().int().positive().optional(),
   reservationIntervalMinutes: z.number().int().positive().optional(),
 }).strict();

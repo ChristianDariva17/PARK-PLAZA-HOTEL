@@ -134,8 +134,8 @@ export const customerCreateEventDto = z.object({
 
 export const updateSpacePolicyDto = z.object({
   capacity: z.number().int().min(1).optional(),
-  openingTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  closingTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  openingTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  closingTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   setupMinutes: z.number().int().min(0).max(1_440).optional(),
   teardownMinutes: z.number().int().min(0).max(1_440).optional(),
   minimumDurationMinutes: z.number().int().min(1).max(10_080).optional(),

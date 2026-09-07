@@ -10,7 +10,7 @@ import { ReceivablesService } from '../src/receivables/receivables.service.js';
 import { databaseUrlFromEnv, validateEnv } from '../src/config/environment.js';
 import * as schema from '../src/database/schema/index.js';
 
-const env = validateEnv({ ...process.env, DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5433' });
+const env = validateEnv({ ...process.env, DATABASE_HOST: '127.0.0.1', DATABASE_PORT: process.env.DATABASE_TEST_PORT ?? '5433' });
 const pool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 1 });
 afterAll(() => pool.end());
 
@@ -84,7 +84,7 @@ async function insertReservationDependencies(client: PoolClient, fixture: Reserv
 
 describe('PostgreSQL readiness', () => {
   it('has the migrated schema and overlap constraint', async () => {
-    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean; folio_ready: boolean; cleaning_stay_ready: boolean }>(`select
+    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean; folio_ready: boolean; cleaning_stay_ready: boolean; supplier_schema_ready: boolean }>(`select
       to_regclass('public.reservations') is not null as schema_ready,
       exists (select 1 from pg_constraint where conname = 'reservations_no_active_overlap') as constraint_ready,
       exists (select 1 from pg_constraint where conname = 'identity_documents_guest_property_fkey' and convalidated and confdeltype = 'c')
@@ -105,10 +105,18 @@ describe('PostgreSQL readiness', () => {
           and exists (select 1 from pg_constraint where conname = 'folio_entries_property_idempotency_unique')
           and exists (select 1 from pg_indexes where indexname = 'folio_entries_one_reversal_idx')
           and exists (select 1 from pg_constraint where conname = 'cash_movements_property_reference_unique') as folio_ready,
-       exists (select 1 from information_schema.columns where table_name = 'cleaning_tasks' and column_name = 'stay_id')
-         and exists (select 1 from pg_constraint where conname = 'cleaning_tasks_stay_property_fkey')
-         and exists (select 1 from pg_indexes where indexname = 'cleaning_tasks_stay_unique' and indexdef like '%WHERE (stay_id IS NOT NULL)%') as cleaning_stay_ready`);
-    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true, cleaning_stay_ready: true });
+        exists (select 1 from information_schema.columns where table_name = 'cleaning_tasks' and column_name = 'stay_id')
+          and exists (select 1 from pg_constraint where conname = 'cleaning_tasks_stay_property_fkey')
+          and exists (select 1 from pg_indexes where indexname = 'cleaning_tasks_stay_unique' and indexdef like '%WHERE (stay_id IS NOT NULL)%') as cleaning_stay_ready,
+        to_regclass('public.purchase_orders') is not null
+          and exists (select 1 from information_schema.columns where table_name = 'suppliers' and column_name = 'rating')
+          and exists (select 1 from information_schema.columns where table_name = 'suppliers' and column_name = 'rating_notes')
+          and exists (select 1 from pg_constraint where conname = 'purchase_orders_property_id_properties_id_fk')
+          and exists (select 1 from pg_constraint where conname = 'purchase_orders_supplier_id_suppliers_id_fk')
+          and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_property_isolation')
+          and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_supplier')
+          and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_status') as supplier_schema_ready`);
+    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true, cleaning_stay_ready: true, supplier_schema_ready: true });
   });
 });
 
