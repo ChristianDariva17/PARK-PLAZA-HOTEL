@@ -1,6 +1,6 @@
-import { authRequest } from '../auth/authClient.js';
+import { authRequest, createIdempotencyKey } from '../auth/authClient.js';
 
-export const generateIdempotencyKey = () => crypto.randomUUID();
+export const generateIdempotencyKey = createIdempotencyKey;
 
 export const suppliersClient = {
   async getSuppliers(params = {}, signal) {

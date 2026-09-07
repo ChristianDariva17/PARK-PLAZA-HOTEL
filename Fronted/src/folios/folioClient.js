@@ -1,7 +1,7 @@
-import { AuthRequestError, authRequest } from '../auth/authClient.js';
+import { AuthRequestError, authRequest, createIdempotencyKey } from '../auth/authClient.js';
 
 export class FolioRequestError extends Error { constructor(message, reloadRecommended = false) { super(message); this.name = 'FolioRequestError'; this.reloadRecommended = reloadRecommended; } }
-const key = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+const key = createIdempotencyKey;
 async function request(url, options) {
   try { return await authRequest(url, options); }
   catch (error) {

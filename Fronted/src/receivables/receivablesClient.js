@@ -1,9 +1,9 @@
-import { AuthRequestError, authRequest } from '../auth/authClient.js';
+import { AuthRequestError, authRequest, createIdempotencyKey } from '../auth/authClient.js';
 
 export class ReceivableRequestError extends Error {
   constructor(message, status = null, reloadRecommended = false) { super(message); this.name = 'ReceivableRequestError'; this.status = status; this.reloadRecommended = reloadRecommended; }
 }
-const key = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+const key = createIdempotencyKey;
 function normalize(error) {
   if (!(error instanceof AuthRequestError)) return new ReceivableRequestError('No se pudo confirmar la operación. Actualizá antes de reintentar.', null, true);
   if (error.status === 400) return new ReceivableRequestError('Revisá los datos de la cobranza.', 400);

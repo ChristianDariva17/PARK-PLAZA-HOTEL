@@ -1,4 +1,4 @@
-import { AuthRequestError, authRequest } from '../auth/authClient.js';
+import { AuthRequestError, authRequest, createIdempotencyKey } from '../auth/authClient.js';
 
 export class CleaningRequestError extends Error {
   constructor(message, status = null, reloadRecommended = false, code = null, ambiguous = false) {
@@ -63,7 +63,7 @@ const command = (url, method, { body, key, signal } = {}) =>
     signal,
   });
 
-export const createCleaningIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+export const createCleaningIdempotencyKey = createIdempotencyKey;
 
 export const getCleaningTasks = (signal) => request('/api/cleaning', { signal });
 export const createCleaningTask = (body, key, signal) => command(`/api/cleaning`, 'POST', { body, key, signal });

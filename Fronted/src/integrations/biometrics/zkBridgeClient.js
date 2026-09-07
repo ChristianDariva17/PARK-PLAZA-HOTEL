@@ -89,7 +89,9 @@ export async function runBiometricOperation(kind, subject, { signal, onProgress,
     }
   } catch (error) {
     if (signal?.aborted && operation.operationId) {
-      request(`/api/v1/operations/${operation.operationId}`, capability, { method: 'DELETE', timeoutMs: 2000 }).catch(() => {});
+      request(`/api/v1/operations/${operation.operationId}`, capability, { method: 'DELETE', timeoutMs: 2000 }).catch((error) => {
+        console.warn('[biometrics] Unable to cancel local operation', { code: error?.code, status: error?.status });
+      });
     }
     throw error;
   }

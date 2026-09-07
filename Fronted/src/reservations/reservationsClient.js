@@ -1,4 +1,4 @@
-import { AuthRequestError, authRequest } from '../auth/authClient.js';
+import { AuthRequestError, authRequest, createIdempotencyKey } from '../auth/authClient.js';
 
 export class ReservationRequestError extends Error {
   constructor(message, status = null, reloadRecommended = false, code = null, ambiguous = false) {
@@ -46,4 +46,4 @@ export const getReservationDetail = (id, signal) => reservationRequest(`/api/res
 export const confirmReservation = (id, key, signal) => lifecycleCommand(id, 'confirm', {}, key, signal);
 export const cancelReservation = (id, body, key, signal) => lifecycleCommand(id, 'cancel', body, key, signal);
 export const dispositionReservation = (id, body, key, signal) => lifecycleCommand(id, 'disposition', body, key, signal);
-export const createReservationIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+export const createReservationIdempotencyKey = createIdempotencyKey;

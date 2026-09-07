@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../auth/authClient.js', () => { class AuthRequestError extends Error { constructor(message, status) { super(message); this.status = status; } } return { AuthRequestError, authRequest: vi.fn() }; });
+vi.mock('../auth/authClient.js', () => { class AuthRequestError extends Error { constructor(message, status) { super(message); this.status = status; } } return { AuthRequestError, authRequest: vi.fn(), createIdempotencyKey: vi.fn(() => 'mock-idempotency-key') }; });
 import { AuthRequestError, authRequest } from '../auth/authClient.js';
 import { collectReceivable, getReceivable, getReceivables, ReceivableRequestError, reverseReceivableCollection } from './receivablesClient.js';
 beforeEach(() => vi.mocked(authRequest).mockReset().mockResolvedValue([]));

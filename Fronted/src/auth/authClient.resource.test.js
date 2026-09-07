@@ -5,7 +5,7 @@ describe('shared resource boundary', () => {
   it('requires exact money strings and exposes normalized response states', () => {
     expect(serializeExactMoney('12.50')).toBe('12.50');
     expect(() => serializeExactMoney(12.5)).toThrow(TypeError);
-    expect(normalizeResourceError(new AuthRequestError('ignored', 403))).toEqual({ code: 'forbidden', status: 403, retry: false });
+    expect(normalizeResourceError(new AuthRequestError('ignored', { status: 403, code: 'forbidden' }))).toEqual({ code: 'forbidden', status: 403, retry: false, requestId: null });
   });
 
   it('retains a supplied idempotency key across command retries', async () => {

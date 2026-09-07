@@ -2,6 +2,7 @@ const SESSION_URL = '/api/auth/session';
 
 let initialSessionRequest;
 const unauthorizedListeners = new Set();
+const requestTelemetryListeners = new Set();
 
 const KNOWN_ERROR_MESSAGES = new Map([
   ['Current password is incorrect', 'La contraseña actual es incorrecta.'],
@@ -24,10 +25,16 @@ const KNOWN_ERROR_MESSAGES = new Map([
 ]);
 
 export class AuthRequestError extends Error {
-  constructor(message, status, known = false) {
-    super(message);
+  constructor(message, options = {}, legacyKnown = false) {
+    const { status = null, code = 'transport', retryable = false, ambiguous = false, reloadRecommended = false, requestId = null, cause, known = legacyKnown } = typeof options === 'number' ? { status: options } : options;
+    super(message, cause === undefined ? undefined : { cause });
     this.name = 'AuthRequestError';
     this.status = status;
+    this.code = code;
+    this.retryable = retryable;
+    this.ambiguous = ambiguous;
+    this.reloadRecommended = reloadRecommended;
+    this.requestId = requestId;
     this.known = known;
   }
 }
@@ -36,9 +43,11 @@ const RESOURCE_ERROR_CODES = new Map([
   [401, 'session'], [403, 'forbidden'], [404, 'absent'], [409, 'reconcile'], [422, 'validation'],
 ]);
 
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
 export function normalizeResourceError(error) {
-  const status = error instanceof AuthRequestError ? error.status : null;
-  return Object.freeze({ code: RESOURCE_ERROR_CODES.get(status) || 'transport', status, retry: status === null || status === 404 || status === 409 });
+  if (error instanceof AuthRequestError) return Object.freeze({ code: error.code, status: error.status, retry: error.retryable, requestId: error.requestId });
+  return Object.freeze({ code: 'transport', status: null, retry: true, requestId: null });
 }
 
 export function serializeExactMoney(value) {
@@ -46,7 +55,15 @@ export function serializeExactMoney(value) {
   return value;
 }
 
-export function createKeyedCommand(command, key = globalThis.crypto?.randomUUID?.()) {
+export function createIdempotencyKey() {
+  const key = globalThis.crypto?.randomUUID?.();
+  if (typeof key !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+    throw new Error('This browser cannot create a required idempotency key.');
+  }
+  return key;
+}
+
+export function createKeyedCommand(command, key = createIdempotencyKey()) {
   if (!key) throw new Error('A stable idempotency key is required.');
   return Object.freeze({ key, run: () => command(key) });
 }
@@ -73,47 +90,95 @@ export function subscribeUnauthorized(listener) {
   return () => unauthorizedListeners.delete(listener);
 }
 
-async function readErrorMessage(response) {
+export function subscribeRequestTelemetry(listener) {
+  requestTelemetryListeners.add(listener);
+  return () => requestTelemetryListeners.delete(listener);
+}
+
+async function readErrorPayload(response) {
   const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) return null;
+  if (!contentType.includes('application/json')) return {};
   try {
     const payload = await response.json();
-    return typeof payload?.message === 'string' && payload.message.length <= 200 ? payload.message : null;
+    return {
+      message: typeof payload?.message === 'string' && payload.message.length <= 200 ? payload.message : null,
+      code: typeof payload?.code === 'string' && payload.code.length <= 100 ? payload.code : null,
+      requestId: typeof payload?.requestId === 'string' && payload.requestId.length <= 100 ? payload.requestId : null,
+    };
   } catch {
-    return null;
+    return {};
   }
 }
 
+const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
+  const timer = setTimeout(resolve, milliseconds);
+  signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Operation aborted', 'AbortError')); }, { once: true });
+});
+
+const isReadRetry = (method, attempt, signal) => method === 'GET' && attempt === 0 && !signal?.aborted;
+
+function reportFailure({ method, url, error, attempt }) {
+  requestTelemetryListeners.forEach((listener) => listener({
+    method,
+    path: new URL(url, globalThis.location?.origin || 'http://localhost').pathname,
+    status: error.status,
+    code: error.code,
+    requestId: error.requestId,
+    attempt,
+  }));
+}
+
 export async function authRequest(url, options = {}) {
-  let response;
   const { signalUnauthorized = true, ...fetchOptions } = options;
+  const method = (fetchOptions.method || 'GET').toUpperCase();
 
-  try {
-    response = await fetch(url, {
-      credentials: 'include',
-      ...fetchOptions,
-      headers: fetchOptions.body ? { 'Content-Type': 'application/json', ...fetchOptions.headers } : fetchOptions.headers,
-    });
-  } catch (error) {
-    // Canceled requests are expected during effect cleanup, not connection failures.
-    if (error?.name === 'AbortError') throw error;
-    throw new AuthRequestError('No se pudo conectar con el servidor. Intentá nuevamente.');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(url, {
+        credentials: 'include',
+        ...fetchOptions,
+        headers: fetchOptions.body ? { 'Content-Type': 'application/json', ...fetchOptions.headers } : fetchOptions.headers,
+      });
+    } catch (cause) {
+      // Canceled requests are expected during effect cleanup, not connection failures.
+      if (cause?.name === 'AbortError') throw cause;
+      if (isReadRetry(method, attempt, fetchOptions.signal)) { await delay(100, fetchOptions.signal); continue; }
+      const error = new AuthRequestError('No se pudo conectar con el servidor. Intentá nuevamente.', { retryable: method === 'GET', cause });
+      reportFailure({ method, url, error, attempt });
+      throw error;
+    }
+
+    if (!response.ok) {
+      const payload = await readErrorPayload(response);
+      if (RETRYABLE_STATUSES.has(response.status) && isReadRetry(method, attempt, fetchOptions.signal)) { await delay(100, fetchOptions.signal); continue; }
+      const knownMessage = KNOWN_ERROR_MESSAGES.get(payload.message);
+      if (response.status === 401 && signalUnauthorized && payload.message !== 'Current password is incorrect') unauthorizedListeners.forEach((listener) => listener());
+      const error = new AuthRequestError(knownMessage || 'La solicitud no pudo completarse.', {
+        status: response.status,
+        code: payload.code || RESOURCE_ERROR_CODES.get(response.status) || `http_${response.status}`,
+        retryable: method === 'GET' && RETRYABLE_STATUSES.has(response.status),
+        ambiguous: method !== 'GET' && (response.status >= 500 || response.status === 0),
+        reloadRecommended: [404, 409].includes(response.status) || (method !== 'GET' && response.status >= 500),
+        requestId: payload.requestId,
+        known: Boolean(knownMessage),
+      });
+      reportFailure({ method, url, error, attempt });
+      throw error;
+    }
+
+    if (response.status === 204) return null;
+
+    try {
+      return await response.json();
+    } catch (cause) {
+      const error = new AuthRequestError('El servidor devolvió una respuesta no válida. Intentá nuevamente.', { code: 'invalid_response', retryable: false, cause });
+      reportFailure({ method, url, error, attempt });
+      throw error;
+    }
   }
 
-  if (!response.ok) {
-    const backendMessage = await readErrorMessage(response);
-    const knownMessage = KNOWN_ERROR_MESSAGES.get(backendMessage);
-    if (response.status === 401 && signalUnauthorized && backendMessage !== 'Current password is incorrect') unauthorizedListeners.forEach((listener) => listener());
-    throw new AuthRequestError(knownMessage || 'La solicitud no pudo completarse.', response.status, Boolean(knownMessage));
-  }
-
-  if (response.status === 204) return null;
-
-  try {
-    return await response.json();
-  } catch {
-    throw new AuthRequestError('El servidor devolvió una respuesta no válida. Intentá nuevamente.');
-  }
+  throw new Error('Unreachable request retry state.');
 }
 
 export async function getSession() {
@@ -149,10 +214,10 @@ export async function loginRequest(email, password) {
     });
   } catch (error) {
     if (error instanceof AuthRequestError && error.status === 401) {
-      throw new AuthRequestError('El correo electrónico o la contraseña son incorrectos.', 401);
+      throw new AuthRequestError('El correo electrónico o la contraseña son incorrectos.', { status: 401, code: 'invalid_credentials' });
     }
     if (error instanceof AuthRequestError && error.status === 429) {
-      throw new AuthRequestError('Se realizaron demasiados intentos. Esperá unos minutos antes de volver a intentar.', 429);
+      throw new AuthRequestError('Se realizaron demasiados intentos. Esperá unos minutos antes de volver a intentar.', { status: 429, code: 'rate_limited' });
     }
     throw error;
   }

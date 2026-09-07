@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../auth/authClient.js', () => {
   class AuthRequestError extends Error { constructor(message, status) { super(message); this.status = status; } }
-  return { AuthRequestError, authRequest: vi.fn() };
+  return { AuthRequestError, authRequest: vi.fn(), createIdempotencyKey: vi.fn(() => 'mock-idempotency-key') };
 });
 
 import { AuthRequestError, authRequest } from '../auth/authClient.js';
