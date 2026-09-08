@@ -72,40 +72,19 @@ export function StayConditionsDocument({
   const pendingBalance = Math.max(0, totalStay - advancePaid);
 
   return (
-    <div className="stay-conditions-document-wrapper" style={{ color: '#0F172A', background: '#FFFFFF', padding: 0 }}>
+    <div className="stay-conditions-document-wrapper">
       {/* Print Controls Bar (Hidden during printing) */}
-      <div className="no-print" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: '#0F172A',
-        color: '#F8FAFC',
-        padding: '12px 20px',
-        borderRadius: 8,
-        marginBottom: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="no-print stay-document-controls">
+        <div className="stay-document-control-title">
           <FileCheck size={20} color="#D4AF37" />
-          <span style={{ fontWeight: 700, fontSize: 14 }}>
+          <span className="stay-document-control-label">
             Documento Oficial de Condiciones de Estadía
           </span>
         </div>
         <button
           type="button"
           onClick={handlePrint}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            borderRadius: 6,
-            background: '#D4AF37',
-            color: '#0F172A',
-            border: 'none',
-            fontWeight: 800,
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
+          className="stay-document-print-button"
         >
           <Printer size={16} /> Imprimir / Guardar PDF
         </button>
@@ -115,62 +94,50 @@ export function StayConditionsDocument({
       <div
         ref={documentRef}
         className="printable-stay-document"
-        style={{
-          border: '1px solid #CBD5E1',
-          borderRadius: 8,
-          padding: '32px 36px',
-          background: '#FFFFFF',
-          fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-          fontSize: 12.5,
-          lineHeight: 1.5,
-          color: '#1E293B',
-          maxWidth: 900,
-          margin: '0 auto',
-        }}
       >
         {/* Header Hotel Banner */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #D4AF37', paddingBottom: 16, marginBottom: 20 }}>
+        <div className="stay-document-header">
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0F172A', letterSpacing: '0.05em' }}>
+            <h1 className="stay-document-hotel-name">
               {HOTEL_INFO.name.toUpperCase()}
             </h1>
-            <div style={{ color: '#D4AF37', fontSize: 14, fontWeight: 800, letterSpacing: '0.1em' }}>
+            <div className="stay-document-stars">
               {HOTEL_INFO.stars}
             </div>
-            <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
+            <div className="stay-document-hotel-meta stay-document-hotel-meta-spaced">
               RUC: {HOTEL_INFO.ruc} · {HOTEL_INFO.address}
             </div>
-            <div style={{ fontSize: 11, color: '#64748B' }}>
+            <div className="stay-document-hotel-meta">
               Tel: {HOTEL_INFO.phone} · Email: {HOTEL_INFO.email}
             </div>
           </div>
-          <div style={{ textAlign: 'right', border: '1px solid #E2E8F0', padding: '8px 14px', borderRadius: 6, background: '#F8FAFC' }}>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#64748B', fontWeight: 700 }}>N.º de Registro</div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', fontFamily: 'monospace' }}>
+          <div className="stay-document-registration">
+            <div className="stay-document-registration-label">N.º de Registro</div>
+            <div className="stay-document-registration-id">
               {stay?.id || reservation?.id || 'DOC-REG-' + new Date().getFullYear()}
             </div>
-            <div style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>
+            <div className="stay-document-registration-date">
               Emisión: {new Date().toLocaleDateString('es-PE')}
             </div>
           </div>
         </div>
 
         {/* Title */}
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 900, margin: '0 0 4px', textTransform: 'uppercase', color: '#0F172A', letterSpacing: '0.02em' }}>
+        <div className="stay-document-title">
+          <h2 className="stay-document-title-heading">
             Documento de Reconocimiento de Gastos, Condiciones y Responsabilidades de Estadía
           </h2>
-          <p style={{ fontSize: 11, color: '#64748B', margin: 0 }}>
+          <p className="stay-document-title-copy">
             Conformidad de ingreso, cargos a cuenta acumulada, políticas internas y estado de habitación
           </p>
         </div>
 
         {/* 1. Datos del Huésped y de la Estadía */}
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 10px', color: '#0F172A' }}>
+        <div className="stay-document-section">
+          <h3 className="stay-document-section-heading">
             1. Datos del Huésped y de la Estadía
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 20px', fontSize: 12 }}>
+          <div className="stay-document-guest-grid">
             <div><strong>Huésped Principal:</strong> {guestName}</div>
             <div><strong>Documento Identidad:</strong> {guestDoc}</div>
             <div><strong>Teléfono:</strong> {guestPhone}</div>
@@ -183,61 +150,61 @@ export function StayConditionsDocument({
         </div>
 
         {/* 2. Resumen Económico */}
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 10px', color: '#0F172A' }}>
+        <div className="stay-document-section">
+          <h3 className="stay-document-section-heading">
             2. Resumen Económico Inicial
           </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 6 }}>
+          <table className="stay-document-summary-table">
             <thead>
-              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #CBD5E1', textAlign: 'left' }}>
-                <th style={{ padding: '6px 10px' }}>Concepto</th>
-                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Tarifa Unitaria</th>
-                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Noches / Cant.</th>
-                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Subtotal</th>
+              <tr className="stay-document-table-header">
+                <th>Concepto</th>
+                <th className="stay-document-number-cell">Tarifa Unitaria</th>
+                <th className="stay-document-number-cell">Noches / Cant.</th>
+                <th className="stay-document-number-cell">Subtotal</th>
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                <td style={{ padding: '6px 10px' }}>Hospedaje Habitación {roomCategory}</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right' }}>{formatMoney(nightlyRate)}</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right' }}>{nights}</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700 }}>{formatMoney(totalStay)}</td>
+              <tr className="stay-document-table-row">
+                <td>Hospedaje Habitación {roomCategory}</td>
+                <td className="stay-document-number-cell">{formatMoney(nightlyRate)}</td>
+                <td className="stay-document-number-cell">{nights}</td>
+                <td className="stay-document-number-cell stay-document-total-cell">{formatMoney(totalStay)}</td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#16A34A' }}>
-                <td style={{ padding: '6px 10px' }}>Adelantos / Pagos registrados al momento</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right' }}>—</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right' }}>—</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700 }}>- {formatMoney(advancePaid)}</td>
+              <tr className="stay-document-table-row stay-document-paid-row">
+                <td>Adelantos / Pagos registrados al momento</td>
+                <td className="stay-document-number-cell">—</td>
+                <td className="stay-document-number-cell">—</td>
+                <td className="stay-document-number-cell stay-document-total-cell">- {formatMoney(advancePaid)}</td>
               </tr>
-              <tr style={{ background: '#F8FAFC', fontWeight: 900 }}>
-                <td style={{ padding: '6px 10px' }} colSpan={3}>Saldo pendiente estimado por hospedaje:</td>
-                <td style={{ padding: '6px 10px', textAlign: 'right', color: '#0F172A' }}>{formatMoney(pendingBalance)}</td>
+              <tr className="stay-document-balance-row">
+                <td colSpan={3}>Saldo pendiente estimado por hospedaje:</td>
+                <td className="stay-document-number-cell">{formatMoney(pendingBalance)}</td>
               </tr>
             </tbody>
           </table>
-          <p style={{ fontSize: 10.5, color: '#64748B', margin: 0, fontStyle: 'italic' }}>
+          <p className="stay-document-note">
             * El saldo final podrá variar de acuerdo con consumos adicionales de restaurante, bar, room service, lavandería, daños o servicios especiales solicitados y autorizados durante la estadía.
           </p>
         </div>
 
         {/* 3. Condiciones de Consumos y Cuenta Acumulada */}
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 8px', color: '#0F172A' }}>
+        <div className="stay-document-section stay-document-section-tight">
+          <h3 className="stay-document-section-heading">
             3. Gastos Adicionales y Cuenta Acumulada (Folio)
           </h3>
-          <p style={{ fontSize: 11.5, margin: '0 0 6px', color: '#334155' }}>
+          <p className="stay-document-paragraph">
             El huésped autoriza que todos los consumos realizados por él o sus acompañantes en el Restaurante, Bar, Servicio a la habitación (Room Service), Lavandería y Áreas recreativas sean cargados directamente al <strong>Folio de su Habitación</strong>. Cada consumo registrado incluirá fecha, hora, detalle, importe y firma/identificación del solicitante.
           </p>
         </div>
 
         {/* 4. Tarifario de Daños y Penalidades */}
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 8px', color: '#0F172A' }}>
+        <div className="stay-document-section stay-document-section-tight">
+          <h3 className="stay-document-section-heading">
             4. Tarifario Oficial de Daños y Penalidades
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px 16px', fontSize: 11.5 }}>
+          <div className="stay-document-penalty-grid">
             {PENALTY_RATES.map((pen, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dotted #CBD5E1', padding: '3px 0' }}>
+              <div key={idx} className="stay-document-penalty-row">
                 <span>• {pen.concept}:</span>
                 <strong>{typeof pen.amount === 'number' ? formatMoney(pen.amount) : pen.amount}</strong>
               </div>
@@ -246,13 +213,13 @@ export function StayConditionsDocument({
         </div>
 
         {/* 5. Estado Inicial de la Habitación (Checklist) */}
-        <div style={{ marginBottom: 18 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 8px', color: '#0F172A' }}>
+        <div className="stay-document-section stay-document-section-tight">
+          <h3 className="stay-document-section-heading">
             5. Verificación y Estado Inicial de la Habitación
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px 12px', fontSize: 11.5 }}>
+          <div className="stay-document-checklist-grid">
             {checklist.map((item) => (
-              <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: isReadOnly ? 'default' : 'pointer' }}>
+              <label key={item.id} className={`stay-document-checklist-item ${isReadOnly ? 'is-read-only' : 'is-editable'}`}>
                 <input
                   type="checkbox"
                   checked={item.checked}
@@ -262,7 +229,7 @@ export function StayConditionsDocument({
                       onChecklistChange(checklist.map(c => c.id === item.id ? { ...c, checked: e.target.checked } : c));
                     }
                   }}
-                  style={{ accentColor: '#D4AF37' }}
+                  className="stay-document-checkbox"
                 />
                 <span>{item.label}</span>
               </label>
@@ -271,88 +238,58 @@ export function StayConditionsDocument({
         </div>
 
         {/* 6. Declaración de Conformidad */}
-        <div style={{ marginBottom: 20 }}>
-          <h3 style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', background: '#F1F5F9', padding: '4px 10px', borderRadius: 4, margin: '0 0 8px', color: '#0F172A' }}>
+        <div className="stay-document-section stay-document-conformity-section">
+          <h3 className="stay-document-section-heading">
             6. Declaración de Conformidad y Aceptación
           </h3>
-          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 10, borderRadius: 6, fontSize: 11, color: '#334155', lineHeight: 1.45 }}>
+          <div className="stay-document-conformity-copy">
             El huésped declara que ha sido debidamente informado sobre las tarifas contratadas, las normas de convivencia del hotel, el horario límite de salida (12:00 m.), las políticas de penalidades por daños y el sistema de cargos al Folio. Con su firma a continuación, expresa su plena conformidad con todas las condiciones estipuladas.
           </div>
         </div>
 
         {/* 7. Sección de Firmas Digitales */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 30, marginTop: 24, paddingTop: 16, borderTop: '2px solid #E2E8F0' }}>
+        <div className="stay-document-signatures">
           {/* Firma del Huésped */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              height: 100,
-              border: '1px solid #CBD5E1',
-              borderRadius: 6,
-              background: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 8,
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
+          <div className="stay-document-signature-column">
+            <div className="stay-document-guest-signature-box">
               {guestSignature ? (
                 <img
                   src={guestSignature}
                   alt="Firma del Huésped"
-                  style={{ maxHeight: '90%', maxWidth: '90%', objectFit: 'contain' }}
+                  className="stay-document-signature-image"
                 />
               ) : (
-                <span style={{ color: '#94A3B8', fontSize: 11, fontStyle: 'italic' }}>
+                <span className="stay-document-signature-pending">
                   Pendiente de firma digital
                 </span>
               )}
             </div>
-            <div style={{ borderTop: '1px solid #475569', paddingTop: 4 }}>
-              <div style={{ fontWeight: 800, fontSize: 12, color: '#0F172A' }}>{guestName}</div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>{guestDoc}</div>
-              <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>FIRMA DEL HUÉSPED / TITULAR</div>
+            <div className="stay-document-signature-caption">
+              <div className="stay-document-signature-name">{guestName}</div>
+              <div className="stay-document-signature-document">{guestDoc}</div>
+              <div className="stay-document-signature-role">FIRMA DEL HUÉSPED / TITULAR</div>
             </div>
           </div>
 
           {/* Firma / Sello del Hotel */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              height: 100,
-              border: '1px solid #CBD5E1',
-              borderRadius: 6,
-              background: '#F8FAFC',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 8,
-            }}>
-              <div style={{
-                border: '2px solid #D4AF37',
-                borderRadius: 8,
-                padding: '6px 14px',
-                color: '#D4AF37',
-                fontWeight: 900,
-                fontSize: 12,
-                letterSpacing: '0.05em',
-                textAlign: 'center',
-                background: 'rgba(212, 175, 55, 0.05)',
-              }}>
+          <div className="stay-document-signature-column">
+            <div className="stay-document-hotel-signature-box">
+              <div className="stay-document-hotel-stamp">
                 <div>HOTEL PARK PLAZA</div>
-                <div style={{ fontSize: 9, color: '#64748B' }}>VALIDADO EN RECEPCIÓN</div>
-                <div style={{ fontSize: 9, color: '#0F172A', fontWeight: 700 }}>{receptionistName}</div>
+                <div className="stay-document-stamp-label">VALIDADO EN RECEPCIÓN</div>
+                <div className="stay-document-stamp-name">{receptionistName}</div>
               </div>
             </div>
-            <div style={{ borderTop: '1px solid #475569', paddingTop: 4 }}>
-              <div style={{ fontWeight: 800, fontSize: 12, color: '#0F172A' }}>{receptionistName}</div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>Recepción / Front Desk</div>
-              <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>REPRESENTANTE DEL HOTEL</div>
+            <div className="stay-document-signature-caption">
+              <div className="stay-document-signature-name">{receptionistName}</div>
+              <div className="stay-document-signature-document">Recepción / Front Desk</div>
+              <div className="stay-document-signature-role">REPRESENTANTE DEL HOTEL</div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{ textAlign: 'center', marginTop: 24, fontSize: 9.5, color: '#94A3B8', borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>
+        <div className="stay-document-footer">
           Documento generado y custodiado digitalmente bajo estándares de trazabilidad y seguridad por Hotel Park Plaza S.A.C.
         </div>
       </div>

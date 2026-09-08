@@ -48,21 +48,21 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
   }, {}), [filteredEvents]);
 
   return (
-    <div className="view-container events-module-view" style={{ paddingBottom: 60 }}>
+    <div className="view-container events-module-view">
       {/* Top Header */}
-      <header className="page-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <header className="page-heading events-page-heading">
         <div>
-          <span className="page-metadata" style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.08em' }}>
+          <span className="page-metadata events-page-metadata">
             Fechas, Horarios & Ocupación de Salones
           </span>
-          <h2 style={{ fontSize: 28, fontWeight: 900, color: '#1E3A8A', margin: '4px 0 0', letterSpacing: '-0.02em' }}>
+          <h2 className="events-page-title">
             Calendario de Eventos & Salones
           </h2>
-          <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: 14 }}>
+          <p className="events-page-description">
             Visualice la ocupación de cada ambiente, detecte disponibilidad y gestione eventos directamente.
           </p>
         </div>
-        <div className="page-actions" style={{ display: 'flex', gap: 10 }}>
+        <div className="page-actions events-page-actions">
           <P1Button onClick={onCreateEvent}>
             <Plus size={16} aria-hidden="true" /> Nuevo Evento
           </P1Button>
@@ -70,14 +70,14 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
       </header>
 
       {/* Filter by Space Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, background: '#FFFFFF', padding: '12px 18px', borderRadius: 14, border: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="events-filter-bar">
+        <div className="events-filter-control">
           <MapPin size={16} color="#D97706" />
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1E3A8A' }}>Filtrar por Salón:</span>
+          <span className="events-filter-label">Filtrar por Salón:</span>
           <select
             value={selectedSpaceId}
             onChange={(e) => setSelectedSpaceId(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 13, color: '#111827', background: '#F9FAFB', outline: 'none' }}
+            className="events-filter-select"
           >
             <option value="all">-- Todos los Salones ({spaces.length}) --</option>
             {spaces.map(s => (
@@ -86,7 +86,7 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
           </select>
         </div>
 
-        <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 600 }}>
+        <div className="events-filter-result">
           Mostrando <strong>{filteredEvents.length}</strong> eventos agendados
         </div>
       </div>
@@ -95,7 +95,7 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
 
       {/* Calendar Grid Shell */}
       <section className="card calendar-shell">
-        <div className="calendar-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="calendar-toolbar events-calendar-toolbar">
           <button 
             className="calendar-nav" 
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} 
@@ -104,9 +104,9 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
             <ChevronLeft size={18} />
           </button>
           
-          <div style={{ textAlign: 'center' }}>
-            <span className="section-kicker" style={{ fontSize: 11, textTransform: 'uppercase', color: '#D97706', fontWeight: 800 }}>Agenda Mensual</span>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1E3A8A' }}>
+          <div className="events-calendar-heading">
+            <span className="section-kicker events-calendar-kicker">Agenda Mensual</span>
+            <h3 className="events-calendar-title">
               {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
             </h3>
           </div>
@@ -132,10 +132,10 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
 
             return (
               <div className={`calendar-day ${inMonth ? '' : 'calendar-day-muted'}`} key={keyFor(day)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="calendar-day-header">
                   <time dateTime={keyFor(day)}>{day.getDate()}</time>
                   {hasMultiple && inMonth && (
-                    <span style={{ fontSize: 10, fontWeight: 800, color: '#D97706', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4 }}>
+                    <span className="calendar-day-count">
                       {dayEvents.length} ev.
                     </span>
                   )}
@@ -161,11 +161,11 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
       </section>
 
       {/* Legend Footer */}
-      <div className="calendar-legend" style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="calendar-legend events-calendar-legend">
         <span><i className="legend-dot legend-confirmed" /> Confirmado & Bloqueado</span>
         <span><i className="legend-dot legend-tentative" /> Tentativo (Pre-reserva)</span>
         <span><i className="legend-dot legend-other" /> En Preparación / Finalizado</span>
-        {loading ? <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6B7280' }}>Cargando calendario...</span> : null}
+        {loading ? <span className="calendar-loading">Cargando calendario...</span> : null}
       </div>
     </div>
   );

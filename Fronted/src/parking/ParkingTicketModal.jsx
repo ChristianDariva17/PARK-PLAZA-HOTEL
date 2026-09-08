@@ -19,56 +19,40 @@ export function ParkingTicketModal({ open, onClose, vehicle, clientName = '' }) 
       title="Comprobante de Cochera"
       description="Ticket de control de acceso vehicular para impresión térmica o comprobante del huésped."
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="parking-ticket-modal">
         {/* Ticket Térmico 80mm Container */}
         <div
           id="parking-thermal-ticket"
-          style={{
-            maxWidth: '360px',
-            margin: '0 auto',
-            padding: '24px 20px',
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '12px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-            fontFamily: "'Courier New', Courier, monospace",
-            color: '#0f172a',
-          }}
+          className="parking-ticket"
+          data-ticket-layout="thermal"
         >
           {/* Header */}
-          <div style={{ textAlign: 'center', borderBottom: '1px dashed #94a3b8', paddingBottom: '12px', marginBottom: '12px' }}>
-            <div style={{ fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#64748b' }}>
+          <div className="parking-ticket-header">
+            <div className="parking-ticket-hotel-label">
               HOTEL
             </div>
-            <div style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '0.05em', margin: '2px 0' }}>
+            <div className="parking-ticket-brand">
               PARK PLAZA
             </div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>★★★★★</div>
-            <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '4px', textTransform: 'uppercase' }}>
+            <div className="parking-ticket-stars">★★★★★</div>
+            <div className="parking-ticket-title">
               CONTROL DE COCHERA
             </div>
-            <div style={{ fontSize: '10px', color: '#64748b' }}>
+            <div className="parking-ticket-number">
               Ticket N°: {vehicle.id}
             </div>
           </div>
 
           {/* Placa & Espacio Destacados */}
           <div
-            style={{
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '10px',
-              textAlign: 'center',
-              marginBottom: '14px',
-            }}
+            className="parking-ticket-vehicle-summary"
           >
-            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Placa del Vehículo</div>
-            <div style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '0.1em', margin: '2px 0' }}>
+            <div className="parking-ticket-label">Placa del Vehículo</div>
+            <div className="parking-ticket-plate">
               {vehicle.plate}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '12px', fontWeight: 700 }}>
-              <span style={{ color: '#0369a1' }}>ESPACIO: {vehicle.space}</span>
+            <div className="parking-ticket-space-info">
+              <span className="parking-ticket-space">ESPACIO: {vehicle.space}</span>
               {vehicle.roomId ? (
                 <>
                   <span>·</span>
@@ -84,62 +68,62 @@ export function ParkingTicketModal({ open, onClose, vehicle, clientName = '' }) 
           </div>
 
           {/* Datos Detallados */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Tipo / Modelo:</span>
-              <span style={{ fontWeight: 600 }}>{vehicle.type} · {vehicle.brandModel || 'S/M'}</span>
+          <div className="parking-ticket-details">
+            <div className="parking-ticket-row">
+              <span className="parking-ticket-muted">Tipo / Modelo:</span>
+              <span className="parking-ticket-value">{vehicle.type} · {vehicle.brandModel || 'S/M'}</span>
             </div>
             {vehicle.color ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Color:</span>
-                <span style={{ fontWeight: 600 }}>{vehicle.color}</span>
+              <div className="parking-ticket-row">
+                <span className="parking-ticket-muted">Color:</span>
+                <span className="parking-ticket-value">{vehicle.color}</span>
               </div>
             ) : null}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Titular / Conductor:</span>
-              <span style={{ fontWeight: 600, maxWidth: '180px', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="parking-ticket-row">
+              <span className="parking-ticket-muted">Titular / Conductor:</span>
+              <span className="parking-ticket-value parking-ticket-driver">
                 {vehicle.driverName || clientName || 'No especificado'}
               </span>
             </div>
             {vehicle.driverPhone ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Teléfono:</span>
-                <span style={{ fontWeight: 600 }}>{vehicle.driverPhone}</span>
+              <div className="parking-ticket-row">
+                <span className="parking-ticket-muted">Teléfono:</span>
+                <span className="parking-ticket-value">{vehicle.driverPhone}</span>
               </div>
             ) : null}
             {vehicle.stayId ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Estadía:</span>
-                <span style={{ fontWeight: 600 }}>{vehicle.stayId?.slice(0, 10)}...</span>
+              <div className="parking-ticket-row">
+                <span className="parking-ticket-muted">Estadía:</span>
+                <span className="parking-ticket-value">{vehicle.stayId?.slice(0, 10)}...</span>
               </div>
             ) : null}
             {vehicle.keysLeft ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309' }}>
-                <span style={{ fontWeight: 700 }}>Custodia de llaves:</span>
-                <span style={{ fontWeight: 700 }}>🔑 En Recepción</span>
+              <div className="parking-ticket-row parking-ticket-keys">
+                <span className="parking-ticket-value">Custodia de llaves:</span>
+                <span className="parking-ticket-value">🔑 En Recepción</span>
               </div>
             ) : null}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Ingreso:</span>
-              <span style={{ fontWeight: 600 }}>{formatDateTime(vehicle.entryAt)}</span>
+            <div className="parking-ticket-row">
+              <span className="parking-ticket-muted">Ingreso:</span>
+              <span className="parking-ticket-value">{formatDateTime(vehicle.entryAt)}</span>
             </div>
             {vehicle.exitAt ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Salida:</span>
-                <span style={{ fontWeight: 600 }}>{formatDateTime(vehicle.exitAt)}</span>
+              <div className="parking-ticket-row">
+                <span className="parking-ticket-muted">Salida:</span>
+                <span className="parking-ticket-value">{formatDateTime(vehicle.exitAt)}</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Estado:</span>
-                <span style={{ fontWeight: 700, color: '#15803d' }}>● DENTRO</span>
+              <div className="parking-ticket-row">
+                <span className="parking-ticket-muted">Estado:</span>
+                <span className="parking-ticket-status">● DENTRO</span>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '4px' }}>
-              <span style={{ fontWeight: 700 }}>Tarifa Folio:</span>
-              <span style={{ fontWeight: 900, color: '#0f172a' }}>{formatMoney(vehicle.fee)}</span>
+            <div className="parking-ticket-row parking-ticket-total">
+              <span className="parking-ticket-value">Tarifa Folio:</span>
+              <span className="parking-ticket-total-value">{formatMoney(vehicle.fee)}</span>
             </div>
             {vehicle.entryResponsible ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b' }}>
+              <div className="parking-ticket-row parking-ticket-registered-by">
                 <span>Registrado por:</span>
                 <span>{vehicle.entryResponsible}</span>
               </div>
@@ -147,23 +131,23 @@ export function ParkingTicketModal({ open, onClose, vehicle, clientName = '' }) 
           </div>
 
           {/* QR / Código de Barras Representativo */}
-          <div style={{ textAlign: 'center', padding: '12px 0', borderTop: '1px dashed #94a3b8', borderBottom: '1px dashed #94a3b8', marginBottom: '12px' }}>
-            <div style={{ display: 'inline-flex', padding: '6px', backgroundColor: '#f1f5f9', borderRadius: '6px', marginBottom: '4px' }}>
+          <div className="parking-ticket-qr-section">
+            <div className="parking-ticket-qr">
               <QrCode size={64} />
             </div>
-            <div style={{ fontSize: '10px', letterSpacing: '0.2em', color: '#64748b' }}>
+            <div className="parking-ticket-qr-code">
               *{vehicle.id}*
             </div>
           </div>
 
           {/* Cláusula Legal / Disclaimer */}
-          <div style={{ fontSize: '9px', color: '#64748b', textAlign: 'center', lineHeight: '1.3' }}>
+          <div className="parking-ticket-disclaimer">
             Conserve este ticket para la autorización de retiro de su vehículo. El hotel no se responsabiliza por dinero, joyas u objetos de valor dejados en el interior.
           </div>
         </div>
 
         {/* Acciones del Modal */}
-        <div className="form-actions" style={{ justifyContent: 'center' }}>
+        <div className="form-actions parking-ticket-actions">
           <button type="button" className="btn btn-outline" onClick={onClose}>
             Cerrar
           </button>

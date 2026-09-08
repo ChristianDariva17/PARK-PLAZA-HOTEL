@@ -138,28 +138,11 @@ export const SignatureCanvas = forwardRef(function SignatureCanvas({
   }), [clear, hasDrawn, getDataUrl]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        height: height,
-        borderRadius: 10,
-        overflow: 'hidden',
-        border: hasDrawn ? '2px solid #D4AF37' : '2px dashed rgba(255, 255, 255, 0.25)',
-        background: backgroundColor,
-        boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.1)',
-        touchAction: 'none',
-        userSelect: 'none',
-      }}>
+    <div className="signature-canvas">
+      <div className={`signature-canvas-shell ${hasDrawn ? 'has-drawn' : ''}`}>
         <canvas
           ref={canvasRef}
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'block',
-            cursor: 'crosshair',
-            touchAction: 'none',
-          }}
+          className="signature-canvas-input"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -172,73 +155,30 @@ export const SignatureCanvas = forwardRef(function SignatureCanvas({
 
         {/* Placeholder Guide Line & Text */}
         {!hasDrawn && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            color: '#94A3B8',
-            fontSize: 13,
-            fontWeight: 600,
-            gap: 6,
-          }}>
+          <div className="signature-canvas-placeholder">
             <PenTool size={20} color="#CBD5E1" />
             <span>{placeholder}</span>
-            <div style={{
-              width: '80%',
-              height: 1,
-              background: '#E2E8F0',
-              marginTop: 10,
-            }} />
+            <div className="signature-canvas-guide-line" />
           </div>
         )}
 
         {/* Signed Indicator badge */}
         {hasDrawn && (
-          <div style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            background: 'rgba(34, 197, 94, 0.15)',
-            color: '#16A34A',
-            padding: '3px 8px',
-            borderRadius: 12,
-            fontSize: 11,
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            pointerEvents: 'none',
-          }}>
+          <div className="signature-canvas-captured-badge">
             <CheckCircle2 size={12} /> Firma capturada
           </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: '#64748B' }}>
+      <div className="signature-canvas-footer">
+        <span className="signature-canvas-hint">
           * Dibuje su firma en el recuadro con el dedo o ratón.
         </span>
         <button
           type="button"
           onClick={clear}
           disabled={!hasDrawn}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '4px 10px',
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            background: 'transparent',
-            color: hasDrawn ? '#F87171' : '#64748B',
-            border: 'none',
-            cursor: hasDrawn ? 'pointer' : 'default',
-          }}
+          className={`signature-canvas-clear ${hasDrawn ? 'has-drawn' : ''}`}
         >
           <RotateCcw size={13} /> Limpiar firma
         </button>

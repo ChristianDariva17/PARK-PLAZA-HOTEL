@@ -97,29 +97,28 @@ export function NotificationsView({ navigate, notify }) {
   };
 
   return (
-    <div className="view-container" style={{ paddingBottom: 60 }}>
+    <div className="view-container notifications-view">
       {/* Luxury Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
+      <div className="notifications-header">
         <div>
-          <span style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="notifications-kicker">
             <Sparkles size={13} color="#D97706" /> CENTRO DE ALERTAS & NOTIFICACIONES 5★
           </span>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1E3A8A', margin: '4px 0 2px' }}>
+          <h1 className="notifications-title">
             Bandeja de Notificaciones Internas
           </h1>
-          <p style={{ margin: 0, fontSize: 13.5, color: '#64748B' }}>
+          <p className="notifications-subtitle">
             Monitoreo en tiempo real de operaciones de recepción, housekeeping, cocina, almacén, eventos y seguridad.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="notifications-actions">
           <button
             type="button"
-            className="btn btn-outline"
             onClick={refresh}
             disabled={notifications.status === 'loading'}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            className="btn btn-outline notifications-action"
           >
             <RefreshCw size={14} className={notifications.status === 'loading' ? 'spin' : ''} />
             Actualizar
@@ -127,10 +126,9 @@ export function NotificationsView({ navigate, notify }) {
 
           <button
             type="button"
-            className="btn btn-outline"
+            className="btn btn-outline notifications-action"
             onClick={onClearAllRead}
             disabled={actionLoading || !items.some(i => i.read)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
             title="Elimina notificaciones leídas de la vista"
           >
             <Trash2 size={14} /> Limpiar Leídas
@@ -138,10 +136,9 @@ export function NotificationsView({ navigate, notify }) {
 
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary notifications-action notifications-action--primary"
             onClick={onMarkAll}
             disabled={actionLoading || unreadCount === 0}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800 }}
           >
             <CheckCheck size={16} /> Marcar Todas Leídas
           </button>
@@ -149,46 +146,36 @@ export function NotificationsView({ navigate, notify }) {
       </div>
 
       {/* Metrics Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <div style={{ background: '#FFFFFF', padding: '14px 18px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600, display: 'block' }}>Total de Notificaciones</span>
-          <strong style={{ fontSize: 22, color: '#0F172A', fontWeight: 900 }}>{items.length}</strong>
+      <div className="notifications-metrics">
+        <div className="notifications-metric">
+          <span className="notifications-metric-label">Total de Notificaciones</span>
+          <strong className="notifications-metric-value">{items.length}</strong>
         </div>
 
-        <div style={{ background: unreadCount > 0 ? '#FFFBEB' : '#F8FAFC', padding: '14px 18px', borderRadius: 12, border: unreadCount > 0 ? '1.5px solid #FDE68A' : '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <span style={{ fontSize: 12, color: unreadCount > 0 ? '#B45309' : '#64748B', fontWeight: 700, display: 'block' }}>Sin Leer / Pendientes</span>
-          <strong style={{ fontSize: 22, color: unreadCount > 0 ? '#D97706' : '#15803D', fontWeight: 900 }}>
+        <div className={`notifications-metric notifications-metric--unread${unreadCount > 0 ? ' is-pending' : ''}`}>
+          <span className="notifications-metric-label">Sin Leer / Pendientes</span>
+          <strong className="notifications-metric-value">
             {unreadCount > 0 ? `${unreadCount} pendientes` : '✓ Todas al día'}
           </strong>
         </div>
 
-        <div style={{ background: '#FFFFFF', padding: '14px 18px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600, display: 'block' }}>Cocina & Bar (A&B)</span>
-          <strong style={{ fontSize: 22, color: '#D97706', fontWeight: 900 }}>{departmentCounts.restaurant || 0}</strong>
+        <div className="notifications-metric">
+          <span className="notifications-metric-label">Cocina & Bar (A&B)</span>
+          <strong className="notifications-metric-value notifications-metric-value--amber">{departmentCounts.restaurant || 0}</strong>
         </div>
 
-        <div style={{ background: '#FFFFFF', padding: '14px 18px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600, display: 'block' }}>Limpieza & Habitaciones</span>
-          <strong style={{ fontSize: 22, color: '#059669', fontWeight: 900 }}>{departmentCounts.housekeeping || 0}</strong>
+        <div className="notifications-metric">
+          <span className="notifications-metric-label">Limpieza & Habitaciones</span>
+          <strong className="notifications-metric-value notifications-metric-value--green">{departmentCounts.housekeeping || 0}</strong>
         </div>
       </div>
 
       {/* Department Filter Tabs */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 16, borderBottom: '2px solid #E5E7EB' }}>
+      <div className="notifications-department-tabs">
         <button
           type="button"
           onClick={() => setSelectedDepartment('all')}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 8,
-            border: 'none',
-            background: selectedDepartment === 'all' ? '#1E3A8A' : '#F1F5F9',
-            color: selectedDepartment === 'all' ? '#FFFFFF' : '#475569',
-            fontWeight: 800,
-            fontSize: 12.5,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+           className={`notifications-tab${selectedDepartment === 'all' ? ' is-selected' : ''}`}
         >
           🌟 Todas ({departmentCounts.all || 0})
         </button>
@@ -201,20 +188,7 @@ export function NotificationsView({ navigate, notify }) {
               key={key}
               type="button"
               onClick={() => setSelectedDepartment(key)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 8,
-                border: 'none',
-                background: selectedDepartment === key ? '#1E3A8A' : '#F1F5F9',
-                color: selectedDepartment === key ? '#FFFFFF' : '#475569',
-                fontWeight: 700,
-                fontSize: 12.5,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6
-              }}
+               className={`notifications-tab${selectedDepartment === key ? ' is-selected' : ''}`}
             >
               <span>{cfg.icon}</span> {cfg.label} ({count})
             </button>
@@ -223,67 +197,37 @@ export function NotificationsView({ navigate, notify }) {
       </div>
 
       {/* Search & Sub-Filter Bar */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: '1 1 240px', position: 'relative' }}>
-          <Search size={15} style={{ position: 'absolute', left: 10, top: 12, color: '#94A3B8' }} />
+      <div className="notifications-filter-bar">
+        <div className="notifications-search">
+          <Search size={15} className="notifications-search-icon" />
           <input
             type="text"
             placeholder="Buscar por título, contenido o palabra clave..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', height: 38, paddingLeft: 34, borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, boxSizing: 'border-box' }}
+             className="notifications-search-input"
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="notifications-status-tabs">
           <button
             type="button"
             onClick={() => setSelectedStatus('all')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 6,
-              border: '1px solid',
-              borderColor: selectedStatus === 'all' ? '#1E3A8A' : '#CBD5E1',
-              background: selectedStatus === 'all' ? '#EFF6FF' : '#FFFFFF',
-              color: selectedStatus === 'all' ? '#1E3A8A' : '#64748B',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
+             className={`notifications-status-tab${selectedStatus === 'all' ? ' is-selected' : ''}`}
           >
             Todas ({items.length})
           </button>
           <button
             type="button"
             onClick={() => setSelectedStatus('unread')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 6,
-              border: '1px solid',
-              borderColor: selectedStatus === 'unread' ? '#D97706' : '#CBD5E1',
-              background: selectedStatus === 'unread' ? '#FFFBEB' : '#FFFFFF',
-              color: selectedStatus === 'unread' ? '#B45309' : '#64748B',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
+             className={`notifications-status-tab${selectedStatus === 'unread' ? ' is-selected is-unread' : ''}`}
           >
             Sin leer ({unreadCount})
           </button>
           <button
             type="button"
             onClick={() => setSelectedStatus('read')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 6,
-              border: '1px solid',
-              borderColor: selectedStatus === 'read' ? '#15803D' : '#CBD5E1',
-              background: selectedStatus === 'read' ? '#ECFDF5' : '#FFFFFF',
-              color: selectedStatus === 'read' ? '#15803D' : '#64748B',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
+             className={`notifications-status-tab${selectedStatus === 'read' ? ' is-selected is-read' : ''}`}
           >
             Leídas ({items.length - unreadCount})
           </button>
@@ -292,22 +236,22 @@ export function NotificationsView({ navigate, notify }) {
 
       {/* Notifications List */}
       {notifications.status === 'loading' && items.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>
-          <RefreshCw size={24} className="spin" style={{ margin: '0 auto 10px' }} />
+        <div className="notifications-loading">
+          <RefreshCw size={24} className="spin notifications-loading-icon" />
           <p>Cargando notificaciones del hotel...</p>
         </div>
       ) : filteredItems.length === 0 ? (
-        <div style={{ padding: '48px 24px', textAlign: 'center', background: '#FFFFFF', borderRadius: 14, border: '1px solid #E2E8F0', marginTop: 10 }}>
-          <Inbox size={42} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#1E293B' }}>
+        <div className="notifications-empty">
+          <Inbox size={42} color="#94A3B8" className="notifications-empty-icon" />
+          <h3 className="notifications-empty-title">
             {selectedStatus === 'unread' ? '¡Estás al día! No hay notificaciones pendientes' : 'No se encontraron notificaciones'}
           </h3>
-          <p style={{ margin: '6px 0 0', color: '#64748B', fontSize: 13 }}>
+          <p className="notifications-empty-copy">
             {selectedStatus === 'unread' ? 'Todas las alertas operativas han sido leídas y atendidas.' : 'Intente cambiando los filtros de departamento o término de búsqueda.'}
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="notifications-list">
           {filteredItems.map(item => {
             const isUnread = !item.read;
             const dept = item.department || DEPARTMENT_CONFIG.general;
@@ -316,95 +260,56 @@ export function NotificationsView({ navigate, notify }) {
             return (
               <div
                 key={item.id}
-                style={{
-                  background: isUnread ? '#FFFFFF' : '#F8FAFC',
-                  border: isUnread ? '1.5px solid #93C5FD' : '1px solid #E2E8F0',
-                  borderRadius: 12,
-                  padding: '14px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  transition: 'all 0.15s ease',
-                  boxShadow: isUnread ? '0 3px 8px -1px rgba(30, 58, 138, 0.06)' : 'none',
-                }}
+                className={`notification-item${isUnread ? ' is-unread' : ' is-read'}`}
               >
                 {/* Left side: Icon + Texts */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flex: 1 }}>
+                <div className="notification-item-content">
                   {/* Department Icon Avatar */}
-                  <div style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 10,
-                    background: dept.bg,
-                    border: `1px solid ${dept.borderColor}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 20,
-                    flexShrink: 0,
-                  }}>
+                  <div className={`notification-department-icon notification-department-icon--${item.departmentKey || 'general'}`}>
                     {dept.icon}
                   </div>
 
-                  <div style={{ flex: 1 }}>
+                  <div className="notification-item-text">
                     {/* Header line: Title + Priority + Department Badge + Time */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                    <div className="notification-item-heading">
                       {isUnread && (
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563EB', display: 'inline-block' }} title="Sin leer" />
+                        <span className="notification-unread-dot" title="Sin leer" />
                       )}
-                      <strong style={{ fontSize: 14, color: isUnread ? '#0F172A' : '#334155', fontWeight: isUnread ? 800 : 700 }}>
+                      <strong className="notification-item-title">
                         {item.title}
                       </strong>
 
                       {/* Department Tag */}
-                      <span style={{
-                        background: dept.bg,
-                        color: dept.color,
-                        border: `1px solid ${dept.borderColor}`,
-                        padding: '2px 8px',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: 700
-                      }}>
+                      <span className={`notification-department-tag notification-department-tag--${item.departmentKey || 'general'}`}>
                         {dept.label}
                       </span>
 
                       {/* Priority Tag */}
                       {prio.label !== 'Informativo' && (
-                        <span style={{
-                          background: prio.bg,
-                          color: prio.color,
-                          padding: '2px 7px',
-                          borderRadius: 6,
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          textTransform: 'uppercase'
-                        }}>
+                        <span className={`notification-priority-tag notification-priority-tag--${item.priorityKey || 'info'}`}>
                           {prio.label}
                         </span>
                       )}
 
-                      <span style={{ fontSize: 11.5, color: '#94A3B8', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className="notification-time">
                         <Clock size={12} /> {item.timeAgo}
                       </span>
                     </div>
 
                     {/* Content / Description */}
-                    <p style={{ margin: 0, fontSize: 13, color: isUnread ? '#475569' : '#64748B', lineHeight: 1.4 }}>
+                    <p className="notification-item-description">
                       {item.description}
                     </p>
                   </div>
                 </div>
 
                 {/* Right side: Action Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <div className="notification-item-actions">
                   {isUnread && (
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm"
                       onClick={() => handleMarkRead(item.id)}
-                      style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px' }}
+                      className="btn btn-outline btn-sm notification-mark-read"
                       title="Marcar como leída"
                     >
                       <CheckCheck size={14} /> Leída
@@ -413,18 +318,8 @@ export function NotificationsView({ navigate, notify }) {
 
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
                     onClick={() => handleOpenModule(item)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      padding: '6px 14px',
-                      background: isUnread ? '#1E3A8A' : '#475569',
-                      borderColor: isUnread ? '#1E3A8A' : '#475569'
-                    }}
+                    className={`btn btn-primary btn-sm notification-open-module${isUnread ? ' is-unread' : ' is-read'}`}
                   >
                     Ir al módulo <ArrowRight size={13} />
                   </button>

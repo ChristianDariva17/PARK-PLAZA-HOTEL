@@ -51,5 +51,5 @@ export default function GoogleSignInButton({ disabled, onCredential, onError }) 
   }, []);
 
   if (state === 'unavailable') return null;
-  return <div className="auth-google" aria-busy={state === 'loading'} aria-disabled={disabled || undefined} style={disabled ? { pointerEvents: 'none', opacity: 0.6 } : undefined} ref={button} />;
+  return <div className={`auth-google${disabled ? ' auth-google--disabled' : ''}`} aria-busy={state === 'loading'} aria-disabled={disabled || undefined} ref={button} />;
 }

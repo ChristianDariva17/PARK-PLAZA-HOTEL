@@ -72,76 +72,48 @@ function OrderTicket({ order, onAdvance, onCancel, advancing }) {
   const isUrgent = order.status === 'Pedido recibido' && mins >= 3;
 
   return (
-    <div style={{
-      background: cfg.bg,
-      border: `2px solid ${isUrgent ? '#EF4444' : cfg.border}`,
-      borderRadius: 16,
-      padding: '18px 20px',
-      marginBottom: 14,
-      boxShadow: isUrgent ? '0 0 18px rgba(239,68,68,0.35)' : '0 0 10px rgba(0,0,0,0.4)',
-      transition: 'border-color 0.3s, box-shadow 0.3s',
-    }}>
+    <div className={`kitchen-ticket kitchen-ticket-${order.status === 'Pedido recibido' ? 'received' : order.status === 'Confirmado' ? 'confirmed' : order.status === 'En preparacion' ? 'preparing' : 'ready'}${isUrgent ? ' is-urgent' : ''}`}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {isUrgent && <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0 }} />}
-          <span style={{
-            fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
-            color: cfg.badgeText, background: cfg.badge, padding: '3px 10px', borderRadius: 20,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-          }}>
+      <div className="kitchen-ticket-header">
+        <div className="kitchen-ticket-heading">
+          {isUrgent && <AlertCircle size={16} color="#EF4444" className="kitchen-ticket-urgent-icon" />}
+          <span className="kitchen-ticket-badge">
             <Icon size={10} />{cfg.label}
           </span>
-          <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600 }}>{order.source}</span>
+          <span className="kitchen-ticket-source">{order.source}</span>
         </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: cfg.text }}>{formatMoney(order.total)}</div>
-          <div style={{ fontSize: 11, color: isUrgent ? '#EF4444' : '#6B7280', fontWeight: isUrgent ? 800 : 500, marginTop: 2 }}>
-            <Clock size={10} style={{ display: 'inline', marginRight: 3 }} />
+        <div className="kitchen-ticket-total">
+          <div className="kitchen-ticket-amount">{formatMoney(order.total)}</div>
+          <div className={`kitchen-ticket-elapsed${isUrgent ? ' is-urgent' : ''}`}>
+            <Clock size={10} className="kitchen-ticket-clock" />
             {elapsed(order.createdAt)} esperando
           </div>
         </div>
       </div>
 
       {/* Items */}
-      <div style={{ borderTop: `1px solid ${cfg.border}40`, paddingTop: 12, marginBottom: 14 }}>
+      <div className="kitchen-ticket-items">
         {(order.items || []).map((item, i) => (
-          <div key={i} style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-            padding: '5px 0',
-            borderBottom: i < order.items.length - 1 ? `1px solid ${cfg.border}25` : 'none',
-          }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#F9FAFB' }}>
-              <span style={{ fontSize: 19, fontWeight: 900, color: cfg.text, marginRight: 8 }}>{item.quantity}\xD7</span>
+          <div key={i} className={`kitchen-ticket-item${i < order.items.length - 1 ? ' has-divider' : ''}`}>
+            <span className="kitchen-ticket-item-label">
+              <span className="kitchen-ticket-quantity">{item.quantity}\xD7</span>
               {itemLabel(item)}
             </span>
           </div>
         ))}
         {order.comment && (
-          <div style={{
-            marginTop: 10, padding: '7px 12px', background: '#1F2937',
-            borderRadius: 8, fontSize: 13, color: '#D1FAE5', fontStyle: 'italic',
-            borderLeft: `3px solid ${cfg.border}`,
-          }}>
+          <div className="kitchen-ticket-comment">
             \uD83D\uDCAC {order.comment}
           </div>
         )}
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div className="kitchen-ticket-actions">
         <button
           onClick={() => onAdvance(order)}
           disabled={advancing === order.id}
-          style={{
-            flex: 1, padding: '13px 0', borderRadius: 12, border: 'none',
-            background: advancing === order.id ? '#374151' : cfg.border,
-            color: advancing === order.id ? '#6B7280' : '#fff',
-            fontSize: 14, fontWeight: 900,
-            cursor: advancing === order.id ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            transition: 'background 0.2s',
-          }}
+          className={`kitchen-advance-button${advancing === order.id ? ' is-advancing' : ''}`}
         >
           {advancing === order.id
             ? <RefreshCw size={14} />
@@ -152,11 +124,7 @@ function OrderTicket({ order, onAdvance, onCancel, advancing }) {
           <button
             onClick={() => onCancel(order)}
             disabled={advancing === order.id}
-            style={{
-              padding: '13px 16px', borderRadius: 12,
-              background: 'transparent', border: '2px solid #374151',
-              color: '#6B7280', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}
+            className="kitchen-cancel-button"
           >
             \u2715
           </button>
@@ -171,22 +139,15 @@ function StatusColumn({ status, orders, onAdvance, onCancel, advancing }) {
   const cfg = STATUS_CONFIG[status];
   const Icon = cfg.Icon;
   return (
-    <div style={{ minWidth: 290, flex: '1 1 290px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
-        padding: '10px 16px', borderRadius: 12,
-        background: `${cfg.border}18`, border: `1px solid ${cfg.border}40`,
-      }}>
+    <div className="kitchen-status-column">
+      <div className={`kitchen-status-header kitchen-status-${status === 'Pedido recibido' ? 'received' : status === 'Confirmado' ? 'confirmed' : status === 'En preparacion' ? 'preparing' : 'ready'}`}>
         <Icon size={18} color={cfg.border} />
-        <span style={{ fontSize: 14, fontWeight: 800, color: cfg.text }}>{cfg.label}</span>
-        <span style={{
-          marginLeft: 'auto', background: cfg.badge, color: cfg.badgeText,
-          borderRadius: 20, padding: '2px 12px', fontSize: 13, fontWeight: 900,
-        }}>{orders.length}</span>
+        <span className="kitchen-status-label">{cfg.label}</span>
+        <span className="kitchen-status-count">{orders.length}</span>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="kitchen-status-orders">
         {orders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 0', color: '#374151', fontSize: 14, fontWeight: 600 }}>
+          <div className="kitchen-empty-column">
             Sin pedidos
           </div>
         ) : orders.map(order => (
@@ -252,35 +213,23 @@ export default function KitchenView({ notify }) {
   }, [advancing, restaurantCommands, notify]);
 
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0A0A0A',
-      padding: '24px 28px', boxSizing: 'border-box',
-      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-    }}>
+    <div className="kitchen-view">
       {/* Header */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 28, paddingBottom: 20, borderBottom: '1px solid #1F2937',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="kitchen-view-header">
+        <div className="kitchen-view-heading">
           <ChefHat size={32} color="#D97706" />
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#F9FAFB', letterSpacing: '-0.02em' }}>
+            <h1 className="kitchen-view-title">
               Vista de Cocina
             </h1>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#4B5563' }}>
+            <p className="kitchen-view-subtitle">
               {activeOrders.length} pedido{activeOrders.length !== 1 ? 's' : ''} activo{activeOrders.length !== 1 ? 's' : ''} \xB7 Auto-refresh cada 30s
             </p>
           </div>
         </div>
         <button
           onClick={() => ordersResource.reload()}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 18px', borderRadius: 12,
-            background: '#111827', border: '1px solid #374151',
-            color: '#9CA3AF', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}
+          className="kitchen-refresh-button"
         >
           <RefreshCw size={14} />
           Actualizar
@@ -288,32 +237,31 @@ export default function KitchenView({ notify }) {
       </div>
 
       {ordersResource.status === 'loading' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 100, color: '#374151' }}>
-          <RefreshCw size={64} style={{ marginBottom: 20, opacity: 0.3, animation: 'spin 2s linear infinite' }} />
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Cargando pedidos</div>
-          <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+        <div className="kitchen-state kitchen-state-loading">
+          <RefreshCw size={64} className="kitchen-state-icon kitchen-state-icon-loading" />
+          <div className="kitchen-state-title">Cargando pedidos</div>
         </div>
       ) : ordersResource.status === 'error' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 100, color: '#EF4444' }}>
-          <AlertCircle size={64} style={{ marginBottom: 20, opacity: 0.8 }} />
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Error al cargar</div>
-          <div style={{ fontSize: 14, color: '#F87171' }}>{ordersResource.error}</div>
-          <button onClick={() => ordersResource.reload()} style={{ marginTop: 20, padding: '10px 20px', borderRadius: 8, background: '#374151', color: '#fff', border: 'none', cursor: 'pointer' }}>Reintentar</button>
+        <div className="kitchen-state kitchen-state-error">
+          <AlertCircle size={64} className="kitchen-state-icon" />
+          <div className="kitchen-state-title">Error al cargar</div>
+          <div className="kitchen-state-error-copy">{ordersResource.error}</div>
+          <button onClick={() => ordersResource.reload()} className="kitchen-retry-button">Reintentar</button>
         </div>
       ) : ordersResource.isForbidden ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 100, color: '#EF4444' }}>
-          <AlertCircle size={64} style={{ marginBottom: 20, opacity: 0.8 }} />
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Acceso denegado</div>
-          <div style={{ fontSize: 14, color: '#F87171' }}>No tienes permiso para ver los pedidos de cocina.</div>
+        <div className="kitchen-state kitchen-state-error">
+          <AlertCircle size={64} className="kitchen-state-icon" />
+          <div className="kitchen-state-title">Acceso denegado</div>
+          <div className="kitchen-state-error-copy">No tienes permiso para ver los pedidos de cocina.</div>
         </div>
       ) : activeOrders.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 100, color: '#374151' }}>
-          <ChefHat size={64} style={{ marginBottom: 20, opacity: 0.3 }} />
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Sin pedidos activos</div>
-          <div style={{ fontSize: 14, color: '#4B5563' }}>Los nuevos pedidos aparecerán aquí automáticamente</div>
+        <div className="kitchen-state kitchen-state-empty">
+          <ChefHat size={64} className="kitchen-state-icon kitchen-state-icon-empty" />
+          <div className="kitchen-state-title">Sin pedidos activos</div>
+          <div className="kitchen-state-empty-copy">Los nuevos pedidos aparecerán aquí automáticamente</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 20, overflowX: 'auto', alignItems: 'flex-start', paddingBottom: 20 }}>
+        <div className="kitchen-status-grid">
           {ACTIVE_STATUSES.map(status => (
             <StatusColumn
               key={status}

@@ -105,7 +105,7 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
       title="Configuración de Tarifas & Aforos"
       description="Ajuste los precios para visitantes externos, tarifas de huéspedes, aforo máximo y horarios operativos."
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="amenity-modal-stack">
         {error ? (
           <div className="alert-banner alert-banner-danger" role="alert">
             <AlertCircle size={18} />
@@ -114,34 +114,11 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
         ) : null}
 
         {/* Pestañas de Selección de Zona */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '4px',
-          background: 'var(--color-surface-soft, #f1f5f9)',
-          borderRadius: '12px',
-          border: '1px solid var(--color-border, #e2e8f0)'
-        }}>
+        <div className="amenity-zone-tabs">
           <button
             type="button"
             onClick={() => setActiveTab('piscina')}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              borderRadius: '9px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13.5px',
-              fontWeight: '700',
-              transition: 'all 0.2s ease',
-              background: activeTab === 'piscina' ? '#ffffff' : 'transparent',
-              color: activeTab === 'piscina' ? '#0891b2' : 'var(--color-muted, #64748b)',
-              boxShadow: activeTab === 'piscina' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
-            }}
+            className={`amenity-zone-tab ${activeTab === 'piscina' ? 'is-selected tone-cyan' : ''}`}
           >
             <Waves size={18} />
             <span>Piscina Principal</span>
@@ -150,201 +127,119 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
           <button
             type="button"
             onClick={() => setActiveTab('mirador')}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              borderRadius: '9px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13.5px',
-              fontWeight: '700',
-              transition: 'all 0.2s ease',
-              background: activeTab === 'mirador' ? '#ffffff' : 'transparent',
-              color: activeTab === 'mirador' ? '#9333ea' : 'var(--color-muted, #64748b)',
-              boxShadow: activeTab === 'mirador' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
-            }}
+            className={`amenity-zone-tab ${activeTab === 'mirador' ? 'is-selected tone-purple' : ''}`}
           >
             <Mountain size={18} />
             <span>Mirador Terraza</span>
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <form onSubmit={handleSave} className="amenity-form-stack">
           {/* Tarifas Diferenciadas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+          <div className="amenity-grid amenity-grid-wide">
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Tarifa Visitante Externo (S/)
               </label>
               <input
                 type="number"
                 step="0.50"
                 min="0"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-number-input"
                 value={current.priceExternal}
                 onChange={(e) => handleChange('priceExternal', e.target.value)}
                 required
               />
-              <span style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)', marginTop: '4px', display: 'block' }}>
+              <span className="amenity-helper">
                 Day Pass general por persona
               </span>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Tarifa Huésped del Hotel (S/)
               </label>
               <input
                 type="number"
                 step="0.50"
                 min="0"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-number-input"
                 value={current.priceGuest}
                 onChange={(e) => handleChange('priceGuest', e.target.value)}
                 required
               />
-              <span style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)', marginTop: '4px', display: 'block' }}>
+              <span className="amenity-helper">
                 0.00 = Acceso incluido en estadía
               </span>
             </div>
           </div>
 
           {/* Aforo, Pax y Duración */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px' }}>
+          <div className="amenity-grid amenity-grid-compact">
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Aforo Máximo Total
               </label>
               <input
                 type="number"
                 min="1"
                 max="200"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-number-input"
                 value={current.capacity}
                 onChange={(e) => handleChange('capacity', e.target.value)}
                 required
               />
-              <span style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)', marginTop: '4px', display: 'block' }}>
+              <span className="amenity-helper">
                 Capacidad simultánea
               </span>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Máx. Pax por Grupo
               </label>
               <input
                 type="number"
                 min="1"
                 max="50"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-number-input"
                 value={current.maxPax}
                 onChange={(e) => handleChange('maxPax', e.target.value)}
                 required
               />
-              <span style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)', marginTop: '4px', display: 'block' }}>
+              <span className="amenity-helper">
                 Límite por reserva
               </span>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Duración de Turno
               </label>
               <input
                 type="number"
                 min="15"
                 step="15"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-number-input"
                 value={current.durationMinutes}
                 onChange={(e) => handleChange('durationMinutes', e.target.value)}
                 required
               />
-              <span style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)', marginTop: '4px', display: 'block' }}>
+              <span className="amenity-helper">
                 En minutos (ej. 120 = 2h)
               </span>
             </div>
           </div>
 
           {/* Horarios Operativos */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="amenity-grid amenity-grid-hours">
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Hora de Apertura
               </label>
               <input
                 type="time"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-time-input"
                 value={current.openingHour || '08:00'}
                 onChange={(e) => handleChange('openingHour', e.target.value)}
                 required
@@ -352,23 +247,12 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+              <label className="amenity-field-label">
                 Hora de Cierre
               </label>
               <input
                 type="time"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  background: '#ffffff',
-                  color: 'var(--color-navy, #0f172a)',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="form-control amenity-time-input"
                 value={current.closingHour || '20:00'}
                 onChange={(e) => handleChange('closingHour', e.target.value)}
                 required
@@ -377,27 +261,19 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
           </div>
 
           {/* Estado de la Zona */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 18px',
-            borderRadius: '12px',
-            background: 'var(--color-surface-soft, #f8fafc)',
-            border: '1px solid var(--color-border, #e2e8f0)'
-          }}>
+          <div className="amenity-active-row">
             <div>
-              <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--color-navy, #0f172a)' }}>
+              <div className="amenity-title">
                 Zona Activa para Reservas
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--color-muted, #64748b)' }}>
+              <div className="amenity-description">
                 Si se desactiva, los huéspedes no podrán generar nuevas reservas
               </div>
             </div>
-            <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+            <label className="amenity-checkbox-label">
               <input
                 type="checkbox"
-                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--color-primary, #2563eb)' }}
+                className="amenity-checkbox"
                 checked={current.isActive}
                 onChange={(e) => handleChange('isActive', e.target.checked)}
               />
@@ -405,11 +281,11 @@ export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, not
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--color-border, #e2e8f0)' }}>
+          <div className="amenity-form-actions">
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <button type="submit" className="btn btn-primary amenity-inline-button" disabled={saving}>
               <Save size={16} />
               <span>{saving ? 'Guardando...' : 'Guardar Cambios'}</span>
             </button>

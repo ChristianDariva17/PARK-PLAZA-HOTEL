@@ -127,34 +127,32 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
   }, [events]);
 
   return (
-    <div className="view-container events-module-view" style={{ paddingBottom: 60 }}>
+    <div className="view-container events-module-view">
       {/* Page Header */}
-      <header className="page-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <header className="page-heading events-page-heading">
         <div>
-          <span className="page-metadata" style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.08em' }}>
+          <span className="page-metadata events-page-metadata">
             Agenda, Salones & Banquetería 5★
           </span>
-          <h2 style={{ fontSize: 28, fontWeight: 900, color: '#1E3A8A', margin: '4px 0 0', letterSpacing: '-0.02em' }}>
+          <h2 className="events-page-title">
             Directorio de Eventos
           </h2>
-          <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: 13.5 }}>
+          <p className="events-page-description">
             Consulte programaciones, disponibilidad de salones, comandas BEO y estado operativo.
           </p>
         </div>
-        <div className="page-actions" style={{ display: 'flex', gap: 10 }}>
+        <div className="page-actions events-page-actions">
           <button 
             type="button" 
             onClick={onManagePolicies}
-            className="btn btn-outline"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontWeight: 700 }}
+            className="btn btn-outline events-action-policy"
           >
             <Building2 size={16} /> Políticas de ambientes
           </button>
           <button 
             type="button" 
             onClick={onCreateEvent}
-            className="btn btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', fontWeight: 800 }}
+            className="btn btn-primary events-action-create"
           >
             <CalendarDays size={16} /> Nuevo evento
           </button>
@@ -162,69 +160,58 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
       </header>
 
       {/* KPI Metric Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1D4ED8' }}>
+      <div className="events-kpi-grid">
+        <div className="card events-kpi-card">
+          <div className="events-kpi-icon events-kpi-icon-calendar">
             <Calendar size={22} />
           </div>
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Eventos Registrados</span>
-            <strong style={{ fontSize: 22, fontWeight: 900, color: '#111827', display: 'block', lineHeight: 1.2 }}>{total}</strong>
+            <span className="events-kpi-label">Eventos Registrados</span>
+            <strong className="events-kpi-value">{total}</strong>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
+        <div className="card events-kpi-card">
+          <div className="events-kpi-icon events-kpi-icon-tentative">
             <Clock size={22} />
           </div>
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tentativos / Pre-reservas</span>
-            <strong style={{ fontSize: 22, fontWeight: 900, color: '#D97706', display: 'block', lineHeight: 1.2 }}>{kpis.tentative}</strong>
+            <span className="events-kpi-label">Tentativos / Pre-reservas</span>
+            <strong className="events-kpi-value events-kpi-value-tentative">{kpis.tentative}</strong>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803D' }}>
+        <div className="card events-kpi-card">
+          <div className="events-kpi-icon events-kpi-icon-progress">
             <PlayCircle size={22} />
           </div>
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En Curso / Montaje</span>
-            <strong style={{ fontSize: 22, fontWeight: 900, color: '#15803D', display: 'block', lineHeight: 1.2 }}>{kpis.inProgress}</strong>
+            <span className="events-kpi-label">En Curso / Montaje</span>
+            <strong className="events-kpi-value events-kpi-value-progress">{kpis.inProgress}</strong>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B45309' }}>
+        <div className="card events-kpi-card">
+          <div className="events-kpi-icon events-kpi-icon-revenue">
             <DollarSign size={22} />
           </div>
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Proyección Ingresos (S/)</span>
-            <strong style={{ fontSize: 20, fontWeight: 900, color: '#92400E', display: 'block', lineHeight: 1.2 }}>{formatMoney(kpis.totalRevenue)}</strong>
+            <span className="events-kpi-label">Proyección Ingresos (S/)</span>
+            <strong className="events-kpi-value events-kpi-value-revenue">{formatMoney(kpis.totalRevenue)}</strong>
           </div>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <section className="card" style={{ padding: '18px 22px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB', marginBottom: 20 }}>
+      <section className="card events-filter-section">
         {/* Row 1: Status Filter Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 14, borderBottom: '1px solid #F3F4F6', marginBottom: 16 }}>
+        <div className="events-status-tabs">
           {STATUS_FILTERS.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => handleStatusChange(tab.key)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 9999,
-                fontSize: 12.5,
-                fontWeight: 700,
-                border: '1px solid',
-                borderColor: selectedStatus === tab.key ? '#1E3A8A' : '#E5E7EB',
-                background: selectedStatus === tab.key ? '#1E3A8A' : '#FFFFFF',
-                color: selectedStatus === tab.key ? '#FFFFFF' : '#475569',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
+              className={`events-status-tab${selectedStatus === tab.key ? ' is-selected' : ''}`}
             >
               {tab.label}
             </button>
@@ -232,22 +219,22 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
         </div>
 
         {/* Row 2: Search, Space Select & Date Range */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr auto', gap: 14, alignItems: 'center' }}>
-          <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: 12 }} />
+        <div className="events-filter-controls">
+          <form onSubmit={handleSearch} className="events-search-form">
+            <Search size={16} color="#94A3B8" className="events-search-icon" />
             <input
               type="text"
               placeholder="Buscar por título, anfitrión, empresa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+              className="events-filter-input events-search-input"
             />
           </form>
 
           <select
             value={selectedSpace}
             onChange={(e) => handleSpaceChange(e.target.value)}
-            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: '#FFFFFF' }}
+            className="events-filter-input"
           >
             <option value="">Todos los Salones</option>
             {spaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -256,7 +243,7 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
           <select
             value={dateFilter}
             onChange={(e) => handleDateFilterChange(e.target.value)}
-            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: '#FFFFFF' }}
+            className="events-filter-input"
           >
             <option value="all">Cualquier Fecha</option>
             <option value="today">Hoy</option>
@@ -267,8 +254,7 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
           <button 
             type="button" 
             onClick={refresh}
-            className="btn btn-outline"
-            style={{ padding: '9px 14px', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+            className="btn btn-outline events-refresh-button"
             title="Recargar eventos"
           >
             <RefreshCw size={14} /> Refrescar
@@ -277,36 +263,36 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
       </section>
 
       {error ? (
-        <div style={{ padding: '14px 18px', background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 12, marginBottom: 20 }}>
+        <div className="events-error-alert">
           {error}
         </div>
       ) : null}
 
       {/* Events List */}
-      <section className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
+      <section className="card events-directory-section">
+        <div className="events-directory-header">
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.06em' }}>Programación Operativa</span>
-            <h3 style={{ fontSize: 17, fontWeight: 900, color: '#111827', margin: '2px 0 0' }}>Eventos Registrados</h3>
+            <span className="events-directory-kicker">Programación Operativa</span>
+            <h3 className="events-directory-title">Eventos Registrados</h3>
           </div>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#64748B' }}>
+          <span className="events-directory-count">
             {total} evento{total === 1 ? '' : 's'} en total
           </span>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#6B7280' }}>
-            <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} />
+          <div className="events-empty-state events-loading-state">
+            <RefreshCw size={24} className="events-loading-icon" />
             <p>Cargando programación de eventos...</p>
           </div>
         ) : events.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#94A3B8' }}>
-            <CalendarDays size={48} color="#CBD5E1" style={{ marginBottom: 12 }} />
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#475569', margin: '0 0 6px' }}>No se encontraron eventos</h3>
-            <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>Modifique los filtros de búsqueda o registre un nuevo evento.</p>
+          <div className="events-empty-state">
+            <CalendarDays size={48} color="#CBD5E1" className="events-empty-icon" />
+            <h3 className="events-empty-title">No se encontraron eventos</h3>
+            <p className="events-empty-copy">Modifique los filtros de búsqueda o registre un nuevo evento.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="events-list">
             {events.map((event) => {
               const status = STATUS_CONFIG[event.status] || { label: event.status, variant: 'neutral', icon: Clock };
               const startDate = new Date(event.startsAt);
@@ -319,64 +305,43 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
               return (
                 <article 
                   key={event.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 20px',
-                    borderRadius: 12,
-                    border: '1px solid #E2E8F0',
-                    background: '#FFFFFF',
-                    transition: 'all 0.15s ease',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
-                  }}
+                  className="events-list-item"
                 >
                   {/* Left: Date Block */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                    <div style={{ 
-                      width: 56, 
-                      height: 58, 
-                      borderRadius: 10, 
-                      background: '#0F172A', 
-                      color: '#FFFFFF', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      textAlign: 'center'
-                    }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#C59D5F', letterSpacing: '0.05em' }}>{monthStr}</span>
-                      <strong style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{dayNum}</strong>
+                  <div className="events-list-main">
+                    <div className="events-date-block">
+                      <span className="events-date-month">{monthStr}</span>
+                      <strong className="events-date-day">{dayNum}</strong>
                     </div>
 
                     {/* Middle: Event Info */}
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div className="events-meta-row">
+                        <span className="events-space-name">
                           {event.space?.name || 'Salón Gran Plaza'}
                         </span>
-                        <span style={{ fontSize: 11, color: '#94A3B8' }}>•</span>
-                        <span style={{ fontSize: 12, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className="events-meta-separator">•</span>
+                        <span className="events-time">
                           <Clock size={12} /> {startTime} - {endTime}
                         </span>
                       </div>
 
-                      <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
+                      <h4 className="events-item-title">
                         {event.title}
                       </h4>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#64748B' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <div className="events-item-details">
+                        <span className="events-inline-detail">
                           <Users size={13} /> {event.attendees || 20} asistentes
                         </span>
                         <span>•</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, color: '#0F172A' }}>
+                        <span className="events-inline-detail events-total-detail">
                           <DollarSign size={13} color="#15803D" /> Total: {formatMoney(Number(event.estimatedAmount || 0))}
                         </span>
                         {event.services && event.services.length > 0 && (
                           <>
                             <span>•</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#D97706' }}>
+                            <span className="events-inline-detail events-services-detail">
                               <UtensilsCrossed size={12} /> {event.services.length} servicio(s)
                             </span>
                           </>
@@ -386,7 +351,7 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
                   </div>
 
                   {/* Right: Status and Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="events-item-actions">
                     <P1Badge variant={status.variant}>
                       {status.label}
                     </P1Badge>
@@ -395,18 +360,7 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
                     <button
                       type="button"
                       onClick={() => setBeoEvent(event)}
-                      className="btn btn-outline"
-                      style={{ 
-                        padding: '6px 12px', 
-                        fontSize: 12, 
-                        fontWeight: 700, 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: 5,
-                        borderColor: '#C59D5F',
-                        color: '#B45309',
-                        background: '#FFFBEB'
-                      }}
+                      className="btn btn-outline events-beo-button"
                       title="Ver e imprimir Orden BEO"
                     >
                       <Printer size={13} /> BEO
@@ -415,8 +369,7 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
                     <button 
                       type="button" 
                       onClick={() => onSelectEvent(event.id)}
-                      className="btn btn-primary"
-                      style={{ padding: '7px 16px', fontSize: 13, fontWeight: 800 }}
+                      className="btn btn-primary events-detail-button"
                     >
                       Ver detalle
                     </button>
@@ -429,26 +382,24 @@ export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies 
 
         {/* Pagination */}
         {!loading && events.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, paddingTop: 16, borderTop: '1px solid #F3F4F6' }}>
-            <span style={{ fontSize: 13, color: '#64748B' }}>
+          <div className="events-pagination">
+            <span className="events-pagination-label">
               Mostrando {events.length} de {total} eventos
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="events-pagination-actions">
               <button 
                 type="button"
-                className="btn btn-outline"
                 disabled={filters.page <= 1} 
                 onClick={() => updateFilters({ page: filters.page - 1 })}
-                style={{ padding: '6px 14px', fontSize: 13 }}
+                className="btn btn-outline events-pagination-button"
               >
                 Anterior
               </button>
               <button 
                 type="button"
-                className="btn btn-outline"
                 disabled={events.length < filters.pageSize} 
                 onClick={() => updateFilters({ page: filters.page + 1 })}
-                style={{ padding: '6px 14px', fontSize: 13 }}
+                className="btn btn-outline events-pagination-button"
               >
                 Siguiente
               </button>

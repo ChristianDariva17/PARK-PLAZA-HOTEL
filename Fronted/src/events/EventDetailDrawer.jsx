@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, 
   Calendar, 
@@ -25,6 +25,7 @@ import { P1Button, P1Badge } from '../components/ui/P1Atoms';
 import { eventsClient } from './eventsClient';
 import { formatMoney } from '../domain/hotelModel.js';
 import { EventBeoModal } from './EventBeoModal';
+import { Drawer } from '../components/ui/Overlay';
 
 const STATUS_CONFIG = {
   draft: { label: 'Borrador', variant: 'neutral', icon: Clock },
@@ -62,22 +63,29 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
-  const fetchEvent = async () => {
+  const fetchEvent = useCallback(async (signal) => {
     try {
       setLoading(true);
-      const ev = await eventsClient.getEventDetail(eventId);
+      const ev = await eventsClient.getEventDetail(eventId, signal);
+      if (signal?.aborted) return;
       setEvent(ev);
       setConfirmDeposit(ev.depositAmount ? Number(ev.depositAmount) : 0);
     } catch (e) {
+      if (signal?.aborted) return;
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
-    if (eventId) fetchEvent();
-  }, [eventId]);
+    const controller = new AbortController();
+    setEvent(null);
+    setError(null);
+    setLoading(Boolean(eventId));
+    if (eventId) fetchEvent(controller.signal);
+    return () => controller.abort();
+  }, [eventId, fetchEvent]);
 
   const handleAction = async (actionFn, ...args) => {
     try {
@@ -136,144 +144,113 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
   const statusInfo = event ? STATUS_CONFIG[event.status] || { label: event.status, variant: 'neutral', icon: Clock } : null;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', justifyContent: 'flex-end', background: 'rgba(2, 6, 23, 0.4)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div 
-        style={{
-          width: '100%',
-          maxWidth: 500,
-          background: '#FFFFFF',
-          height: '100%',
-          boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          flexDirection: 'column',
-          boxSizing: 'border-box'
-        }} 
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Drawer Header */}
-        <div style={{ padding: '22px 26px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F9FAFB' }}>
-          <div>
-            <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.06em' }}>
-              Ficha Operativa de Evento
-            </span>
-            <h2 style={{ fontSize: 18, fontWeight: 900, color: '#1E3A8A', margin: '2px 0 0' }}>
-              Detalle del Salón & Banquetería
-            </h2>
-          </div>
-          <button 
-            type="button" 
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', padding: 6, borderRadius: 8 }}
-          >
-            <X size={20} />
-          </button>
-        </div>
+    <Drawer open={Boolean(eventId)} onClose={onClose} title="Detalle del Salón & Banquetería" description="Ficha Operativa de Evento">
 
         {/* Drawer Body */}
-        <div style={{ padding: '24px 26px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="event-detail-body">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#6B7280', fontSize: 14 }}>
+            <div className="event-detail-loading">
               Cargando detalles del evento...
             </div>
           ) : error ? (
-            <div style={{ padding: 14, background: '#FEE2E2', color: '#B91C1C', borderRadius: 10, fontSize: 13.5 }}>
+            <div className="event-detail-error">
               {error}
             </div>
           ) : event ? (
             <>
               {/* Quarantine Notice */}
               {isQuarantine && (
-                <div style={{ padding: 14, background: '#FEF3C7', border: '1px solid #FDE047', borderRadius: 10, display: 'flex', gap: 10 }}>
+                <div className="event-quarantine-notice">
                   <AlertTriangle size={18} color="#B45309" />
                   <div>
-                    <strong style={{ fontSize: 12.5, color: '#92400E', display: 'block' }}>Identidad en Cuarentena</strong>
-                    <span style={{ fontSize: 12, color: '#B45309' }}>Debe resolver la identidad del titular antes de confirmar o editar.</span>
+                    <strong className="event-quarantine-title">Identidad en Cuarentena</strong>
+                    <span className="event-quarantine-copy">Debe resolver la identidad del titular antes de confirmar o editar.</span>
                   </div>
                 </div>
               )}
 
               {/* Status Pill & Title Card */}
-              <div style={{ padding: '16px 20px', background: '#F9FAFB', borderRadius: 14, border: '1px solid #E5E7EB' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div className="event-detail-card event-detail-card-soft">
+                <div className="event-detail-card-heading">
                   <P1Badge variant={statusInfo.variant}>
                     {statusInfo.label}
                   </P1Badge>
-                  <span style={{ fontSize: 11.5, color: '#6B7280', fontWeight: 600 }}>ID: {event.id?.slice(0, 8)}</span>
+                  <span className="event-detail-id">ID: {event.id?.slice(0, 8)}</span>
                 </div>
-                <h3 style={{ fontSize: 19, fontWeight: 900, color: '#111827', margin: '0 0 6px', lineHeight: 1.3 }}>
+                <h3 className="event-detail-title">
                   {event.title}
                 </h3>
                 {event.description && (
-                  <p style={{ fontSize: 13, color: '#4B5563', margin: 0, lineHeight: 1.4 }}>
+                  <p className="event-detail-description">
                     {event.description}
                   </p>
                 )}
               </div>
 
               {/* Identity & Host */}
-              <div style={{ padding: '16px 20px', background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div className="event-detail-card">
+                <div className="event-detail-section-heading">
                   <UserCheck size={16} color="#D97706" />
-                  <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#1E3A8A' }}>
+                  <span className="event-detail-section-label">
                     Anfitrión / Titular
                   </span>
                 </div>
                 {event.guestId ? (
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#111827' }}>
+                    <div className="event-detail-host">
                       👤 {event.guest?.firstName ? `${event.guest.firstName} ${event.guest.lastName}` : (event.guest?.name || 'Huésped del Hotel')}
                     </div>
                     {event.guest?.documentNumber && (
-                      <span style={{ fontSize: 12, color: '#6B7280', display: 'block', marginTop: 2 }}>
+                      <span className="event-detail-host-document">
                         Doc: {event.guest.documentNumber}
                       </span>
                     )}
                   </div>
                 ) : event.customerAccountId ? (
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#111827' }}>
+                    <div className="event-detail-host">
                       🏢 Cuenta Comercial: {event.customerAccountId}
                     </div>
                   </div>
                 ) : (
-                  <span style={{ fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>Sin titular asignado</span>
+                  <span className="event-detail-unassigned">Sin titular asignado</span>
                 )}
               </div>
 
               {/* Times & Location Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ padding: '14px', background: '#F9FAFB', borderRadius: 12, border: '1px solid #E5E7EB' }}>
-                  <span style={{ fontSize: 11, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, textTransform: 'uppercase' }}>
+              <div className="event-detail-info-grid">
+                <div className="event-detail-info-card">
+                  <span className="event-detail-info-label">
                     <MapPin size={12} color="#D97706" /> Salón / Espacio
                   </span>
-                  <strong style={{ fontSize: 14, color: '#111827', display: 'block', marginTop: 4 }}>
+                  <strong className="event-detail-info-value">
                     {event.space?.name || 'Por asignar'}
                   </strong>
                 </div>
 
-                <div style={{ padding: '14px', background: '#F9FAFB', borderRadius: 12, border: '1px solid #E5E7EB' }}>
-                  <span style={{ fontSize: 11, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="event-detail-info-card">
+                  <span className="event-detail-info-label">
                     <Users size={12} color="#D97706" /> Asistentes
                   </span>
-                  <strong style={{ fontSize: 14, color: '#111827', display: 'block', marginTop: 4 }}>
+                  <strong className="event-detail-info-value">
                     {event.attendees} personas
                   </strong>
                 </div>
 
-                <div style={{ padding: '14px', background: '#F9FAFB', borderRadius: 12, border: '1px solid #E5E7EB' }}>
-                  <span style={{ fontSize: 11, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="event-detail-info-card">
+                  <span className="event-detail-info-label">
                     <Clock size={12} color="#D97706" /> Inicio
                   </span>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block', marginTop: 4 }}>
+                  <strong className="event-detail-info-value event-detail-info-value-small">
                     {new Date(event.startsAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </strong>
                 </div>
 
-                <div style={{ padding: '14px', background: '#F9FAFB', borderRadius: 12, border: '1px solid #E5E7EB' }}>
-                  <span style={{ fontSize: 11, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, textTransform: 'uppercase' }}>
+                <div className="event-detail-info-card">
+                  <span className="event-detail-info-label">
                     <Clock size={12} color="#D97706" /> Fin
                   </span>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block', marginTop: 4 }}>
+                  <strong className="event-detail-info-value event-detail-info-value-small">
                     {new Date(event.endsAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </strong>
                 </div>
@@ -281,18 +258,18 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
 
               {/* Catering Services List */}
               {event.services && event.services.length > 0 && (
-                <div style={{ padding: '16px 20px', background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div className="event-detail-card">
+                  <div className="event-detail-section-heading">
                     <UtensilsCrossed size={16} color="#D97706" />
-                    <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#1E3A8A' }}>
+                    <span className="event-detail-section-label">
                       Servicios & Banquetería Contratados ({event.services.length})
                     </span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="event-detail-services">
                     {event.services.map((s, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#F9FAFB', borderRadius: 8, fontSize: 12.5 }}>
+                      <div key={idx} className="event-detail-service-row">
                         <span><strong>{s.quantity}x</strong> {s.serviceCode}</span>
-                        <strong style={{ color: '#D97706' }}>{s.totalAmount ? formatMoney(Number(s.totalAmount)) : '—'}</strong>
+                        <strong className="event-detail-service-total">{s.totalAmount ? formatMoney(Number(s.totalAmount)) : '—'}</strong>
                       </div>
                     ))}
                   </div>
@@ -300,22 +277,22 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
               )}
 
               {/* Financial Summary Card */}
-              <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FDE047', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="event-detail-financial-card">
                 <div>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', textTransform: 'uppercase' }}>Presupuesto Total</span>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#B45309' }}>
+                  <span className="event-detail-financial-label">Presupuesto Total</span>
+                  <div className="event-detail-financial-total">
                     {formatMoney(Number(event.estimatedAmount || 0))}
                   </div>
                 </div>
                 {event.depositReceivedAmount && Number(event.depositReceivedAmount) > 0 ? (
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#15803D' }}>Adelanto Cobrado ✓</span>
-                    <strong style={{ fontSize: 16, color: '#15803D', display: 'block' }}>{formatMoney(Number(event.depositReceivedAmount))}</strong>
+                  <div className="event-detail-deposit event-detail-deposit-paid">
+                    <span>Adelanto Cobrado ✓</span>
+                    <strong>{formatMoney(Number(event.depositReceivedAmount))}</strong>
                   </div>
                 ) : event.depositAmount && Number(event.depositAmount) > 0 ? (
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#92400E' }}>Adelanto Mínimo</span>
-                    <strong style={{ fontSize: 15, color: '#B45309', display: 'block' }}>{formatMoney(Number(event.depositAmount))}</strong>
+                  <div className="event-detail-deposit event-detail-deposit-minimum">
+                    <span>Adelanto Mínimo</span>
+                    <strong>{formatMoney(Number(event.depositAmount))}</strong>
                   </div>
                 ) : null}
               </div>
@@ -325,12 +302,11 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
 
         {/* Drawer Actions Footer */}
         {event && (
-          <div style={{ padding: '18px 26px', borderTop: '1px solid #E5E7EB', background: '#F9FAFB', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="event-detail-actions">
             {/* Botón Ver Orden BEO / Imprimir */}
             <button 
               type="button" 
-              className="btn btn-outline"
-              style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 13.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 8, borderColor: '#C59D5F', color: '#B45309', background: '#FFFBEB' }}
+              className="btn btn-outline event-detail-action event-detail-action-beo"
               onClick={() => setShowBeoModal(true)}
             >
               <Printer size={16} /> Ver Orden BEO / Imprimir
@@ -339,8 +315,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {!isLocked && !isQuarantine && event.status !== 'cancelled' && event.status !== 'completed' && (
               <button 
                 type="button" 
-                className="btn btn-outline"
-                style={{ width: '100%', justifyContent: 'center', padding: '10px 0', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                className="btn btn-outline event-detail-action"
                 onClick={() => onEdit(event.id)}
                 disabled={actionLoading}
               >
@@ -351,8 +326,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {(event.status === 'draft' || event.status === 'tentative') && !isQuarantine && (
               <button 
                 type="button"
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', fontSize: 14, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                className="btn btn-primary event-detail-action"
                 onClick={() => setShowConfirmModal(true)}
                 disabled={actionLoading}
               >
@@ -363,8 +337,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {event.status === 'confirmed' && (
               <button 
                 type="button" 
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14, fontWeight: 800 }}
+                className="btn btn-primary event-detail-action"
                 onClick={() => handleAction(eventsClient.advanceEvent, 'preparing')} 
                 disabled={actionLoading}
               >
@@ -374,8 +347,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {event.status === 'preparing' && (
               <button 
                 type="button" 
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14, fontWeight: 800 }}
+                className="btn btn-primary event-detail-action"
                 onClick={() => handleAction(eventsClient.advanceEvent, 'start')} 
                 disabled={actionLoading}
               >
@@ -385,8 +357,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {event.status === 'in_progress' && (
               <button 
                 type="button" 
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14, fontWeight: 800 }}
+                className="btn btn-primary event-detail-action"
                 onClick={() => handleAction(eventsClient.advanceEvent, 'complete')} 
                 disabled={actionLoading}
               >
@@ -397,8 +368,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {(event.status === 'draft' || event.status === 'tentative' || event.status === 'confirmed') && (
               <button 
                 type="button" 
-                className="btn btn-danger"
-                style={{ width: '100%', justifyContent: 'center', padding: '9px 0', fontSize: 13, fontWeight: 700 }}
+                className="btn btn-danger event-detail-action"
                 onClick={() => setShowCancelModal(true)}
                 disabled={actionLoading}
               >
@@ -409,8 +379,7 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             {(event.status === 'cancelled' || event.status === 'completed') && (
               <button 
                 type="button" 
-                className="btn btn-outline"
-                style={{ width: '100%', justifyContent: 'center', padding: '9px 0', fontSize: 13, fontWeight: 700 }}
+                className="btn btn-outline event-detail-action"
                 onClick={() => handleAction(eventsClient.archiveEvent)}
                 disabled={actionLoading}
               >
@@ -419,23 +388,21 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
             )}
           </div>
         )}
-      </div>
-
       {/* MODAL: Confirmar Evento & Registrar Pago de Adelanto (Recomendación 2) */}
       {showConfirmModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(2,6,23,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowConfirmModal(false)}>
-          <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 26, width: '100%', maxWidth: 460, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="event-confirm-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div className="event-confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="event-modal-heading">
+              <div className="event-modal-title-group">
                 <ShieldCheck size={22} color="#15803D" />
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827' }}>Confirmar Reserva & Adelanto</h3>
+                <h3 className="event-modal-title">Confirmar Reserva & Adelanto</h3>
               </div>
-              <button type="button" onClick={() => setShowConfirmModal(false)} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 20 }}>✕</button>
+              <button type="button" onClick={() => setShowConfirmModal(false)} className="event-modal-close">✕</button>
             </div>
 
-            <form onSubmit={handleExecuteConfirm} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleExecuteConfirm} className="event-modal-form">
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-form-label">
                   Monto de Adelanto / Garantía Recibido (S/)
                 </label>
                 <input
@@ -444,26 +411,26 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
                   min="0"
                   value={confirmDeposit}
                   onChange={(e) => setConfirmDeposit(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 15, fontWeight: 700, color: '#111827', boxSizing: 'border-box' }}
+                  className="event-form-control event-form-control-amount"
                   required
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-form-label">
                   Método de Pago
                 </label>
                 <select
                   value={confirmPaymentMethod}
                   onChange={(e) => setConfirmPaymentMethod(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13.5, color: '#111827', boxSizing: 'border-box' }}
+                  className="event-form-control"
                 >
                   {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-form-label">
                   Notas / N° Operación Bancaria
                 </label>
                 <input
@@ -471,15 +438,15 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
                   placeholder="Ej: Transf. BCP Op. #982341"
                   value={confirmNotes}
                   onChange={(e) => setConfirmNotes(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, boxSizing: 'border-box' }}
+                  className="event-form-control"
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 10 }}>
-                <button type="button" onClick={() => setShowConfirmModal(false)} className="btn btn-outline" style={{ padding: '10px 18px' }}>
+              <div className="event-modal-actions event-modal-actions-confirm">
+                <button type="button" onClick={() => setShowConfirmModal(false)} className="btn btn-outline event-modal-button">
                   Cancelar
                 </button>
-                <button type="submit" disabled={actionLoading} className="btn btn-primary" style={{ padding: '10px 24px', fontWeight: 800 }}>
+                <button type="submit" disabled={actionLoading} className="btn btn-primary event-modal-button event-modal-button-primary">
                   {actionLoading ? 'Procesando...' : 'Confirmar & Bloquear Salón'}
                 </button>
               </div>
@@ -490,19 +457,19 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
 
       {/* MODAL: Cancelar Evento */}
       {showCancelModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(2,6,23,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowCancelModal(false)}>
-          <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 26, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="event-cancel-overlay" onClick={() => setShowCancelModal(false)}>
+          <div className="event-cancel-modal" onClick={e => e.stopPropagation()}>
+            <div className="event-modal-heading event-modal-heading-cancel">
+              <div className="event-modal-title-group">
                 <XCircle size={22} color="#DC2626" />
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827' }}>Cancelar Evento</h3>
+                <h3 className="event-modal-title">Cancelar Evento</h3>
               </div>
-              <button type="button" onClick={() => setShowCancelModal(false)} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 20 }}>✕</button>
+              <button type="button" onClick={() => setShowCancelModal(false)} className="event-modal-close">✕</button>
             </div>
 
-            <form onSubmit={handleExecuteCancel} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleExecuteCancel} className="event-modal-form">
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-form-label">
                   Motivo de Cancelación *
                 </label>
                 <textarea
@@ -510,16 +477,16 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
                   placeholder="Indique la razón por la cual se cancela este evento..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, boxSizing: 'border-box' }}
+                  className="event-form-control"
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 6 }}>
-                <button type="button" onClick={() => setShowCancelModal(false)} className="btn btn-outline" style={{ padding: '10px 18px' }}>
+              <div className="event-modal-actions event-modal-actions-cancel">
+                <button type="button" onClick={() => setShowCancelModal(false)} className="btn btn-outline event-modal-button">
                   Atrás
                 </button>
-                <button type="submit" disabled={actionLoading} className="btn btn-danger" style={{ padding: '10px 22px', fontWeight: 700 }}>
+                <button type="submit" disabled={actionLoading} className="btn btn-danger event-modal-button event-modal-button-danger">
                   {actionLoading ? 'Cancelando...' : 'Confirmar Cancelación'}
                 </button>
               </div>
@@ -532,6 +499,6 @@ export function EventDetailDrawer({ eventId, onClose, onEdit, onRefresh }) {
       {showBeoModal && (
         <EventBeoModal event={event} onClose={() => setShowBeoModal(false)} />
       )}
-    </div>
+    </Drawer>
   );
 }

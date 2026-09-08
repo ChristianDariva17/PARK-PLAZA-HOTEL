@@ -168,78 +168,71 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
     >
       {createdPO ? (
         /* PRINTABLE FORMAL PURCHASE ORDER VIEW */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="supplier-stack">
           <div 
             id="printable-po" 
-            style={{
-              background: '#FFFFFF',
-              border: '2px solid #1E3A8A',
-              borderRadius: 12,
-              padding: 24,
-              color: '#0F172A',
-              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-            }}
+            className="supplier-card-compact"
           >
             {/* Header / Brand */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1E3A8A', paddingBottom: 14, marginBottom: 16 }}>
+            <div className="supplier-row-muted">
               <div>
-                <span style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.08em' }}>
+                <span className="supplier-text-secondary">
                   HOTEL PARK PLAZA ★★★★★
                 </span>
-                <h2 style={{ fontSize: 20, fontWeight: 900, color: '#1E3A8A', margin: '2px 0' }}>
+                <h2 className="supplier-text-compact">
                   ORDEN DE COMPRA FORMAL
                 </h2>
-                <span style={{ fontSize: 12, color: '#64748B' }}>RUC: 20100458923 · Av. El Sol 450, Cusco - Perú</span>
+                <span className="supplier-text-muted">RUC: 20100458923 · Av. El Sol 450, Cusco - Perú</span>
               </div>
 
-              <div style={{ textAlign: 'right', background: '#F8FAFC', border: '1px solid #CBD5E1', padding: '8px 14px', borderRadius: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', display: 'block' }}>N° DOCUMENTO</span>
-                <strong style={{ fontSize: 16, color: '#1E3A8A', fontFamily: 'monospace' }}>{createdPO.orderNumber}</strong>
-                <span style={{ fontSize: 11, color: '#64748B', display: 'block', marginTop: 2 }}>
+              <div className="supplier-card-muted">
+                <span className="supplier-text-accent">N° DOCUMENTO</span>
+                <strong className="supplier-text-status">{createdPO.orderNumber}</strong>
+                <span className="supplier-text-action">
                   Fecha: {new Date(createdPO.createdAt).toLocaleDateString('es-PE')}
                 </span>
               </div>
             </div>
 
             {/* Supplier & Delivery Info Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 14, background: '#F8FAFC', padding: 14, borderRadius: 8, marginBottom: 16, border: '1px solid #E2E8F0', fontSize: 12.5 }}>
+            <div className="supplier-grid">
               <div>
-                <strong style={{ color: '#1E3A8A', display: 'block', marginBottom: 4, textTransform: 'uppercase', fontSize: 11 }}>PROVEEDOR SELECCIONADO</strong>
-                <div style={{ fontWeight: 800, fontSize: 14 }}>{createdPO.supplier?.legalName}</div>
-                {createdPO.supplier?.tradeName && <div style={{ color: '#64748B' }}>{createdPO.supplier?.tradeName}</div>}
-                <div>RUC: <strong style={{ fontFamily: 'monospace' }}>{createdPO.supplier?.taxId}</strong></div>
+                <strong className="supplier-text-field">PROVEEDOR SELECCIONADO</strong>
+                <div className="supplier-text-content">{createdPO.supplier?.legalName}</div>
+                {createdPO.supplier?.tradeName && <div className="supplier-element">{createdPO.supplier?.tradeName}</div>}
+                <div>RUC: <strong className="supplier-element-secondary">{createdPO.supplier?.taxId}</strong></div>
                 {createdPO.supplier?.contactName && <div>Contacto: {createdPO.supplier?.contactName}</div>}
                 {createdPO.supplier?.email && <div>Email: {createdPO.supplier?.email}</div>}
               </div>
 
               <div>
-                <strong style={{ color: '#1E3A8A', display: 'block', marginBottom: 4, textTransform: 'uppercase', fontSize: 11 }}>CONDICIONES DE ENTREGA</strong>
+                <strong className="supplier-text-field">CONDICIONES DE ENTREGA</strong>
                 <div>Fecha Requerida: <strong>{createdPO.expectedDeliveryDate ? new Date(createdPO.expectedDeliveryDate).toLocaleDateString('es-PE') : 'A convenir'}</strong></div>
                 <div>Moneda: <strong>{createdPO.currency}</strong></div>
                 <div>Lugar: <strong>Almacén Central / Cocina Principal</strong></div>
-                <div>Estado: <strong style={{ color: '#D97706' }}>EMITIDA / PENDIENTE RECEPCIÓN</strong></div>
+                <div>Estado: <strong className="supplier-element-compact">EMITIDA / PENDIENTE RECEPCIÓN</strong></div>
               </div>
             </div>
 
             {/* Items Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, fontSize: 13 }}>
+            <table className="supplier-table">
               <thead>
-                <tr style={{ background: '#1E3A8A', color: '#FFFFFF', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 10px', borderRadius: '6px 0 0 0' }}>Ítem / Insumo</th>
-                  <th style={{ padding: '8px 10px' }}>Unidad</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Cantidad</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Costo Unit.</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', borderRadius: '0 6px 0 0' }}>Subtotal</th>
+                <tr className="supplier-cell">
+                  <th className="supplier-bordered">Ítem / Insumo</th>
+                  <th className="supplier-spaced">Unidad</th>
+                  <th className="supplier-cell-secondary">Cantidad</th>
+                  <th className="supplier-cell-secondary">Costo Unit.</th>
+                  <th className="supplier-cell-compact">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {(createdPO.items || []).map((itm, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #E2E8F0', background: idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
-                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>{itm.name}</td>
-                    <td style={{ padding: '8px 10px', color: '#64748B' }}>{itm.unit}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800 }}>{itm.quantity}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right' }}>S/ {Number(itm.unitCost || 0).toFixed(2)}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#1E3A8A' }}>
+                  <tr key={idx} className="supplier-surface-secondary">
+                    <td className="supplier-text-header">{itm.name}</td>
+                    <td className="supplier-spaced-secondary">{itm.unit}</td>
+                    <td className="supplier-text-footer">{itm.quantity}</td>
+                    <td className="supplier-cell-secondary">S/ {Number(itm.unitCost || 0).toFixed(2)}</td>
+                    <td className="supplier-text-variant-k">
                       S/ {Number(itm.totalCost || 0).toFixed(2)}
                     </td>
                   </tr>
@@ -248,22 +241,22 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
             </table>
 
             {/* Totals & Notes */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
-              <div style={{ flex: 1, fontSize: 12, color: '#64748B', background: '#F8FAFC', padding: 10, borderRadius: 6, border: '1px solid #E2E8F0' }}>
-                <strong style={{ display: 'block', color: '#1E3A8A', marginBottom: 2 }}>Instrucciones / Observaciones:</strong>
+            <div className="supplier-row-accent">
+              <div className="supplier-card-accent">
+                <strong className="supplier-element-muted">Instrucciones / Observaciones:</strong>
                 {createdPO.notes || 'Sin observaciones adicionales.'}
               </div>
 
-              <div style={{ width: 220, fontSize: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+              <div className="supplier-text-variant-l">
+                <div className="supplier-row-status">
                   <span>Subtotal:</span>
                   <strong>S/ {Number(createdPO.subtotal || 0).toFixed(2)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748B' }}>
+                <div className="supplier-row-action">
                   <span>IGV (18%):</span>
                   <span>S/ {Number(createdPO.tax || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '2px solid #1E3A8A', fontSize: 15, fontWeight: 900, color: '#1E3A8A', marginTop: 4 }}>
+                <div className="supplier-row-field">
                   <span>Total {createdPO.currency}:</span>
                   <span>S/ {Number(createdPO.total || 0).toFixed(2)}</span>
                 </div>
@@ -271,32 +264,30 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
             </div>
 
             {/* Signatures */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginTop: 40, paddingTop: 10, textAlign: 'center', fontSize: 11, color: '#64748B' }}>
-              <div style={{ borderTop: '1px solid #94A3B8', paddingTop: 6 }}>
+            <div className="supplier-grid-secondary">
+              <div className="supplier-bordered-secondary">
                 <strong>Gerencia de Alimentos & Bebidas / Compras</strong>
                 <div>Hotel Park Plaza</div>
               </div>
-              <div style={{ borderTop: '1px solid #94A3B8', paddingTop: 6 }}>
+              <div className="supplier-bordered-secondary">
                 <strong>Aceptación & Firma del Proveedor</strong>
                 <div>{createdPO.supplier?.legalName}</div>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <div className="supplier-row-content">
             <button 
               type="button" 
-              className="btn btn-outline"
+              className="btn btn-outline supplier-text-variant-m"
               onClick={() => window.print()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
             >
               <Printer size={15} /> Imprimir / Guardar PDF
             </button>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary supplier-text-variant-n"
               onClick={onClose}
-              style={{ fontWeight: 800 }}
             >
               Cerrar y Volver
             </button>
@@ -304,23 +295,23 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
         </div>
       ) : (
         /* CREATE PURCHASE ORDER FORM */
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '80vh', overflowY: 'auto', paddingRight: 6 }}>
+        <form onSubmit={handleSubmit} className="supplier-stack-secondary">
           {error && (
-            <div style={{ padding: '12px 16px', background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+            <div className="supplier-row-header">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
 
           {/* Supplier Selector */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 12 }}>
+          <div className="supplier-grid-compact">
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 4 }}>
+              <label className="supplier-text-variant-o">
                 Proveedor Destinatario *
               </label>
               <select
                 value={selectedSupplierId}
                 onChange={(e) => setSelectedSupplierId(e.target.value)}
-                style={{ width: '100%', height: 38, borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, color: '#0F172A', outline: 'none' }}
+                className="supplier-text-variant-p"
                 required
               >
                 <option value="">-- Seleccionar Proveedor --</option>
@@ -333,25 +324,25 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 4 }}>
+              <label className="supplier-text-variant-o">
                 Fecha Requerida de Entrega
               </label>
               <input
                 type="date"
                 value={expectedDate}
                 onChange={(e) => setExpectedDate(e.target.value)}
-                style={{ width: '100%', height: 38, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 10px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                className="supplier-text-variant-q"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 4 }}>
+              <label className="supplier-text-variant-o">
                 Moneda de la Orden
               </label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                style={{ width: '100%', height: 38, borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, color: '#0F172A', outline: 'none' }}
+                className="supplier-text-variant-p"
               >
                 <option value="PEN">Soles (PEN - S/)</option>
                 <option value="USD">Dólares (USD - $)</option>
@@ -360,17 +351,17 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
           </div>
 
           {/* Add Insumo Selector */}
-          <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase' }}>
+          <div className="supplier-card-status">
+            <div className="supplier-row-footer">
+              <span className="supplier-text-variant-r">
                 Agregar Insumos de Inventario a la Orden
               </span>
             </div>
             
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div className="supplier-row-variant-k">
               <select
                 id="select-inv-item"
-                style={{ flex: 1, height: 38, borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, padding: '0 10px', outline: 'none' }}
+                className="supplier-text-variant-s"
                 defaultValue=""
                 onChange={(e) => {
                   const itm = inventory.find(i => i.id === e.target.value);
@@ -389,22 +380,22 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
           </div>
 
           {/* Items Table in Editor */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <div className="supplier-bordered-compact">
+            <table className="supplier-table-secondary">
               <thead>
-                <tr style={{ background: '#F1F5F9', color: '#334155', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>
-                  <th style={{ padding: '8px 12px' }}>Insumo</th>
-                  <th style={{ padding: '8px 12px', width: 70 }}>Unidad</th>
-                  <th style={{ padding: '8px 12px', width: 110, textAlign: 'right' }}>Cantidad</th>
-                  <th style={{ padding: '8px 12px', width: 110, textAlign: 'right' }}>Costo Unit. (S/)</th>
-                  <th style={{ padding: '8px 12px', width: 110, textAlign: 'right' }}>Subtotal</th>
-                  <th style={{ padding: '8px 12px', width: 40 }}></th>
+                <tr className="supplier-cell-muted">
+                  <th className="supplier-spaced-compact">Insumo</th>
+                  <th className="supplier-spaced-muted">Unidad</th>
+                  <th className="supplier-cell-accent">Cantidad</th>
+                  <th className="supplier-cell-accent">Costo Unit. (S/)</th>
+                  <th className="supplier-cell-accent">Subtotal</th>
+                  <th className="supplier-spaced-accent"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#94A3B8' }}>
+                    <td colSpan={6} className="supplier-cell-status">
                       No hay insumos añadidos. Seleccione insumos arriba para agregarlos a la orden de compra.
                     </td>
                   </tr>
@@ -412,37 +403,37 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
                   items.map((itm, idx) => {
                     const lineTotal = Number(itm.quantity || 0) * Number(itm.unitCost || 0);
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F172A' }}>{itm.name}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748B' }}>{itm.unit}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <tr key={idx} className="supplier-bordered-muted">
+                        <td className="supplier-text-variant-t">{itm.name}</td>
+                        <td className="supplier-spaced-status">{itm.unit}</td>
+                        <td className="supplier-cell-action">
                           <input
                             type="number"
                             step="0.1"
                             min="0.1"
                             value={itm.quantity}
                             onChange={(e) => updateItemField(idx, 'quantity', e.target.value)}
-                            style={{ width: '100%', height: 32, padding: '0 6px', textAlign: 'right', borderRadius: 6, border: '1px solid #CBD5E1', fontSize: 12.5, fontWeight: 700 }}
+                            className="supplier-text-variant-u"
                           />
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <td className="supplier-cell-action">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
                             value={itm.unitCost}
                             onChange={(e) => updateItemField(idx, 'unitCost', e.target.value)}
-                            style={{ width: '100%', height: 32, padding: '0 6px', textAlign: 'right', borderRadius: 6, border: '1px solid #CBD5E1', fontSize: 12.5 }}
+                            className="supplier-text-variant-v"
                           />
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#1E3A8A' }}>
+                        <td className="supplier-text-variant-w">
                           S/ {lineTotal.toFixed(2)}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <td className="supplier-cell-field">
                           <button
                             type="button"
                             onClick={() => removeItem(idx)}
-                            style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: 2 }}
+                            className="supplier-surface-compact"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -456,28 +447,28 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
           </div>
 
           {/* Subtotal, IGV and Total Summary Card */}
-          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', padding: '12px 18px', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 12, color: '#92400E' }}>
+          <div className="supplier-row-variant-l">
+            <div className="supplier-text-variant-x">
               <span>💡 Al recepcionar la OC, el inventario y Kardex se actualizarán automáticamente.</span>
             </div>
-            <div style={{ textAlign: 'right', display: 'flex', gap: 16 }}>
+            <div className="supplier-row-variant-m">
               <div>
-                <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>Subtotal</span>
+                <span className="supplier-text-variant-y">Subtotal</span>
                 <strong>S/ {subtotal.toFixed(2)}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>IGV (18%)</span>
+                <span className="supplier-text-variant-y">IGV (18%)</span>
                 <strong>S/ {tax.toFixed(2)}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: '#92400E', fontWeight: 800, display: 'block' }}>Total {currency}</span>
-                <strong style={{ fontSize: 16, color: '#B45309' }}>S/ {total.toFixed(2)}</strong>
+                <span className="supplier-text-variant-z">Total {currency}</span>
+                <strong className="supplier-element-variant-i">S/ {total.toFixed(2)}</strong>
               </div>
             </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1E3A8A', marginBottom: 4 }}>
+            <label className="supplier-element-variant-j">
               Instrucciones / Observaciones para el Proveedor
             </label>
             <input
@@ -485,19 +476,18 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ej: Entregar en almacén central..."
-              style={{ width: '100%', height: 38, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13, boxSizing: 'border-box' }}
+              className="supplier-element-variant-k"
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E2E8F0', paddingTop: 14 }}>
+          <div className="supplier-row-variant-n">
             <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+               className="btn btn-primary supplier-element-variant-l"
               disabled={loading || items.length === 0}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, padding: '10px 24px' }}
             >
               <Send size={15} /> {loading ? 'Generando...' : 'Emitir Orden de Compra (OC)'}
             </button>

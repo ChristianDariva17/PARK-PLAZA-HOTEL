@@ -60,22 +60,7 @@ function ClientAvatar({ name }) {
     .join("");
 
   return (
-    <div
-      style={{
-        width: "36px",
-        height: "36px",
-        borderRadius: "50%",
-        background: "var(--color-navy)",
-        color: "var(--color-gold)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontWeight: "600",
-        fontSize: "13px",
-        flexShrink: 0,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-      }}
-    >
+    <div className="customer-table-avatar">
       {initials || "H"}
     </div>
   );
@@ -549,32 +534,15 @@ export default function CustomersView({
               {table.visible.map((client) => (
                 <tr key={client.id}>
                   <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                      }}
-                    >
+                    <div className="customer-table-person">
                       <ClientAvatar name={client.name} />
                       <div>
-                        <strong
-                          style={{
-                            fontSize: "14px",
-                            color: "var(--color-text)",
-                          }}
-                        >
+                        <strong className="customer-table-name">
                           {client.name}
                         </strong>
                         {client.primaryDocument.type === "passport" &&
                         client.nationality ? (
-                          <div
-                            style={{
-                              fontSize: "11px",
-                              color: "var(--color-muted)",
-                              marginTop: "2px",
-                            }}
-                          >
+                          <div className="customer-table-nationality">
                             🌐 Nacionalidad: {client.nationality.toUpperCase()}
                           </div>
                         ) : null}

@@ -25,97 +25,49 @@ export function PetPassModal({ open, onClose, pet, clientName }) {
       title="Pase y Carnet Pet-Friendly"
       description="Credencial digital e impresa de estancia y control sanitario."
     >
-      <div className="pet-pass-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="pet-pass-container">
         <div
           id="pet-printable-pass"
-          style={{
-            border: '2px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '20px',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
+          className="pet-pass-card"
         >
           {/* Decorative luxury header bar */}
           <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '6px',
-              background: 'linear-gradient(90deg, #d97706, #f59e0b, #b45309)',
-            }}
+            className="pet-pass-accent"
           />
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '14px' }}>
+          <div className="pet-pass-header">
             <div>
-              <span style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', color: '#92400e', fontWeight: 700 }}>
+              <span className="pet-pass-kicker">
                 Hotel Park Plaza · Pet-Friendly
               </span>
-              <h2 style={{ margin: '4px 0 0 0', fontSize: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 className="pet-pass-title">
                 <span>{petIcon}</span> {pet.name}
               </h2>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
+              <span className="pet-pass-meta">
                 ID: <strong>{pet.id}</strong> · {pet.type} {pet.breed ? `(${pet.breed})` : ''} · {pet.size}
               </span>
             </div>
-            <div style={{ textAlign: 'center' }}>
+            <div className="pet-pass-qr-column">
               <div
-                style={{
-                  width: '64px',
-                  height: '64px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px dashed #cbd5e1',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '9px',
-                  fontWeight: 600,
-                  color: '#475569',
-                }}
+                className="pet-pass-qr"
               >
-                <div style={{ fontSize: '24px', lineHeight: 1 }}>📱</div>
+                <div className="pet-pass-qr-icon">📱</div>
                 <span>QR Check</span>
               </div>
             </div>
           </div>
 
           {/* Badges Strip */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <div className="pet-pass-badges">
             {pet.vaccinationVerified ? (
               <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: '#dcfce7',
-                  color: '#166534',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                }}
+                className="pet-pass-badge pet-pass-badge-success"
               >
                 <ShieldCheck size={13} /> Vacunas al Día
               </span>
             ) : (
               <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: '#fef3c7',
-                  color: '#92400e',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                }}
+                className="pet-pass-badge pet-pass-badge-warning"
               >
                 <AlertTriangle size={13} /> Vacuna Pendiente
               </span>
@@ -123,17 +75,7 @@ export function PetPassModal({ open, onClose, pet, clientName }) {
 
             {pet.welcomeKitDelivered ? (
               <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: '#f3e8ff',
-                  color: '#6b21a8',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                }}
+                className="pet-pass-badge pet-pass-badge-purple"
               >
                 <HeartHandshake size={13} /> Kit Entregado
               </span>
@@ -141,86 +83,57 @@ export function PetPassModal({ open, onClose, pet, clientName }) {
 
             {pet.temperament ? (
               <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  backgroundColor: '#e0f2fe',
-                  color: '#0369a1',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                }}
+                className="pet-pass-badge pet-pass-badge-info"
               >
                 Carácter: {pet.temperament}
               </span>
             ) : null}
 
             <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                backgroundColor: isStay ? '#f8fafc' : '#ffedd5',
-                color: isStay ? '#334155' : '#c2410c',
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '3px 8px',
-                borderRadius: '6px',
-              }}
+              className={`pet-pass-badge ${isStay ? 'pet-pass-badge-stay' : 'pet-pass-badge-visit'}`}
             >
               {isStay ? `Hab. ${pet.roomId || 'Estadía'}` : 'Visita / Restaurante'}
             </span>
           </div>
 
           {/* Details Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '10px',
-              backgroundColor: '#f8fafc',
-              padding: '12px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              marginBottom: '14px',
-            }}
-          >
+          <div className="pet-pass-details-grid">
             <div>
-              <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Propietario / Responsable:</span>
+              <span className="pet-pass-detail-label">Propietario / Responsable:</span>
               <strong>{owner}</strong>
             </div>
             <div>
-              <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Teléfono de contacto:</span>
+              <span className="pet-pass-detail-label">Teléfono de contacto:</span>
               <strong>{phone}</strong>
             </div>
             <div>
-              <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Ubicación permitida:</span>
+              <span className="pet-pass-detail-label">Ubicación permitida:</span>
               <span>{pet.lodgingPlace || 'Habitación / Zonas autorizadas'}</span>
             </div>
             <div>
-              <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Tarifa aplicada:</span>
+              <span className="pet-pass-detail-label">Tarifa aplicada:</span>
               <strong>{formatMoney(pet.charge || 0)}</strong>
             </div>
             {pet.emergencyContact ? (
-              <div style={{ gridColumn: 'span 2' }}>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Veterinaria de emergencia:</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#0f172a', fontWeight: 500 }}>
+              <div className="pet-pass-detail-wide">
+                <span className="pet-pass-detail-label">Veterinaria de emergencia:</span>
+                <span className="pet-pass-contact">
                   <PhoneCall size={12} /> {pet.emergencyContact}
                 </span>
               </div>
             ) : null}
             {pet.notes ? (
-              <div style={{ gridColumn: 'span 2' }}>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Notas de recepción / comportamiento:</span>
-                <span style={{ fontStyle: 'italic', color: '#334155' }}>"{pet.notes}"</span>
+              <div className="pet-pass-detail-wide">
+                <span className="pet-pass-detail-label">Notas de recepción / comportamiento:</span>
+                <span className="pet-pass-notes">"{pet.notes}"</span>
               </div>
             ) : null}
           </div>
 
           {/* Rules / Policy */}
-          <div style={{ fontSize: '11px', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
-            <strong style={{ color: '#334155', display: 'block', marginBottom: '4px' }}>Normas de Convivencia Pet-Friendly:</strong>
-            <ul style={{ margin: 0, paddingLeft: '16px', lineHeight: 1.4 }}>
+          <div className="pet-pass-rules">
+            <strong className="pet-pass-rules-title">Normas de Convivencia Pet-Friendly:</strong>
+            <ul>
               <li>Mantener con correa en pasillos, elevadores y áreas comunes en todo momento.</li>
               <li>No dejar a la mascota sola en la habitación por periodos prolongados.</li>
               <li>El huésped/dueño asume la responsabilidad de aseo y cuidado de las instalaciones.</li>
@@ -228,15 +141,14 @@ export function PetPassModal({ open, onClose, pet, clientName }) {
           </div>
         </div>
 
-        <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <div className="form-actions pet-pass-actions">
           <button type="button" className="btn btn-outline" onClick={onClose}>
             Cerrar
           </button>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary pet-pass-print-button"
             onClick={handlePrint}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
             <Printer size={15} /> Imprimir Pase (80mm / A4)
           </button>

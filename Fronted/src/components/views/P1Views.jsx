@@ -968,20 +968,12 @@ export function P1CheckInOutView({ notify }) {
                 if (!linkedVehiclesInside.length) return null;
                 return (
                   <div
-                    className="span-2 alert-banner alert-banner-danger"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                      padding: "12px 14px",
-                      borderRadius: "8px",
-                      marginBottom: "4px",
-                    }}
+                    className="span-2 alert-banner alert-banner-danger operations-stack"
                   >
-                    <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <strong className="operations-row">
                       ⚠️ Vehículo(s) aún registrados en cochera:
                     </strong>
-                    <span style={{ fontSize: "12px" }}>
+                    <span className="operations-text">
                       Esta habitación tiene {linkedVehiclesInside.length} vehículo(s) dentro:{" "}
                       <strong>
                         {linkedVehiclesInside
@@ -1797,49 +1789,26 @@ export function P1CleaningView({ notify }) {
 
           return (
             <article
-              className="card operation-card"
+              className="card operation-card operations-bordered"
               key={task.id}
-              style={{
-                padding: "20px",
-                borderRadius: "12px",
-                border: "1px solid var(--color-border)",
-                boxShadow: "var(--shadow-sm)",
-              }}
             >
               <div className="row-between">
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                  className="operations-row-secondary"
                 >
                   <div
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "10px",
-                      background: "var(--color-navy)",
-                      color: "var(--color-gold)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: "700",
-                      fontSize: "16px",
-                      border: "1px solid var(--color-gold-soft)",
-                    }}
+                    className="operations-row-compact"
                   >
                     🧹
                   </div>
                   <div>
                     <span
-                      className="eyebrow"
-                      style={{ fontSize: "11px", color: "var(--color-muted)" }}
+                      className="eyebrow operations-text-secondary"
                     >
                       Tarea #{shortTaskId}
                     </span>
                     <h3
-                      style={{
-                        margin: 0,
-                        fontSize: "16px",
-                        color: "var(--color-text)",
-                      }}
+                      className="operations-text-compact"
                     >
                       {roomLabel}
                     </h3>
@@ -1849,14 +1818,7 @@ export function P1CleaningView({ notify }) {
               </div>
 
               <div
-                style={{
-                  margin: "14px 0",
-                  fontSize: "13px",
-                  color: "var(--color-body)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                }}
+                className="operations-stack-secondary"
               >
                 <div>
                   👤 <strong>Responsable:</strong>{" "}
@@ -1875,19 +1837,11 @@ export function P1CleaningView({ notify }) {
 
               {/* Direct Card Actions (Hybrid Flow) */}
               <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  marginTop: "12px",
-                  flexWrap: "wrap",
-                  borderTop: "1px solid var(--color-border)",
-                  paddingTop: "12px",
-                }}
+                className="operations-stack0"
               >
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
-                  style={{ flex: 1, minWidth: "110px" }}
+                  className="btn btn-sm btn-outline operations-stack1"
                   onClick={() => open(task)}
                 >
                   {isApproved ? "👁️ Ver Auditoría" : "✏️ Gestionar / Fotos"}
@@ -1897,8 +1851,7 @@ export function P1CleaningView({ notify }) {
                   <>
                     <button
                       type="button"
-                      className="btn btn-sm btn-primary"
-                      style={{ minWidth: "95px" }}
+                      className="btn btn-sm btn-primary operations-stack2"
                       onClick={(e) => advanceTaskDirectly(task, e)}
                     >
                       {task.status === "Pendiente"
@@ -1910,13 +1863,7 @@ export function P1CleaningView({ notify }) {
 
                     <button
                       type="button"
-                      className="btn btn-sm btn-outline"
-                      style={{
-                        borderColor: "#d97706",
-                        color: "#92400e",
-                        background: "#fef3c7",
-                        fontWeight: "700",
-                      }}
+                      className="btn btn-sm btn-outline operations-stack3"
                       title="Liberar inmediatamente y marcar habitación disponible en 1 clic"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1948,62 +1895,29 @@ export function P1CleaningView({ notify }) {
             {/* VIEW WHEN ALREADY APPROVED: Clean Audit Summary */}
             {["Aprobada", "approved"].includes(selected.status) ? (
               <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "18px",
-                }}
+                className="operations-stack4"
               >
                 <div
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-                    padding: "20px",
-                    borderRadius: "12px",
-                    color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    boxShadow: "var(--shadow-md)",
-                  }}
+                  className="operations-stack5"
                 >
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                    }}
+                    className="operations-stack6"
                   >
                     <div
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "12px",
-                        background: "rgba(16, 185, 129, 0.2)",
-                        border: "1px solid #10b981",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "24px",
-                      }}
+                      className="operations-stack7"
                     >
                       ✅
                     </div>
                     <div>
                       <h3
-                        style={{ margin: 0, fontSize: "18px", color: "#fff" }}
+                        className="operations-stack8"
                       >
                         Habitación{" "}
                         {selectedRoom ? selectedRoom.number : selected.roomId}{" "}
                         Aprobada y Disponible
                       </h3>
                       <p
-                        style={{
-                          margin: "4px 0 0 0",
-                          fontSize: "12px",
-                          color: "#94a3b8",
-                        }}
+                        className="operations-stack9"
                       >
                         Limpieza certificada e inventario listo para asignación
                         inmediata.
@@ -2011,16 +1925,14 @@ export function P1CleaningView({ notify }) {
                     </div>
                   </div>
                   <span
-                    className="badge badge-green"
-                    style={{ fontSize: "13px", padding: "6px 14px" }}
+                    className="badge badge-green operations-row0"
                   >
                     Disponible
                   </span>
                 </div>
 
                 <div
-                  className="drawer-specs-grid"
-                  style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
+                    className="drawer-specs-grid operations-row1"
                 >
                   <div className="drawer-spec-item">
                     <div className="drawer-spec-icon">👤</div>
@@ -2071,11 +1983,7 @@ export function P1CleaningView({ notify }) {
                       💬 Observaciones de la Limpieza
                     </div>
                     <p
-                      style={{
-                        margin: "4px 0 0 0",
-                        fontSize: "13px",
-                        color: "var(--color-text)",
-                      }}
+                      className="operations-row2"
                     >
                       {selected.observation}
                     </p>
@@ -2083,13 +1991,7 @@ export function P1CleaningView({ notify }) {
                 ) : null}
 
                 <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: "10px",
-                    borderTop: "1px solid var(--color-border)",
-                    paddingTop: "16px",
-                  }}
+                  className="operations-row3"
                 >
                   <button
                     type="button"
@@ -2105,15 +2007,7 @@ export function P1CleaningView({ notify }) {
               <>
                 {/* Status Stepper Pipeline */}
                 <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: "8px",
-                    padding: "12px 16px",
-                    borderRadius: "10px",
-                    background: "var(--color-surface-soft)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  className="operations-row4"
                 >
                   {[
                     {
@@ -2144,26 +2038,7 @@ export function P1CleaningView({ notify }) {
                     return (
                       <div
                         key={step.statusKey}
-                        style={{
-                          textAlign: "center",
-                          padding: "8px 4px",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          fontWeight: isCurrent ? "700" : "500",
-                          background: isCurrent
-                            ? "var(--color-navy)"
-                            : isDone
-                              ? "var(--color-success-soft)"
-                              : "var(--color-surface)",
-                          color: isCurrent
-                            ? "var(--color-gold)"
-                            : isDone
-                              ? "var(--color-success)"
-                              : "var(--color-muted)",
-                          border: isCurrent
-                            ? "1px solid var(--color-gold)"
-                            : "1px solid var(--color-border)",
-                        }}
+                        className="operations-row5"
                       >
                         {step.icon} {step.label}
                       </div>
@@ -2173,16 +2048,7 @@ export function P1CleaningView({ notify }) {
 
                 {/* Room Info Header */}
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background: "var(--color-surface-soft)",
-                    fontSize: "13px",
-                    color: "var(--color-text)",
-                  }}
+                  className="operations-row6"
                 >
                   <div>
                     🛏️{" "}
@@ -2271,37 +2137,20 @@ export function P1CleaningView({ notify }) {
                   </label>
                   {photos.length ? (
                     <div
-                      className="span-2"
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(120px, 1fr))",
-                        gap: "10px",
-                      }}
+                      className="span-2 operations-row7"
                     >
                       {photos.map((photo) => (
                         <figure
                           key={`${photo.fileName}-${photo.size}`}
-                          style={{ margin: 0 }}
+                          className="operations-row8"
                         >
                           <img
                             src={photo.dataUrl}
                             alt={photo.fileName}
-                            style={{
-                              width: "100%",
-                              height: "100px",
-                              objectFit: "cover",
-                              borderRadius: "8px",
-                              border: "1px solid var(--color-border)",
-                            }}
+                            className="operations-row9"
                           />
                           <figcaption
-                            style={{
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              fontSize: "11px",
-                            }}
+                            className="operations-text0"
                           >
                             {photo.fileName}
                           </figcaption>
@@ -2313,15 +2162,7 @@ export function P1CleaningView({ notify }) {
 
                 {/* Action Bar with Express Release Button */}
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                    paddingTop: "14px",
-                    borderTop: "1px solid var(--color-border)",
-                    flexWrap: "wrap",
-                  }}
+                  className="operations-text1"
                 >
                   {canUpdate ? (
                     <button
@@ -2336,23 +2177,12 @@ export function P1CleaningView({ notify }) {
                   )}
 
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
+                    className="operations-text2"
                   >
                     {canProgress ? (
                       <button
                         type="button"
-                        className="btn btn-outline"
-                        style={{
-                          borderColor: "#d97706",
-                          color: "#92400e",
-                          background: "#fef3c7",
-                          fontWeight: "700",
-                          padding: "10px 18px",
-                        }}
+                        className="btn btn-outline operations-text3"
                         title="Aprobar directamente y liberar habitación en 1 clic"
                         onClick={() => expressApprove(selected)}
                       >
@@ -2362,13 +2192,8 @@ export function P1CleaningView({ notify }) {
 
                     {canProgress ? (
                       <button
-                        className="btn btn-primary"
+                        className="btn btn-primary operations-text4"
                         type="button"
-                        style={{
-                          padding: "10px 22px",
-                          fontSize: "14px",
-                          fontWeight: "600",
-                        }}
                         onClick={advance}
                       >
                         {selected.status === "Pendiente"
@@ -2384,32 +2209,16 @@ export function P1CleaningView({ notify }) {
                 {/* Optional Incident Reporting Box */}
                 {canReportIncident ? (
                   <details
-                    style={{
-                      marginTop: "16px",
-                      border: "1px solid var(--color-danger)",
-                      borderRadius: "10px",
-                      background: "var(--color-danger-soft)",
-                      padding: "12px 16px",
-                    }}
+                    className="operations-text5"
                   >
                     <summary
-                      style={{
-                        cursor: "pointer",
-                        fontWeight: "600",
-                        color: "var(--color-danger)",
-                        fontSize: "13px",
-                      }}
+                      className="operations-text6"
                     >
                       ⚠️ Reportar Incidencia Bloqueante (opcional si la
                       habitación presenta daños)
                     </summary>
                     <div
-                      style={{
-                        marginTop: "12px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                      }}
+                      className="operations-text7"
                     >
                       <textarea
                         rows={2}
@@ -2423,8 +2232,7 @@ export function P1CleaningView({ notify }) {
                         }
                       />
                       <button
-                        className="btn btn-danger"
-                        style={{ alignSelf: "flex-end" }}
+                        className="btn btn-danger operations-text8"
                         type="button"
                         onClick={incident}
                       >
@@ -2704,33 +2512,13 @@ function ParkingEditor({ vehicle, onClose, notify }) {
   return (
     <form className="form-grid" onSubmit={submit}>
       <div
-        className="span-2"
-        style={{
-          display: "flex",
-          gap: "8px",
-          padding: "4px",
-          backgroundColor: "var(--color-bg-secondary, #f1f5f9)",
-          borderRadius: "8px",
-          marginBottom: "8px",
-        }}
+        className="span-2 operations-text9"
       >
         <button
           type="button"
           disabled={isEditing}
           onClick={() => setEntryMode("stay")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: 600,
-            fontSize: "13px",
-            cursor: isEditing ? "not-allowed" : "pointer",
-            backgroundColor: entryMode === "stay" ? "#ffffff" : "transparent",
-            color: entryMode === "stay" ? "var(--color-primary, #0f172a)" : "var(--color-text-muted, #64748b)",
-            boxShadow: entryMode === "stay" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-            transition: "all 0.15s ease",
-          }}
+          className="operations-bordered0"
         >
           🏨 Huésped de Habitación
         </button>
@@ -2738,19 +2526,7 @@ function ParkingEditor({ vehicle, onClose, notify }) {
           type="button"
           disabled={isEditing}
           onClick={() => setEntryMode("visitor")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: 600,
-            fontSize: "13px",
-            cursor: isEditing ? "not-allowed" : "pointer",
-            backgroundColor: entryMode === "visitor" ? "#ffffff" : "transparent",
-            color: entryMode === "visitor" ? "var(--color-primary, #0f172a)" : "var(--color-text-muted, #64748b)",
-            boxShadow: entryMode === "visitor" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-            transition: "all 0.15s ease",
-          }}
+          className="operations-bordered1"
         >
           🚗 Cliente Externo / Visita
         </button>
@@ -2920,8 +2696,8 @@ function ParkingEditor({ vehicle, onClose, notify }) {
       </label>
 
       <div className="span-2">
-        <label style={{ display: "block", marginBottom: "6px" }}>Tarifa de estacionamiento</label>
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+        <label className="operations-bordered2">Tarifa de estacionamiento</label>
+        <div className="operations-bordered3">
           <button
             type="button"
             className={`btn btn-sm ${Number(form.fee) === 0 ? "btn-primary" : "btn-outline"}`}
@@ -2951,18 +2727,18 @@ function ParkingEditor({ vehicle, onClose, notify }) {
             Noche Completa (S/ 20)
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 600 }}>Importe personalizado (S/):</span>
+        <div className="operations-bordered4">
+          <span className="operations-bordered5">Importe personalizado (S/):</span>
           <input
             type="number"
             min="0"
             step="0.50"
-            style={{ width: "120px" }}
+            className="operations-bordered6"
             value={form.fee}
             onChange={(event) => setForm({ ...form, fee: event.target.value })}
           />
         </div>
-        <small style={{ color: "var(--color-text-muted, #64748b)", display: "block", marginTop: "4px" }}>
+        <small className="operations-bordered7">
           {entryMode === "stay"
             ? "Se cargará automáticamente al folio de la habitación seleccionada."
             : "Cobro directo en garita / recepción al ingreso o salida."}
@@ -2970,31 +2746,21 @@ function ParkingEditor({ vehicle, onClose, notify }) {
       </div>
 
       <div
-        className="span-2"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 14px",
-          backgroundColor: form.keysLeft ? "#fef3c7" : "var(--color-bg-secondary, #f8fafc)",
-          border: `1px solid ${form.keysLeft ? "#f59e0b" : "var(--color-border, #e2e8f0)"}`,
-          borderRadius: "8px",
-          transition: "all 0.15s ease",
-        }}
+        className="span-2 operations-bordered8"
       >
         <input
           type="checkbox"
           id="parking-keys-left-checkbox"
           checked={form.keysLeft}
           onChange={(event) => setForm({ ...form, keysLeft: event.target.checked })}
-          style={{ width: "18px", height: "18px", cursor: "pointer" }}
+          className="operations-bordered9"
         />
         <label
           htmlFor="parking-keys-left-checkbox"
-          style={{ cursor: "pointer", fontSize: "13px", fontWeight: 600, margin: 0 }}
+          className="operations-row-secondary0"
         >
           🔑 Llaves bajo custodia en recepción
-          <span style={{ display: "block", fontSize: "11px", fontWeight: 400, color: "var(--color-text-muted, #64748b)" }}>
+          <span className="operations-row-secondary1">
             Marcar si el conductor dejó la llave del vehículo para maniobras o seguridad.
           </span>
         </label>
@@ -3109,60 +2875,21 @@ export function P1ParkingView({ notify }) {
         description="Ingreso, visualización gráfica de bahías, salida auditada y tickets de control."
         action={
           <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
+            className="operations-row-secondary2"
           >
             <div
-              style={{
-                display: "flex",
-                borderRadius: "8px",
-                border: "1px solid var(--color-border, #cbd5e1)",
-                overflow: "hidden",
-                backgroundColor: "var(--color-surface, #ffffff)",
-              }}
+              className="operations-row-secondary3"
             >
               <button
                 type="button"
-                style={{
-                  padding: "8px 14px",
-                  border: "none",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  backgroundColor:
-                    viewMode === "map"
-                      ? "var(--color-primary, #0f172a)"
-                      : "transparent",
-                  color:
-                    viewMode === "map" ? "#ffffff" : "var(--color-text, #0f172a)",
-                  transition: "all 0.15s ease",
-                }}
+                className="operations-row-secondary4"
                 onClick={() => setViewMode("map")}
               >
                 🗺️ Mapa Visual
               </button>
               <button
                 type="button"
-                style={{
-                  padding: "8px 14px",
-                  border: "none",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  backgroundColor:
-                    viewMode === "list"
-                      ? "var(--color-primary, #0f172a)"
-                      : "transparent",
-                  color:
-                    viewMode === "list"
-                      ? "#ffffff"
-                      : "var(--color-text, #0f172a)",
-                  transition: "all 0.15s ease",
-                }}
+                className="operations-row-secondary5"
                 onClick={() => setViewMode("list")}
               >
                 📋 Lista de Registros
@@ -3267,29 +2994,14 @@ export function P1ParkingView({ notify }) {
                   <strong>{item.plate}</strong>
                   {item.vehicleColor ? (
                     <span
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--color-text-muted, #64748b)",
-                        marginLeft: "6px",
-                      }}
+                      className="operations-row-secondary6"
                     >
                       ({item.vehicleColor})
                     </span>
                   ) : null}
                   {item.keysLeft ? (
                     <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "2px",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        backgroundColor: "#fef3c7",
-                        color: "#92400e",
-                        padding: "1px 5px",
-                        borderRadius: "4px",
-                        marginLeft: "6px",
-                      }}
+                      className="operations-row-secondary7"
                       title="Llaves bajo custodia en recepción"
                     >
                       🔑 Llaves
@@ -3302,28 +3014,17 @@ export function P1ParkingView({ notify }) {
                   {item.originType === "restaurant" ? (
                     <div>
                       <span
-                        style={{
-                          backgroundColor: "#ffedd5",
-                          color: "#9a3412",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                        }}
+                        className="operations-row-secondary8"
                       >
                         🍴 Restaurante
                       </span>
                       <div
-                        style={{
-                          fontWeight: 500,
-                          fontSize: "12px",
-                          marginTop: "2px",
-                        }}
+                        className="operations-row-secondary9"
                       >
                         {item.driverName || "Cliente externo"}
                       </div>
                       {item.driverPhone ? (
-                        <small style={{ color: "#64748b" }}>
+                        <small className="operations-row-compact0">
                           📞 {item.driverPhone}
                         </small>
                       ) : null}
@@ -3331,28 +3032,17 @@ export function P1ParkingView({ notify }) {
                   ) : item.originType === "event" ? (
                     <div>
                       <span
-                        style={{
-                          backgroundColor: "#f3e8ff",
-                          color: "#6b21a8",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                        }}
+                        className="operations-row-compact1"
                       >
                         🎉 Evento
                       </span>
                       <div
-                        style={{
-                          fontWeight: 500,
-                          fontSize: "12px",
-                          marginTop: "2px",
-                        }}
+                        className="operations-row-compact2"
                       >
                         {item.driverName || "Cliente externo"}
                       </div>
                       {item.driverPhone ? (
-                        <small style={{ color: "#64748b" }}>
+                        <small className="operations-row-compact3">
                           📞 {item.driverPhone}
                         </small>
                       ) : null}
@@ -3361,42 +3051,28 @@ export function P1ParkingView({ notify }) {
                     (!item.stayId && item.driverName) ? (
                     <div>
                       <span
-                        style={{
-                          backgroundColor: "#e0f2fe",
-                          color: "#0369a1",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                        }}
+                        className="operations-row-compact4"
                       >
                         🚗 Visita / Horas
                       </span>
                       <div
-                        style={{
-                          fontWeight: 500,
-                          fontSize: "12px",
-                          marginTop: "2px",
-                        }}
+                        className="operations-row-compact5"
                       >
                         {item.driverName || "Cliente externo"}
                       </div>
                       {item.driverPhone ? (
-                        <small style={{ color: "#64748b" }}>
+                        <small className="operations-row-compact6">
                           📞 {item.driverPhone}
                         </small>
                       ) : null}
                     </div>
                   ) : (
                     <div>
-                      <span style={{ fontWeight: 600, fontSize: "12px" }}>
+                      <span className="operations-row-compact7">
                         Hab. {item.roomId || "—"}
                       </span>
                       <div
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--color-text-muted, #64748b)",
-                        }}
+                        className="operations-row-compact8"
                       >
                         {item.clientId
                           ? selectClientName(state, item.clientId)
@@ -3408,18 +3084,13 @@ export function P1ParkingView({ notify }) {
                   )}
                 </td>
                 <td>
-                  <strong style={{ color: "#0284c7" }}>{item.space}</strong>
+                  <strong className="operations-row-compact9">{item.space}</strong>
                 </td>
                 <td>
                   {formatMoney(item.fee)}
                   {Number(item.fee) === 0 ? (
                     <span
-                      style={{
-                        display: "block",
-                        fontSize: "10px",
-                        color: "#16a34a",
-                        fontWeight: 600,
-                      }}
+                      className="operations-text-secondary0"
                     >
                       Cortesía
                     </span>
@@ -3437,14 +3108,9 @@ export function P1ParkingView({ notify }) {
                   <div className="inline-actions">
                     <button
                       type="button"
-                      className="btn btn-outline"
+                      className="btn btn-outline operations-text-secondary1"
                       title="Imprimir ticket térmico"
                       onClick={() => setTicketModalVehicle(item)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
                     >
                       <Printer size={13} /> Ticket
                     </button>
@@ -3638,33 +3304,13 @@ function PetEditor({ pet, onClose, notify }) {
   return (
     <form className="form-grid" onSubmit={submit}>
       <div
-        className="span-2"
-        style={{
-          display: "flex",
-          gap: "8px",
-          padding: "4px",
-          backgroundColor: "var(--color-bg-secondary, #f1f5f9)",
-          borderRadius: "8px",
-          marginBottom: "8px",
-        }}
+        className="span-2 operations-text-secondary2"
       >
         <button
           type="button"
           disabled={isEditing}
           onClick={() => setEntryMode("stay")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: 600,
-            fontSize: "13px",
-            cursor: isEditing ? "not-allowed" : "pointer",
-            backgroundColor: entryMode === "stay" ? "#ffffff" : "transparent",
-            color: entryMode === "stay" ? "var(--color-primary, #0f172a)" : "var(--color-text-muted, #64748b)",
-            boxShadow: entryMode === "stay" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-            transition: "all 0.15s ease",
-          }}
+          className="operations-text-secondary3"
         >
           🏨 Huésped de Habitación
         </button>
@@ -3672,19 +3318,7 @@ function PetEditor({ pet, onClose, notify }) {
           type="button"
           disabled={isEditing}
           onClick={() => setEntryMode("visitor")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: 600,
-            fontSize: "13px",
-            cursor: isEditing ? "not-allowed" : "pointer",
-            backgroundColor: entryMode === "visitor" ? "#ffffff" : "transparent",
-            color: entryMode === "visitor" ? "var(--color-primary, #0f172a)" : "var(--color-text-muted, #64748b)",
-            boxShadow: entryMode === "visitor" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-            transition: "all 0.15s ease",
-          }}
+          className="operations-text-secondary4"
         >
           🐾 Cliente Externo / Restaurante / Guardería
         </button>
@@ -3852,31 +3486,21 @@ function PetEditor({ pet, onClose, notify }) {
 
       {/* Health, Safety and Kit */}
       <div
-        className="span-2"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 14px",
-          backgroundColor: form.vaccinationVerified ? "#dcfce7" : "var(--color-bg-secondary, #f8fafc)",
-          border: `1px solid ${form.vaccinationVerified ? "#22c55e" : "var(--color-border, #e2e8f0)"}`,
-          borderRadius: "8px",
-          transition: "all 0.15s ease",
-        }}
+        className="span-2 operations-text-secondary5"
       >
         <input
           type="checkbox"
           id="pet-vaccination-checkbox"
           checked={form.vaccinationVerified}
           onChange={(event) => setForm({ ...form, vaccinationVerified: event.target.checked })}
-          style={{ width: "18px", height: "18px", cursor: "pointer" }}
+          className="operations-text-secondary6"
         />
         <label
           htmlFor="pet-vaccination-checkbox"
-          style={{ cursor: "pointer", fontSize: "13px", fontWeight: 600, margin: 0 }}
+          className="operations-text-secondary7"
         >
           🛡️ Carnet de Vacunación y Antirrábica al día verificado
-          <span style={{ display: "block", fontSize: "11px", fontWeight: 400, color: "var(--color-text-muted, #64748b)" }}>
+          <span className="operations-text-secondary8">
             Confirmar que el huésped/dueño exhibió cartilla sanitaria vigente.
           </span>
         </label>
@@ -3905,31 +3529,21 @@ function PetEditor({ pet, onClose, notify }) {
       </label>
 
       <div
-        className="span-2"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 14px",
-          backgroundColor: form.welcomeKitDelivered ? "#f3e8ff" : "var(--color-bg-secondary, #f8fafc)",
-          border: `1px solid ${form.welcomeKitDelivered ? "#a855f7" : "var(--color-border, #e2e8f0)"}`,
-          borderRadius: "8px",
-          transition: "all 0.15s ease",
-        }}
+        className="span-2 operations-text-secondary9"
       >
         <input
           type="checkbox"
           id="pet-welcome-kit-checkbox"
           checked={form.welcomeKitDelivered}
           onChange={(event) => setForm({ ...form, welcomeKitDelivered: event.target.checked })}
-          style={{ width: "18px", height: "18px", cursor: "pointer" }}
+          className="operations-text-compact0"
         />
         <label
           htmlFor="pet-welcome-kit-checkbox"
-          style={{ cursor: "pointer", fontSize: "13px", fontWeight: 600, margin: 0 }}
+          className="operations-text-compact1"
         >
           🎁 Kit de Bienvenida entregado
-          <span style={{ display: "block", fontSize: "11px", fontWeight: 400, color: "var(--color-text-muted, #64748b)" }}>
+          <span className="operations-text-compact2">
             Marcar si se entregó la camita de cortesía, plato, snack gourmet y bolsas biodegradables.
           </span>
         </label>
@@ -3937,8 +3551,8 @@ function PetEditor({ pet, onClose, notify }) {
 
       {/* Quick Rate Strip */}
       <div className="span-2">
-        <label style={{ display: "block", marginBottom: "6px" }}>Tarifa de hospedaje / servicio de mascota</label>
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+        <label className="operations-text-compact3">Tarifa de hospedaje / servicio de mascota</label>
+        <div className="operations-text-compact4">
           <button
             type="button"
             className={`btn btn-sm ${Number(form.charge) === 0 ? "btn-primary" : "btn-outline"}`}
@@ -3968,19 +3582,19 @@ function PetEditor({ pet, onClose, notify }) {
             Spa / Limpieza Ozono (S/ 50)
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 600 }}>Importe personalizado (S/):</span>
+        <div className="operations-text-compact5">
+          <span className="operations-text-compact6">Importe personalizado (S/):</span>
           <input
             type="number"
             min="0"
             step="1.00"
             disabled={isEditing}
-            style={{ width: "120px" }}
+            className="operations-text-compact7"
             value={form.charge}
             onChange={(event) => setForm({ ...form, charge: event.target.value })}
           />
         </div>
-        <small style={{ color: "var(--color-text-muted, #64748b)", display: "block", marginTop: "4px" }}>
+        <small className="operations-text-compact8">
           {entryMode === "stay"
             ? "Se cargará una sola vez al folio de la estadía seleccionada."
             : "Cobro directo en recepción o caja de restaurante / guardería."}
@@ -4182,22 +3796,15 @@ export function P1PetsView({ notify }) {
 
             return (
               <article
-                className="card"
+                className="card operations-text-compact9"
                 key={pet.id}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "10px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--color-border, #e2e8f0)",
-                }}
               >
                 <div className="row-between">
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "28px" }}>{petIcon}</span>
+                  <div className="operations-stack-secondary0">
+                    <span className="operations-stack-secondary1">{petIcon}</span>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "16px" }}>{pet.name}</h3>
-                      <small style={{ color: "var(--color-text-muted, #64748b)" }}>
+                      <h3 className="operations-stack-secondary2">{pet.name}</h3>
+                      <small className="operations-stack-secondary3">
                         {pet.type} {pet.breed ? `· ${pet.breed}` : ""} · {pet.size}
                       </small>
                     </div>
@@ -4206,83 +3813,48 @@ export function P1PetsView({ notify }) {
                 </div>
 
                 {/* Badges Strip */}
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                <div className="operations-stack-secondary4">
                   {pet.vaccinationVerified ? (
                     <span
-                      style={{
-                        backgroundColor: "#dcfce7",
-                        color: "#166534",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                      }}
+                      className="operations-stack-secondary5"
                     >
                       🛡️ Vacunas OK
                     </span>
                   ) : (
                     <span
-                      style={{
-                        backgroundColor: "#fef3c7",
-                        color: "#92400e",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                      }}
+                      className="operations-stack-secondary6"
                     >
                       ⚠️ Vacuna Pendiente
                     </span>
                   )}
                   {pet.welcomeKitDelivered ? (
                     <span
-                      style={{
-                        backgroundColor: "#f3e8ff",
-                        color: "#6b21a8",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                      }}
+                      className="operations-stack-secondary7"
                     >
                       🎁 Kit Entregado
                     </span>
                   ) : null}
                   <span
-                    style={{
-                      backgroundColor: isStay ? "#f1f5f9" : "#ffedd5",
-                      color: isStay ? "#334155" : "#c2410c",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                    }}
+                    className="operations-stack-secondary8"
                   >
                     {isStay ? `🏨 Habitación` : "🐾 Visita / Restaurante"}
                   </span>
                 </div>
 
                 <div
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--color-text, #334155)",
-                    backgroundColor: "var(--color-bg-secondary, #f8fafc)",
-                    padding: "8px 10px",
-                    borderRadius: "6px",
-                    lineHeight: 1.4,
-                  }}
+                  className="operations-stack-secondary9"
                 >
                   <div>
                     <strong>Dueño:</strong> {ownerDisplay}{" "}
                     {pet.ownerPhone ? (
-                      <span style={{ color: "#64748b" }}>({pet.ownerPhone})</span>
+                      <span className="operations-stack00">({pet.ownerPhone})</span>
                     ) : null}
                   </div>
                   <div>
                     <strong>Ubicación:</strong> {pet.lodgingPlace || "Habitación"} ·{" "}
                     <strong>Tarifa:</strong> {formatMoney(pet.charge)}{" "}
                     {Number(pet.charge) === 0 ? (
-                      <span style={{ color: "#16a34a", fontWeight: 600 }}>(Cortesía)</span>
+                      <span className="operations-stack01">(Cortesía)</span>
                     ) : null}
                   </div>
                   {pet.temperament ? (
@@ -4292,12 +3864,11 @@ export function P1PetsView({ notify }) {
                   ) : null}
                 </div>
 
-                <div className="inline-actions" style={{ marginTop: "auto", flexWrap: "wrap" }}>
+                <div className="inline-actions operations-stack02">
                   <button
                     type="button"
-                    className="btn btn-outline"
+                    className="btn btn-outline operations-stack03"
                     onClick={() => setPassPet(pet)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
                   >
                     🎫 Pase Pet-Friendly
                   </button>
@@ -4402,38 +3973,23 @@ function AmenityIdentityDialog({ reservation, onClose, notify, reload }) {
   };
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: "16px" }}>
+    <form className="form-grid operations-stack04" onSubmit={submit}>
       <div
-        className="span-2"
-        style={{
-          background: "#f8fafc",
-          padding: "12px 16px",
-          borderRadius: "12px",
-          border: "1px solid #e2e8f0",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        className="span-2 operations-stack05"
       >
         <div>
           <span
-            style={{
-              fontSize: "11px",
-              textTransform: "uppercase",
-              color: "#64748b",
-              fontWeight: "700",
-              letterSpacing: "0.05em",
-            }}
+            className="operations-stack06"
           >
             Zona Reservada
           </span>
           <div
-            style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a" }}
+            className="operations-stack07"
           >
             {reservation.amenityType} · #{reservation.id.slice(0, 8)}
           </div>
         </div>
-        <div style={{ textAlign: "right", fontSize: "12px", color: "#64748b" }}>
+        <div className="operations-stack08">
           {reservation.pax} persona(s)
         </div>
       </div>
@@ -4446,7 +4002,7 @@ function AmenityIdentityDialog({ reservation, onClose, notify, reload }) {
           placeholder="Ej. 74859632"
           value={documentNumber}
           onChange={(e) => setDocumentNumber(e.target.value)}
-          style={{ height: "42px", borderRadius: "10px", fontSize: "14px" }}
+          className="operations-stack09"
         />
       </label>
       <label>
@@ -4456,17 +4012,12 @@ function AmenityIdentityDialog({ reservation, onClose, notify, reload }) {
           placeholder="Nombre y Apellido"
           value={customerName}
           onChange={(e) => setCustomerName(e.target.value)}
-          style={{ height: "42px", borderRadius: "10px", fontSize: "14px" }}
+          className="operations-stack10"
         />
       </label>
 
       <div
-        className="form-actions span-2"
-        style={{
-          borderTop: "1px solid #e2e8f0",
-          paddingTop: "14px",
-          marginTop: "4px",
-        }}
+        className="form-actions span-2 operations-stack11"
       >
         <button
           type="button"
@@ -4572,35 +4123,21 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
   const isPiscina = reservation.amenityType === "Piscina";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+    <div className="operations-stack12">
       {loading ? (
         <div
-          style={{
-            padding: "36px 20px",
-            textAlign: "center",
-            color: "#64748b",
-          }}
+          className="operations-stack13"
         >
           <div
-            style={{
-              display: "inline-block",
-              width: "28px",
-              height: "28px",
-              border: "3px solid #cbd5e1",
-              borderTopColor: "#0f172a",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              marginBottom: "12px",
-            }}
+            className="operations-stack14"
           ></div>
-          <p style={{ margin: 0, fontSize: "13px", fontWeight: "500" }}>
+          <p className="operations-stack15">
             Cargando cuenta y consumos...
           </p>
         </div>
       ) : error ? (
         <div
-          className="alert-banner alert-banner-danger"
-          style={{ borderRadius: "12px" }}
+          className="alert-banner alert-banner-danger operations-stack16"
         >
           {error}
         </div>
@@ -4608,50 +4145,30 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
         <>
           {/* Card Resumen de la Zona & Titular */}
           <div
-            style={{
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "16px",
-              padding: "16px 18px",
-            }}
+            className="operations-stack17"
           >
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "12px",
-              }}
+              className="operations-stack18"
             >
               <div
-                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                className="operations-stack19"
               >
-                <span style={{ fontSize: "24px" }}>
+                <span className="operations-stack20">
                   {isPiscina ? "🏊" : "🌄"}
                 </span>
                 <div>
                   <h3
-                    style={{
-                      margin: 0,
-                      fontSize: "16px",
-                      fontWeight: "800",
-                      color: "#0f172a",
-                    }}
+                    className="operations-stack21"
                   >
                     {reservation.amenityType}
                   </h3>
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  <span className="operations-stack22">
                     Reserva #{reservation.id.slice(0, 8)}
                   </span>
                 </div>
               </div>
               <span
-                className={`badge ${isPaid ? "badge-green" : "badge-yellow"}`}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "11px",
-                  borderRadius: "20px",
-                }}
+                className={`badge ${isPaid ? "badge-green" : "badge-yellow"} operations-stack23`}
               >
                 {isPaid ? "✓ Liquidado en Caja" : "● Cuenta Abierta"}
               </span>
@@ -4660,23 +4177,11 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
             {/* Inputs de Identidad del Titular */}
             {!isPaid ? (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "12px",
-                  paddingTop: "10px",
-                  borderTop: "1px solid #e2e8f0",
-                }}
+                className="operations-stack24"
               >
                 <div>
                   <label
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      color: "#475569",
-                      marginBottom: "4px",
-                    }}
+                    className="operations-stack25"
                   >
                     DNI / Documento *
                   </label>
@@ -4684,26 +4189,12 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                     placeholder="Ej. 74859632"
                     value={documentNumber}
                     onChange={(e) => setDocumentNumber(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "38px",
-                      borderRadius: "8px",
-                      border: "1px solid #cbd5e1",
-                      padding: "0 10px",
-                      fontSize: "13px",
-                      background: "#fff",
-                    }}
+                    className="operations-stack26"
                   />
                 </div>
                 <div>
                   <label
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      color: "#475569",
-                      marginBottom: "4px",
-                    }}
+                    className="operations-stack27"
                   >
                     Nombre del Titular
                   </label>
@@ -4711,28 +4202,13 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                     placeholder="Nombre completo"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "38px",
-                      borderRadius: "8px",
-                      border: "1px solid #cbd5e1",
-                      padding: "0 10px",
-                      fontSize: "13px",
-                      background: "#fff",
-                    }}
+                    className="operations-stack28"
                   />
                 </div>
               </div>
             ) : (
               <div
-                style={{
-                  display: "flex",
-                  gap: "20px",
-                  paddingTop: "10px",
-                  borderTop: "1px solid #e2e8f0",
-                  fontSize: "12.5px",
-                  color: "#334155",
-                }}
+                className="operations-stack29"
               >
                 <div>
                   <strong>Titular:</strong> {customerName || "No registrado"}
@@ -4749,27 +4225,17 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
 
           {/* Desglose Limpio de Conceptos */}
           <div
-            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            className="operations-stack30"
           >
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
+              className="operations-stack31"
             >
               <span
-                style={{
-                  fontSize: "12px",
-                  fontWeight: "800",
-                  textTransform: "uppercase",
-                  color: "#475569",
-                  letterSpacing: "0.04em",
-                }}
+                className="operations-stack32"
               >
                 Desglose de Consumos
               </span>
-              <span style={{ fontSize: "12px", color: "#64748b" }}>
+              <span className="operations-stack33">
                 {tabData.orders?.length
                   ? `${tabData.orders.length} comanda(s) asociada(s)`
                   : "Solo tarifa de acceso"}
@@ -4777,62 +4243,33 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
             </div>
 
             <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                overflow: "hidden",
-                background: "#fff",
-              }}
+              className="operations-stack34"
             >
               {/* Tarifa de Entrada */}
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 16px",
-                  borderBottom: tabData.orders?.length
-                    ? "1px solid #f1f5f9"
-                    : "none",
-                }}
+                className="operations-stack35"
               >
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                  className="operations-stack36"
                 >
                   <div
-                    style={{
-                      width: "32px",
-                      height: "32px",
-                      borderRadius: "8px",
-                      background: "#f1f5f9",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "15px",
-                    }}
+                    className="operations-stack37"
                   >
                     🎟️
                   </div>
                   <div>
                     <div
-                      style={{
-                        fontSize: "13.5px",
-                        fontWeight: "700",
-                        color: "#0f172a",
-                      }}
+                      className="operations-stack38"
                     >
                       Entrada / Alquiler {reservation.amenityType}
                     </div>
-                    <div style={{ fontSize: "11.5px", color: "#64748b" }}>
+                    <div className="operations-stack39">
                       Acceso a zona recreativa ({reservation.pax} personas)
                     </div>
                   </div>
                 </div>
                 <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "700",
-                    color: "#0f172a",
-                  }}
+                  className="operations-stack40"
                 >
                   {formatMoney(Number(tabData.entryPrice))}
                 </div>
@@ -4842,57 +4279,27 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
               {tabData.orders?.map((order) => (
                 <div
                   key={order.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    padding: "12px 16px",
-                    borderBottom: "1px solid #f1f5f9",
-                    background: "#fafafa",
-                  }}
+                  className="operations-stack41"
                 >
-                  <div style={{ display: "flex", gap: "10px" }}>
+                  <div className="operations-stack42">
                     <div
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        background: "#fef3c7",
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: "15px",
-                        color: "#b45309",
-                        flexShrink: 0,
-                      }}
+                      className="operations-stack43"
                     >
                       🍽️
                     </div>
                     <div>
                       <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: "700",
-                          color: "#0f172a",
-                        }}
+                        className="operations-stack44"
                       >
                         Comanda #{order.id.slice(0, 6)}
                         <span
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: "500",
-                            color: "#64748b",
-                          }}
+                          className="operations-stack45"
                         >
                           {formatDateTime(order.createdAt)}
                         </span>
                       </div>
                       <div
-                        style={{
-                          fontSize: "12px",
-                          color: "#475569",
-                          marginTop: "3px",
-                        }}
+                        className="operations-stack46"
                       >
                         {order.items?.map((item, idx) => (
                           <span key={item.id}>
@@ -4907,12 +4314,7 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                       </div>
                       {order.comment ? (
                         <div
-                          style={{
-                            fontSize: "11px",
-                            color: "#b45309",
-                            marginTop: "2px",
-                            fontStyle: "italic",
-                          }}
+                          className="operations-stack47"
                         >
                           Nota: {order.comment}
                         </div>
@@ -4920,13 +4322,7 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                     </div>
                   </div>
                   <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "700",
-                      color: "#0f172a",
-                      textAlign: "right",
-                      flexShrink: 0,
-                    }}
+                    className="operations-stack48"
                   >
                     {formatMoney(Number(order.total))}
                   </div>
@@ -4937,46 +4333,23 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
 
           {/* Banner Total Destacado */}
           <div
-            style={{
-              background: "#f8fafc",
-              border: "2px solid #e2e8f0",
-              borderRadius: "16px",
-              padding: "16px 20px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
+            className="operations-stack49"
           >
             <div>
               <span
-                style={{
-                  fontSize: "11.5px",
-                  color: "#64748b",
-                  display: "block",
-                  marginBottom: "2px",
-                }}
+                className="operations-stack50"
               >
                 Entrada {formatMoney(Number(tabData.entryPrice))} + Consumos{" "}
                 {formatMoney(Number(tabData.consumptionsTotal))}
               </span>
               <strong
-                style={{
-                  fontSize: "15px",
-                  color: "#0f172a",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                }}
+                className="operations-stack51"
               >
                 Total a Liquidar:
               </strong>
             </div>
             <div
-              style={{
-                fontSize: "26px",
-                fontWeight: "900",
-                color: "#0f172a",
-                letterSpacing: "-0.02em",
-              }}
+              className="operations-stack52"
             >
               {formatMoney(Number(tabData.totalAmount))}
             </div>
@@ -4985,32 +4358,16 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
           {/* Selector de Método de Pago y Acciones */}
           {!isPaid ? (
             <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "14px",
-                borderTop: "1px solid #e2e8f0",
-                paddingTop: "16px",
-              }}
+              className="operations-stack53"
             >
               <div>
                 <label
-                  style={{
-                    display: "block",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    color: "#475569",
-                    marginBottom: "8px",
-                  }}
+                  className="operations-stack54"
                 >
                   Seleccione Método de Pago en Caja:
                 </label>
                 <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))",
-                    gap: "8px",
-                  }}
+                  className="operations-stack55"
                 >
                   {paymentOptions.map((opt) => {
                     const isSelected = paymentMethod === opt.id;
@@ -5019,29 +4376,9 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                         key={opt.id}
                         type="button"
                         onClick={() => setPaymentMethod(opt.id)}
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "4px",
-                          padding: "10px 6px",
-                          borderRadius: "12px",
-                          border: isSelected
-                            ? "2px solid #0f172a"
-                            : "1px solid #cbd5e1",
-                          background: isSelected ? "#0f172a" : "#fff",
-                          color: isSelected ? "#fff" : "#1e293b",
-                          fontWeight: isSelected ? "700" : "600",
-                          fontSize: "12px",
-                          cursor: "pointer",
-                          transition: "all 150ms ease",
-                          boxShadow: isSelected
-                            ? "0 4px 12px rgba(15,23,42,0.15)"
-                            : "none",
-                        }}
+                        className="operations-stack56"
                       >
-                        <span style={{ fontSize: "16px" }}>{opt.icon}</span>
+                        <span className="operations-stack57">{opt.icon}</span>
                         <span>{opt.label}</span>
                       </button>
                     );
@@ -5050,12 +4387,7 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
               </div>
 
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "10px",
-                  marginTop: "6px",
-                }}
+                className="operations-stack58"
               >
                 <button
                   type="button"
@@ -5067,15 +4399,9 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary operations-stack59"
                   onClick={handleSettle}
                   disabled={settling}
-                  style={{
-                    minWidth: "220px",
-                    fontSize: "13.5px",
-                    padding: "10px 20px",
-                    borderRadius: "12px",
-                  }}
                 >
                   {settling
                     ? "Registrando en caja..."
@@ -5085,12 +4411,7 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
             </div>
           ) : (
             <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                borderTop: "1px solid #e2e8f0",
-                paddingTop: "14px",
-              }}
+              className="operations-stack60"
             >
               <button
                 type="button"
@@ -5238,139 +4559,89 @@ export function P1RecreationView({ notify }) {
       />
 
       {/* Tarjetas de Aforo en Tiempo Real (Estilo Sistema Park Plaza) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+      <div className="operations-stack61">
         {/* Card Piscina */}
-        <div style={{
-          position: "relative",
-          padding: "24px",
-          borderRadius: "var(--radius-lg, 16px)",
-          background: "linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          border: "1px solid rgba(226, 232, 240, 0.8)",
-          boxShadow: "var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))",
-          overflow: "hidden",
-          transition: "transform 0.3s ease, box-shadow 0.3s ease"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div className="kpi-icon-circle tone-blue" style={{ width: "44px", height: "44px", borderRadius: "12px" }}>
+        <div className="operations-stack62">
+          <div className="operations-stack63">
+            <div className="operations-stack64">
+              <div className="kpi-icon-circle tone-blue operations-stack65">
                 <Waves size={22} />
               </div>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: "750", color: "var(--color-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.055em" }}>
+                <div className="operations-stack66">
                   Control de Aforo
                 </div>
-                <h3 style={{ margin: "2px 0 0 0", fontSize: "18px", fontWeight: "800", color: "var(--color-navy, #0f172a)", fontFamily: "var(--font-serif)" }}>
+                <h3 className="operations-stack67">
                   Piscina Principal
                 </h3>
               </div>
             </div>
-            <span style={{
-              padding: "5px 14px",
-              borderRadius: "999px",
-              fontSize: "12px",
-              fontWeight: "700",
-              background: piscinaOcc.occupancyPercentage >= 90 ? "rgba(239, 68, 68, 0.1)" : piscinaOcc.occupancyPercentage >= 60 ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)",
-              color: piscinaOcc.occupancyPercentage >= 90 ? "#dc2626" : piscinaOcc.occupancyPercentage >= 60 ? "#d97706" : "#059669",
-              border: `1px solid ${piscinaOcc.occupancyPercentage >= 90 ? "rgba(239, 68, 68, 0.25)" : piscinaOcc.occupancyPercentage >= 60 ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)"}`
-            }}>
+            <span className="operations-stack68">
               {piscinaOcc.stateBadge}
             </span>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "10px" }}>
+          <div className="operations-stack69">
             <div>
-              <span style={{ fontSize: "12px", color: "var(--color-muted, #64748b)" }}>Tarifa Day Pass: </span>
-              <strong style={{ fontSize: "13.5px", color: "var(--color-navy, #0f172a)" }}>{formatMoney(piscinaOcc.priceExternal)}</strong>
+              <span className="operations-stack70">Tarifa Day Pass: </span>
+              <strong className="operations-stack71">{formatMoney(piscinaOcc.priceExternal)}</strong>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: "20px", fontWeight: "800", color: "var(--color-navy, #0f172a)", fontFamily: "var(--font-serif)" }}>
+            <div className="operations-stack72">
+              <span className="operations-stack73">
                 {piscinaOcc.currentPax}
               </span>
-              <span style={{ fontSize: "13px", color: "var(--color-muted, #64748b)", fontWeight: "500" }}>
+              <span className="operations-stack74">
                 {" "}de {piscinaOcc.capacity} personas ({piscinaOcc.occupancyPercentage}%)
               </span>
             </div>
           </div>
 
-          <div style={{ width: "100%", height: "10px", borderRadius: "999px", background: "rgba(15, 23, 42, 0.06)", overflow: "hidden" }}>
+          <div className="operations-stack75">
             <div
-              style={{
-                height: "100%",
-                borderRadius: "999px",
-                transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                background: piscinaOcc.occupancyPercentage >= 90 ? "#ef4444" : piscinaOcc.occupancyPercentage >= 60 ? "#f59e0b" : "var(--color-primary, #2563eb)",
-                width: `${Math.min(100, Math.max(0, piscinaOcc.occupancyPercentage))}%`
-              }}
+              className="operations-stack76"
             />
           </div>
         </div>
 
         {/* Card Mirador */}
-        <div style={{
-          position: "relative",
-          padding: "24px",
-          borderRadius: "var(--radius-lg, 16px)",
-          background: "linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          border: "1px solid rgba(226, 232, 240, 0.8)",
-          boxShadow: "var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))",
-          overflow: "hidden",
-          transition: "transform 0.3s ease, box-shadow 0.3s ease"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div className="kpi-icon-circle tone-purple" style={{ width: "44px", height: "44px", borderRadius: "12px" }}>
+        <div className="operations-stack77">
+          <div className="operations-stack78">
+            <div className="operations-stack79">
+              <div className="kpi-icon-circle tone-purple operations-stack80">
                 <Mountain size={22} />
               </div>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: "750", color: "var(--color-muted, #64748b)", textTransform: "uppercase", letterSpacing: "0.055em" }}>
+                <div className="operations-stack81">
                   Control de Aforo
                 </div>
-                <h3 style={{ margin: "2px 0 0 0", fontSize: "18px", fontWeight: "800", color: "var(--color-navy, #0f172a)", fontFamily: "var(--font-serif)" }}>
+                <h3 className="operations-stack82">
                   Mirador Terraza
                 </h3>
               </div>
             </div>
-            <span style={{
-              padding: "5px 14px",
-              borderRadius: "999px",
-              fontSize: "12px",
-              fontWeight: "700",
-              background: miradorOcc.occupancyPercentage >= 90 ? "rgba(239, 68, 68, 0.1)" : miradorOcc.occupancyPercentage >= 60 ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)",
-              color: miradorOcc.occupancyPercentage >= 90 ? "#dc2626" : miradorOcc.occupancyPercentage >= 60 ? "#d97706" : "#059669",
-              border: `1px solid ${miradorOcc.occupancyPercentage >= 90 ? "rgba(239, 68, 68, 0.25)" : miradorOcc.occupancyPercentage >= 60 ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)"}`
-            }}>
+            <span className="operations-stack83">
               {miradorOcc.stateBadge}
             </span>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "10px" }}>
+          <div className="operations-stack84">
             <div>
-              <span style={{ fontSize: "12px", color: "var(--color-muted, #64748b)" }}>Tarifa Day Pass: </span>
-              <strong style={{ fontSize: "13.5px", color: "var(--color-navy, #0f172a)" }}>{formatMoney(miradorOcc.priceExternal)}</strong>
+              <span className="operations-stack85">Tarifa Day Pass: </span>
+              <strong className="operations-stack86">{formatMoney(miradorOcc.priceExternal)}</strong>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: "20px", fontWeight: "800", color: "var(--color-navy, #0f172a)", fontFamily: "var(--font-serif)" }}>
+            <div className="operations-stack87">
+              <span className="operations-stack88">
                 {miradorOcc.currentPax}
               </span>
-              <span style={{ fontSize: "13px", color: "var(--color-muted, #64748b)", fontWeight: "500" }}>
+              <span className="operations-stack89">
                 {" "}de {miradorOcc.capacity} personas ({miradorOcc.occupancyPercentage}%)
               </span>
             </div>
           </div>
 
-          <div style={{ width: "100%", height: "10px", borderRadius: "999px", background: "rgba(15, 23, 42, 0.06)", overflow: "hidden" }}>
+          <div className="operations-stack90">
             <div
-              style={{
-                height: "100%",
-                borderRadius: "999px",
-                transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                background: miradorOcc.occupancyPercentage >= 90 ? "#ef4444" : miradorOcc.occupancyPercentage >= 60 ? "#f59e0b" : "#9333ea",
-                width: `${Math.min(100, Math.max(0, miradorOcc.occupancyPercentage))}%`
-              }}
+              className="operations-stack91"
             />
           </div>
         </div>
@@ -5475,7 +4746,7 @@ export function P1RecreationView({ notify }) {
               <td>
                 <strong>{reservation.amenityType}</strong>
                 <br />
-                <small style={{ color: "var(--text-muted)" }}>
+                <small className="operations-stack92">
                   #{reservation.id.slice(0, 8)}
                 </small>
               </td>
@@ -5483,12 +4754,7 @@ export function P1RecreationView({ notify }) {
                 <strong>{reservation.customerName || "Sin registrar"}</strong>
                 <br />
                 <span
-                  style={{
-                    fontSize: "12px",
-                    color: reservation.documentNumber
-                      ? "var(--text-secondary)"
-                      : "var(--color-danger, #ef4444)",
-                  }}
+                  className="operations-stack93"
                 >
                   {reservation.documentNumber
                     ? `DNI: ${reservation.documentNumber}`
@@ -5507,7 +4773,7 @@ export function P1RecreationView({ notify }) {
               <td>
                 {formatDateTime(reservation.startTime)}
                 <br />
-                <small style={{ color: "var(--text-muted)" }}>
+                <small className="operations-stack94">
                   Hasta {formatDateTime(reservation.endTime)} ·{" "}
                   {reservation.pax} pax
                 </small>
@@ -5516,29 +4782,21 @@ export function P1RecreationView({ notify }) {
               <td>
                 {Number(reservation.consumptionsTotal || 0) > 0 ? (
                   <span
-                    style={{
-                      color: "var(--color-warning, #f59e0b)",
-                      fontWeight: "bold",
-                    }}
+                    className="operations-stack95"
                   >
                     {formatReservationMoney(reservation.consumptionsTotal)}
                     <br />
-                    <small style={{ color: "var(--text-muted)" }}>
+                    <small className="operations-stack96">
                       {reservation.ordersCount} pedido(s)
                     </small>
                   </span>
                 ) : (
-                  <span style={{ color: "var(--text-muted)" }}>S/ 0.00</span>
+                  <span className="operations-stack97">S/ 0.00</span>
                 )}
               </td>
               <td>
                 <strong
-                  style={{
-                    fontSize: "14px",
-                    color: isPaid
-                      ? "var(--color-success, #22c55e)"
-                      : "var(--color-primary, #3b82f6)",
-                  }}
+                  className="operations-stack98"
                 >
                   {formatReservationMoney(
                     reservation.totalAmount || reservation.price,

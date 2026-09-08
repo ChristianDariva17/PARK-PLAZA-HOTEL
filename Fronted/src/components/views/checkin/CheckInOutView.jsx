@@ -87,51 +87,27 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
   };
 
   return (
-    <div className="detail-stack" style={{ gap: 16 }}>
+    <div className="detail-stack checkin-dialog-stack">
       {/* Step Tabs Header */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid #E2E8F0', paddingBottom: 10 }}>
+      <div className="checkin-step-tabs">
         <button
           type="button"
           onClick={() => setStep('validation')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 700,
-            border: 'none',
-            background: step === 'validation' ? '#0F172A' : '#F1F5F9',
-            color: step === 'validation' ? '#F8FAFC' : '#64748B',
-            cursor: 'pointer',
-          }}
+          className={`checkin-step-tab${step === 'validation' ? ' is-active' : ''}`}
         >
           <ShieldCheck size={16} /> 1. Validación y Entrega
         </button>
         <button
           type="button"
           onClick={() => setStep('document')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 700,
-            border: 'none',
-            background: step === 'document' ? '#0F172A' : '#F1F5F9',
-            color: step === 'document' ? '#F8FAFC' : '#64748B',
-            cursor: 'pointer',
-          }}
+          className={`checkin-step-tab${step === 'document' ? ' is-active' : ''}`}
         >
-          <FileCheck size={16} color={guestSignature ? '#16A34A' : '#D4AF37'} /> 2. Documento y Firma Digital
+          <FileCheck size={16} className={guestSignature ? 'checkin-step-icon is-signed' : 'checkin-step-icon'} /> 2. Documento y Firma Digital
         </button>
       </div>
 
       {step === 'validation' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="checkin-dialog-section">
           <DetailGrid items={[
             { label: 'Huésped Principal', value: guest?.name || 'Huésped no disponible' },
             { label: 'Habitación Asignada', value: room ? `Habitación ${room.number} (${room.category || ''})` : 'Habitación no disponible' },
@@ -140,20 +116,20 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
             { label: 'Estado de Reserva', node: <StatusBadge>{reservationStatusToLabel(reservation.status)}</StatusBadge> },
           ]} />
 
-          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 14, borderRadius: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#0F172A', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <ShieldCheck size={16} color="#D4AF37" /> Checklist de Estado Inicial y Entrega de Habitación
+          <div className="checkin-checklist-card">
+            <div className="checkin-checklist-heading">
+              <ShieldCheck size={16} className="checkin-gold-icon" /> Checklist de Estado Inicial y Entrega de Habitación
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12 }}>
+            <div className="checkin-checklist-grid">
               {checklist.map((item) => (
-                <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <label key={item.id} className="checkin-checklist-item">
                   <input
                     type="checkbox"
                     checked={item.checked}
                     onChange={(e) => {
                       setChecklist(checklist.map(c => c.id === item.id ? { ...c, checked: e.target.checked } : c));
                     }}
-                    style={{ accentColor: '#D4AF37' }}
+                    className="checkin-checklist-input"
                   />
                   <span>{item.label}</span>
                 </label>
@@ -165,22 +141,21 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
             ℹ️ Al continuar, se presentará el <strong>Documento Oficial de Condiciones de Estadía y Reconocimiento de Gastos</strong> para ser revisado y firmado digitalmente por el huésped.
           </div>
 
-          <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="form-actions checkin-dialog-actions">
             <button className="btn btn-outline" disabled={busy} onClick={onClose}>Cancelar</button>
             <button
-              className="btn btn-primary"
               disabled={!guest || !room}
               onClick={() => setStep('document')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              className="btn btn-primary checkin-inline-button"
             >
               Continuar a Firma de Documento <ArrowRight size={16} />
             </button>
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="checkin-dialog-section">
           {/* Document Preview */}
-          <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 8, padding: 10, background: '#F8FAFC' }}>
+          <div className="checkin-document-preview">
             <StayConditionsDocument
               reservation={reservation}
               guest={guest}
@@ -194,13 +169,13 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
           </div>
 
           {/* Signature Canvas Box */}
-          <div style={{ background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: 8, padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ fontWeight: 800, fontSize: 13, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <PenTool size={16} color="#D4AF37" /> Firma Digital del Huésped ({guest?.name || 'Titular'})
+          <div className="checkin-signature-card">
+            <div className="checkin-signature-heading-row">
+              <div className="checkin-signature-heading">
+                <PenTool size={16} className="checkin-gold-icon" /> Firma Digital del Huésped ({guest?.name || 'Titular'})
               </div>
               {guestSignature && (
-                <span style={{ color: '#16A34A', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="checkin-signature-status">
                   <CheckCircle2 size={14} /> Firma registrada
                 </span>
               )}
@@ -216,15 +191,14 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
           {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
           {state.stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{state.stayCommandRequest.error}</div> : null}
 
-          <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button className="btn btn-outline" disabled={busy} onClick={() => setStep('validation')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <div className="form-actions checkin-dialog-actions">
+            <button className="btn btn-outline checkin-inline-button" disabled={busy} onClick={() => setStep('validation')}>
               <ArrowLeft size={16} /> Volver a validación
             </button>
             <button
-              className="btn btn-primary"
               disabled={busy || state.stayCommandRequest.retryBlocked || !guest || !room || !guestSignature}
               onClick={submit}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              className="btn btn-primary checkin-inline-button"
             >
               {busy ? 'Confirmando check-in y guardando documento…' : '✓ Confirmar Check-in y Guardar Documento'}
             </button>
@@ -273,35 +247,26 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
   const guestName = guest?.name || (guest?.firstName ? `${guest.firstName} ${guest.lastName || ''}`.trim() : 'Huésped Titular');
 
   return (
-    <div className="detail-stack" style={{ gap: 16 }}>
+    <div className="detail-stack checkout-dialog-stack">
       {/* Top Details Card */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 12,
-        background: '#F8FAFC',
-        padding: '12px 16px',
-        borderRadius: 8,
-        border: '1px solid #E2E8F0',
-        fontSize: 12.5,
-      }}>
+      <div className="checkout-details-card">
         <div>
-          <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, display: 'block' }}>Huésped:</span>
-          <strong style={{ color: '#0F172A', fontSize: 14 }}>{guestName}</strong>
+          <span className="checkout-detail-label">Huésped:</span>
+          <strong className="checkout-detail-value">{guestName}</strong>
         </div>
         <div>
-          <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, display: 'block' }}>Habitación:</span>
-          <strong style={{ color: '#0F172A', fontSize: 14 }}>
+          <span className="checkout-detail-label">Habitación:</span>
+          <strong className="checkout-detail-value">
             {room ? `Hab. ${room.number} (${room.category || 'Estándar'})` : 'No asignada'}
           </strong>
         </div>
         <div>
-          <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, display: 'block' }}>Ingreso:</span>
-          <span style={{ color: '#334155' }}>{formatReservationInstant(stay.checkInAt)}</span>
+          <span className="checkout-detail-label">Ingreso:</span>
+          <span className="checkout-detail-text">{formatReservationInstant(stay.checkInAt)}</span>
         </div>
         <div>
-          <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, display: 'block' }}>N.º Estadía / Reserva:</span>
-          <span style={{ fontFamily: 'monospace', color: '#64748B', fontSize: 12 }}>
+          <span className="checkout-detail-label">N.º Estadía / Reserva:</span>
+          <span className="checkout-detail-reference">
             #{stay.id.slice(0, 8)} · {reservation ? `Res: #${reservation.id.slice(0, 8)}` : 'Directa'}
           </span>
         </div>
@@ -318,25 +283,17 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
 
       {/* Debt / Override Handling Box */}
       {hasDebt ? (
-        <div style={{
-          background: 'rgba(217, 119, 6, 0.05)',
-          border: '1.5px solid #FCD34D',
-          borderRadius: 8,
-          padding: 14,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 13, color: '#B45309' }}>
+        <div className="checkout-debt-card">
+          <div className="checkout-debt-heading">
             <span>⚠️ Saldo pendiente por liquidar: S/ {balanceNumber.toFixed(2)}</span>
           </div>
-          <div style={{ fontSize: 12, color: '#475569' }}>
+          <div className="checkout-debt-description">
             Puedes registrar el pago arriba en el panel de folio, o si el huésped se retira con crédito/pago corporativo diferido, autorizar la salida como <strong>Cuenta por Cobrar (Finanzas)</strong>.
           </div>
 
           {canOverride && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0F172A' }}>
+            <label className="checkout-override-field">
+              <span className="checkout-override-label">
                 Motivo de Cuenta por Cobrar (Requerido para autorizar salida con saldo):
               </span>
               <input
@@ -346,24 +303,13 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
                 placeholder="Ej. Facturación a crédito empresa 15 días, transferencia pendiente de verificación..."
-                style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #CBD5E1', fontSize: 12.5 }}
+                className="checkout-override-input"
               />
             </label>
           )}
         </div>
       ) : (
-        <div style={{
-          background: 'rgba(22, 163, 74, 0.06)',
-          border: '1px solid #86EFAC',
-          borderRadius: 8,
-          padding: '10px 14px',
-          fontSize: 12,
-          color: '#15803D',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontWeight: 700,
-        }}>
+        <div className="checkout-settled-card">
           <span>✓ Cuenta liquidada en su totalidad. La habitación pasará a estado <strong>En Limpieza</strong> al finalizar.</span>
         </div>
       )}
@@ -371,23 +317,15 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
       {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
       {state.stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{state.stayCommandRequest.error}</div> : null}
 
-      <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+      <div className="form-actions checkout-dialog-actions">
         <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose}>
           Cancelar
         </button>
         <button
           type="button"
-          className="btn btn-primary"
           disabled={busy || state.stayCommandRequest.retryBlocked || !room || (hasDebt && !overrideReason.trim())}
           onClick={submit}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 20px',
-            fontWeight: 800,
-            background: hasDebt ? '#D97706' : '#0F172A',
-          }}
+          className={`btn btn-primary checkout-submit-button${hasDebt ? ' is-debt' : ''}`}
         >
           {busy
             ? 'Procesando check-out…'
@@ -459,24 +397,24 @@ export default function CheckInOutView({ notify }) {
           const guest = state.clients.find((item) => item.id === entry.primaryGuestId);
           const room = state.rooms.find((item) => item.id === entry.roomId);
           return (
-            <article className="card operation-card" key={entry.id} style={{ padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.8)', background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.8))', backdropFilter: 'blur(20px)', boxShadow: 'var(--shadow-sm)' }}>
+            <article className="card operation-card checkin-operation-card" key={entry.id}>
               <div className="row-between">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-navy)', color: 'var(--color-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px' }}>
+                <div className="checkin-operation-heading">
+                  <div className="checkin-operation-avatar">
                     {(guest?.name || 'H')[0]}
                   </div>
                   <div>
-                    <span className="eyebrow" style={{ fontSize: '11px', color: 'var(--color-muted)' }}>Reserva {entry.id.slice(0, 8)}</span>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text)' }}>{guest?.name || 'Huésped no disponible'}</h3>
+                    <span className="eyebrow checkin-operation-eyebrow">Reserva {entry.id.slice(0, 8)}</span>
+                    <h3 className="checkin-operation-title">{guest?.name || 'Huésped no disponible'}</h3>
                   </div>
                 </div>
                 <StatusBadge>{reservationStatusToLabel(entry.status)}</StatusBadge>
               </div>
-              <div style={{ margin: '14px 0', fontSize: '13px', color: 'var(--color-body)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div className="checkin-operation-details">
                 <div>🛏️ <strong>Habitación:</strong> {room ? `Hab. ${room.number} (${room.category || 'Estándar'})` : 'No asignada'}</div>
                 <div>📅 <strong>Fecha Check-in:</strong> {formatReservationInstant(entry.checkInAt)}</div>
               </div>
-              <button className="btn btn-primary" style={{ width: '100%' }} disabled={!guest || !room || state.stayCommandRequest.status === 'saving'} onClick={() => setReservationId(entry.id)}>
+              <button className="btn btn-primary checkin-operation-button" disabled={!guest || !room || state.stayCommandRequest.status === 'saving'} onClick={() => setReservationId(entry.id)}>
                 Procesar Check-in
               </button>
             </article>
@@ -495,23 +433,23 @@ export default function CheckInOutView({ notify }) {
         {departures.length ? departures.map((entry) => {
           const room = state.rooms.find((item) => item.id === entry.roomId);
           return (
-            <article className="card operation-card" key={entry.id} style={{ padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.8)', background: 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.8))', backdropFilter: 'blur(20px)', boxShadow: 'var(--shadow-sm)' }}>
+            <article className="card operation-card checkin-operation-card" key={entry.id}>
               <div className="row-between">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'var(--color-navy)', color: 'var(--color-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px', border: '1px solid var(--color-gold-soft)' }}>
+                <div className="checkin-operation-heading">
+                  <div className="checkout-operation-avatar">
                     {room ? room.number : 'Hab'}
                   </div>
                   <div>
-                    <span className="eyebrow" style={{ fontSize: '11px', color: 'var(--color-muted)' }}>Estadía Activa</span>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text)' }}>Habitación {room ? room.number : 'N/A'}</h3>
+                    <span className="eyebrow checkin-operation-eyebrow">Estadía Activa</span>
+                    <h3 className="checkin-operation-title">Habitación {room ? room.number : 'N/A'}</h3>
                   </div>
                 </div>
                 <StatusBadge>Activa</StatusBadge>
               </div>
-              <div style={{ margin: '14px 0', fontSize: '13px', color: 'var(--color-body)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div className="checkin-operation-details">
                 <div>⏱️ <strong>Ingresó:</strong> {formatReservationInstant(entry.checkInAt)}</div>
               </div>
-              <button className="btn btn-primary" style={{ width: '100%' }} disabled={!room || state.stayCommandRequest.status === 'saving'} onClick={() => setStayId(entry.id)}>
+              <button className="btn btn-primary checkin-operation-button" disabled={!room || state.stayCommandRequest.status === 'saving'} onClick={() => setStayId(entry.id)}>
                 Procesar Check-out
               </button>
             </article>

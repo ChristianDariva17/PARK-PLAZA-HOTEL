@@ -20,6 +20,7 @@ import { CashMovementEnhancedForm } from '../../cash/CashMovementEnhancedForm.js
 import { PermissionButton } from '../auth/PermissionButton';
 import { useActionPermission } from '../auth/useActionPermission';
 import { Dialog, Drawer, Tabs, TabPanel } from '../ui/Overlay';
+import { FilterBar } from '../ui/FilterBar';
 import { DataTable, DetailGrid, EmptyState, MetricStrip, PageHeader, SectionHeader, StatusBadge } from './SharedViewParts';
 import { useRestaurantResource } from '../../restaurant/useRestaurantResource';
 import { mapMaintenancePriorityToApi, mapMaintenanceStatusToApi, readMaintenancePhoto } from '../../maintenance/maintenanceModel';
@@ -113,7 +114,7 @@ export function OperationalReservationsView({ notify }) {
 function StatusStepper({ currentStatus, steps }) {
   const currentIndex = steps.indexOf(currentStatus);
   return (
-    <div className="status-stepper-container" style={{ display: 'flex', alignItems: 'center', width: '100%', margin: '14px 0 8px 0', gap: '4px' }}>
+    <div className="status-stepper-container">
       {steps.map((step, idx) => {
         const isCompleted = idx < currentIndex;
         const isActive = idx === currentIndex;
@@ -126,35 +127,12 @@ function StatusStepper({ currentStatus, steps }) {
         }
 
         return (
-          <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: color,
-              zIndex: 2,
-              boxShadow: isActive ? '0 0 0 3px rgba(15, 60, 44, 0.2)' : 'none',
-              transition: 'all 0.2s ease'
-            }} />
+          <div key={step} className={`status-step ${isCompleted ? 'step-completed' : isActive ? 'step-active' : 'step-pending'}`}>
+            <div className={`status-step-dot ${isCompleted ? 'step-dot-completed' : isActive ? 'step-dot-active' : 'step-dot-pending'}`} />
             {idx < steps.length - 1 && (
-              <div style={{
-                position: 'absolute',
-                left: '50%',
-                top: '3px',
-                width: '100%',
-                height: '2px',
-                backgroundColor: isCompleted ? 'var(--color-success)' : 'var(--color-border)',
-                zIndex: 1
-              }} />
+              <div className={`status-step-line step-line-${isCompleted ? 'completed' : 'pending'}`} />
             )}
-            <span style={{
-              fontSize: '9px',
-              fontWeight: isActive ? '700' : '500',
-              color: isActive ? 'var(--color-primary)' : 'var(--color-muted)',
-              marginTop: '4px',
-              textAlign: 'center',
-              whiteSpace: 'nowrap'
-            }}>{step}</span>
+            <span className={`status-step-label step-label-${isActive ? 'active' : 'pending'}`}>{step}</span>
           </div>
         );
       })}
@@ -192,19 +170,7 @@ function PriorityTag({ priority }) {
   }
 
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '4px',
-      padding: '3px 9px',
-      borderRadius: '20px',
-      fontSize: '11px',
-      fontWeight: '700',
-      background: bg,
-      color: color,
-      border: `1px solid ${border}`,
-      letterSpacing: '0.02em',
-    }}>
+    <span className={`priority-tag priority-tag-${norm || 'default'}`}>
       <span>{icon}</span> {priority}
     </span>
   );
@@ -287,37 +253,26 @@ function MaintenanceCreateForm({ onClose, notify }) {
   if (!allowed) return null;
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: '14px' }}>
+    <form className="form-grid maintenance-create-form" onSubmit={submit}>
       {/* Presets Bar */}
-      <div className="span-2" style={{ background: 'var(--color-surface-soft)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--color-border)' }}>
-        <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+      <div className="span-2 maintenance-presets">
+        <div className="maintenance-presets-title">
           Plantillas Rápidas de Avería Frecuente:
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="maintenance-presets-list">
           {COMMON_MAINTENANCE_PRESETS.map((p, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => applyPreset(p)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '16px',
-                fontSize: '11.5px',
-                fontWeight: '600',
-                background: '#fff',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
+             className="maintenance-preset-button">
               {p.label}
             </button>
           ))}
         </div>
       </div>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="maintenance-field">
         <span>Habitación Afectada</span>
         <select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}>
           {state.rooms.map((room) => (
@@ -328,12 +283,12 @@ function MaintenanceCreateForm({ onClose, notify }) {
         </select>
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="maintenance-field">
         <span>Tipo de Avería</span>
         <input required value={form.type} onChange={(event) => set('type', event.target.value)} placeholder="Ej. Climatización, Plomería, Electricidad..." />
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="maintenance-field">
         <span>Nivel de Prioridad & SLA</span>
         <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
           <option value="Baja">🟢 Baja (Atención dentro de 24h)</option>
@@ -343,46 +298,46 @@ function MaintenanceCreateForm({ onClose, notify }) {
         </select>
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="maintenance-field">
         <span>Técnico Responsable</span>
         <input value={form.assignedTo} onChange={(event) => set('assignedTo', event.target.value)} placeholder="Ej: Téc. Carlos Mendoza / Por asignar" />
       </label>
 
-      <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="span-2 maintenance-field">
         <span>Descripción Detallada del Problema</span>
         <textarea required rows={3} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Describa la falla observada, ruidos, fugas o partes averiadas..." />
       </label>
 
-      <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="span-2 maintenance-field">
         <span>Enlace de Evidencia / Documentación (Opcional)</span>
         <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="https://... URL de reporte, foto o manual" />
       </label>
 
-      <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="span-2 maintenance-field">
         <span>Fotografía de la Avería (Adjuntar archivo)</span>
         <input type="file" accept="image/*" onChange={(event) => set('photo', event.target.files?.[0] || null)} />
-        {form.photo ? <small style={{ color: 'var(--color-primary)', fontWeight: '600', marginTop: '4px' }}>Archivo seleccionado: {form.photo.name}</small> : null}
+        {form.photo ? <small className="form-helper">Archivo seleccionado: {form.photo.name}</small> : null}
       </label>
 
-      <div className="span-2" style={{ background: form.severe ? '#fef2f2' : 'var(--color-surface-soft)', border: form.severe ? '1.5px solid #f87171' : '1px solid var(--color-border)', borderRadius: '14px', padding: '14px', transition: 'all 0.2s ease' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
-          <input type="checkbox" checked={form.severe} onChange={(event) => set('severe', event.target.checked)} style={{ width: '18px', height: '18px' }} />
+      <div className={`span-2 maintenance-severe ${form.severe ? 'is-severe' : ''}`}>
+        <label className="maintenance-severe-label">
+          <input type="checkbox" checked={form.severe} onChange={(event) => set('severe', event.target.checked)} className="maintenance-severe-checkbox" />
           <div>
-            <strong style={{ fontSize: '13px', color: form.severe ? '#991b1b' : 'var(--color-text)' }}>
+            <strong className={`maintenance-severe-title ${form.severe ? 'is-severe' : ''}`}>
               🔒 Bloquear Habitación Inmediatamente (Fuera de Servicio)
             </strong>
-            <div style={{ fontSize: '11.5px', color: form.severe ? '#b91c1c' : 'var(--color-muted)', marginTop: '2px' }}>
+            <div className={`maintenance-severe-help ${form.severe ? 'is-severe' : ''}`}>
               La habitación no podrá ser asignada a nuevas reservas hasta que el ticket sea completamente resuelto y cerrado.
             </div>
           </div>
         </label>
       </div>
 
-      <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-        <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose} style={{ padding: '10px 20px', borderRadius: '12px' }}>
+      <div className="form-actions span-2 maintenance-form-actions">
+        <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose}>
           Cancelar
         </button>
-        <button className="btn btn-primary" disabled={busy} style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}>
+        <button className="btn btn-primary" disabled={busy}>
           {busy ? 'Registrando ticket…' : 'Crear Ticket de Mantenimiento'}
         </button>
       </div>
@@ -457,39 +412,39 @@ function MaintenanceManager({ ticket, onClose, notify }) {
   if (!canUpdate && !canProgress) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="maintenance-manager">
       {/* Header Banner */}
-      <div style={{ background: 'linear-gradient(135deg, var(--color-navy), var(--color-navy-deep))', color: '#fff', padding: '16px 20px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '28px' }}>{getMaintenanceTypeIcon(ticket.description)}</span>
+      <div className="maintenance-ticket-header">
+        <div className="maintenance-ticket-heading">
+          <span className="maintenance-ticket-icon">{getMaintenanceTypeIcon(ticket.description)}</span>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <div className="maintenance-ticket-meta">
               Ticket #{ticket.id.slice(0, 8)} · Habitación {ticket.room?.number || ticket.roomId}
             </div>
-            <strong style={{ fontSize: '16px', color: '#fff' }}>{ticket.description.replace(/^\[.*?\]\s*/, '')}</strong>
+            <strong className="maintenance-ticket-title">{ticket.description.replace(/^\[.*?\]\s*/, '')}</strong>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="maintenance-ticket-status">
           <PriorityTag priority={ticket.priority} />
-          <span style={{ background: 'rgba(255,255,255,0.12)', padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: '700', color: '#fff' }}>
+          <span className="maintenance-status-label">
             Estado: {ticket.status}
           </span>
         </div>
       </div>
 
       {/* Progress Stepper */}
-      <div style={{ background: 'var(--color-surface-soft)', padding: '12px 16px', borderRadius: '14px', border: '1px solid var(--color-border)' }}>
+      <div className="maintenance-progress">
         <StatusStepper currentStatus={ticket.status} steps={['Pendiente', 'Asignado', 'En reparación', 'Solucionado', 'Cerrado']} />
       </div>
 
       {/* Form Fields */}
-      <div className="form-grid" style={{ gap: '12px' }}>
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <div className="form-grid maintenance-manager-form">
+        <label className="maintenance-field">
           <span>Técnico Responsable Asignado</span>
           <input value={form.assignedTo} onChange={(event) => set('assignedTo', event.target.value)} placeholder="Nombre del técnico responsable" />
         </label>
 
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="maintenance-field">
           <span>Prioridad del Ticket</span>
           <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
             {['Baja', 'Media', 'Alta', 'Urgente'].map((item) => (
@@ -498,36 +453,36 @@ function MaintenanceManager({ ticket, onClose, notify }) {
           </select>
         </label>
 
-        <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="span-2 maintenance-field">
           <span>Notas de Evidencia / Diagnóstico</span>
           <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="URL de fotos de reparación, informes o notas técnicas" />
         </label>
 
-        <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="span-2 maintenance-field">
           <span>Solución Técnica / Informe de Cierre</span>
           <textarea rows={3} value={form.solution} onChange={(event) => set('solution', event.target.value)} placeholder="Detalle los repuestos cambiados, calibración realizada o motivo de resolución..." />
         </label>
 
         {(ticket.status === 'Solucionado' || ticket.status === 'En reparación' || ticket.status === 'En reparacion') && ticket.blocksRoom ? (
-          <div className="span-2" style={{ background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: '12px', padding: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-              <input type="checkbox" checked={form.releaseRoom} onChange={(event) => set('releaseRoom', event.target.checked)} style={{ width: '16px', height: '16px' }} />
-              <strong style={{ fontSize: '12.5px', color: '#065f46' }}>
+          <div className="span-2 maintenance-release-room">
+            <label className="maintenance-release-label">
+              <input type="checkbox" checked={form.releaseRoom} onChange={(event) => set('releaseRoom', event.target.checked)} className="maintenance-release-checkbox" />
+              <strong>
                 🔓 Liberar habitación y reincorporar al inventario disponible al cerrar ticket
               </strong>
             </label>
           </div>
         ) : null}
 
-        <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="form-actions span-2 maintenance-manager-actions">
           {canUpdate ? (
-            <PermissionButton actionType="MAINTENANCE_UPDATE" className="btn btn-outline" disabled={busy} onClick={save} style={{ padding: '10px 20px', borderRadius: '12px' }}>
+            <PermissionButton actionType="MAINTENANCE_UPDATE" className="btn btn-outline" disabled={busy} onClick={save}>
               {busy ? 'Guardando…' : 'Guardar Cambios'}
             </PermissionButton>
           ) : <div />}
 
           {canProgress && nextAction ? (
-            <PermissionButton actionType={progressActionType} className="btn btn-primary" disabled={busy} onClick={() => progress(nextAction[0])} style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}>
+            <PermissionButton actionType={progressActionType} className="btn btn-primary" disabled={busy} onClick={() => progress(nextAction[0])}>
               {busy ? 'Procesando…' : nextAction[1]}
             </PermissionButton>
           ) : null}
@@ -572,100 +527,6 @@ export function OperationalMaintenanceView({ notify }) {
 
   return (
     <div className="view-container">
-      <style>{`
-        .maintenance-metric-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 14px;
-          margin-bottom: 20px;
-        }
-        .maintenance-metric-card {
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 16px;
-          padding: 16px 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          box-shadow: var(--shadow-sm);
-          transition: all 0.2s ease;
-        }
-        .maintenance-metric-card:hover {
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-card);
-        }
-        .custom-filter-bar {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 14px;
-          background: var(--color-surface);
-          padding: 16px 20px;
-          border-radius: 16px;
-          border: 1px solid var(--color-border);
-          margin-bottom: 20px;
-          align-items: center;
-          box-shadow: var(--shadow-sm);
-        }
-        .custom-filter-bar label {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          font-weight: 700;
-          font-size: 11.5px;
-          color: var(--color-navy-soft);
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-        .custom-filter-bar select, .custom-filter-bar input {
-          padding: 8px 12px;
-          border-radius: 10px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg);
-          font-size: 13px;
-          outline: none;
-          min-width: 170px;
-          transition: all 0.2s ease;
-        }
-        .custom-filter-bar select:focus, .custom-filter-bar input:focus {
-          border-color: var(--color-gold);
-          box-shadow: 0 0 0 3px rgba(197, 157, 95, 0.15);
-        }
-        .maintenance-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-          gap: 18px;
-          margin-top: 8px;
-        }
-        .maintenance-card {
-          position: relative;
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 16px;
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          overflow: hidden;
-        }
-        .maintenance-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 25px rgba(15,23,42,0.08);
-        }
-        .maintenance-card::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 5px;
-        }
-        .priority-Baja::before, .priority-low::before { background-color: #94a3b8; }
-        .priority-Media::before, .priority-medium::before { background-color: #0284c7; }
-        .priority-Alta::before, .priority-high::before { background-color: #d97706; }
-        .priority-Urgente::before, .priority-urgent::before { background-color: #dc2626; }
-      `}</style>
 
       <PageHeader
         actionType="MAINTENANCE_CREATE"
@@ -673,50 +534,50 @@ export function OperationalMaintenanceView({ notify }) {
         title="Mantenimiento"
         description="Gestión integral de tickets, asignaciones técnicas, avances operativos y liberación de habitaciones."
         action={
-          <PermissionButton actionType="MAINTENANCE_CREATE" className="btn btn-primary" onClick={() => setOpen(true)} style={{ borderRadius: '12px', padding: '10px 20px', fontWeight: '700' }}>
-            <Plus size={16} style={{ marginRight: '6px' }} /> Nuevo ticket
+          <PermissionButton actionType="MAINTENANCE_CREATE" className="btn btn-primary" onClick={() => setOpen(true)}>
+            <Plus size={16} /> Nuevo ticket
           </PermissionButton>
         }
       />
 
       {/* Modern KPI Strip */}
       <div className="maintenance-metric-grid">
-        <div className="maintenance-metric-card" style={{ borderLeft: '4px solid #d97706' }}>
+        <div className="maintenance-metric-card">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pendientes de Cierre</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--color-navy-deep)', marginTop: '2px' }}>{pendingCount}</div>
+            <div className="maintenance-metric-label">Pendientes de Cierre</div>
+            <div className="maintenance-metric-value">{pendingCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>⏳</span>
+          <span className="maintenance-metric-icon">⏳</span>
         </div>
 
-        <div className="maintenance-metric-card" style={{ borderLeft: '4px solid #0284c7' }}>
+        <div className="maintenance-metric-card">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En Reparación</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#0284c7', marginTop: '2px' }}>{inRepairCount}</div>
+            <div className="maintenance-metric-label">En Reparación</div>
+            <div className="maintenance-metric-value">{inRepairCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>🛠️</span>
+          <span className="maintenance-metric-icon">🛠️</span>
         </div>
 
-        <div className="maintenance-metric-card" style={{ borderLeft: '4px solid #dc2626', background: urgentCount > 0 ? '#fef2f2' : undefined }}>
+        <div className="maintenance-metric-card">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: urgentCount > 0 ? '#991b1b' : 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Urgentes / Críticos</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>{urgentCount}</div>
+            <div className="maintenance-metric-label">Urgentes / Críticos</div>
+            <div className="maintenance-metric-value">{urgentCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>🚨</span>
+          <span className="maintenance-metric-icon">🚨</span>
         </div>
 
-        <div className="maintenance-metric-card" style={{ borderLeft: '4px solid #059669' }}>
+        <div className="maintenance-metric-card">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cerrados / Resueltos</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#059669', marginTop: '2px' }}>{closedCount}</div>
+            <div className="maintenance-metric-label">Cerrados / Resueltos</div>
+            <div className="maintenance-metric-value">{closedCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>✅</span>
+          <span className="maintenance-metric-icon">✅</span>
         </div>
       </div>
 
       {/* Filter Toolbar */}
       <div className="custom-filter-bar">
-        <label style={{ flex: '1 1 200px' }}>
+        <label className="maintenance-filter-search">
           <span>Búsqueda Rápida</span>
           <input
             type="text"
@@ -758,14 +619,14 @@ export function OperationalMaintenanceView({ notify }) {
             return (
               <article className={`maintenance-card ${pClass}`} key={ticket.id}>
                 <div>
-                  <div className="row-between" style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '24px' }}>{typeIcon}</span>
+                   <div className="row-between maintenance-card-heading">
+                     <div className="maintenance-card-title-group">
+                       <span className="maintenance-card-icon">{typeIcon}</span>
                       <div>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-gold)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                         <span className="maintenance-card-room">
                           Habitación {room?.number || 'General'}
                         </span>
-                        <h3 style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--color-navy-deep)', margin: '2px 0 0' }}>
+                         <h3 className="maintenance-card-title">
                           {ticket.description.replace(/^\[.*?\]\s*/, '')}
                         </h3>
                       </div>
@@ -773,14 +634,14 @@ export function OperationalMaintenanceView({ notify }) {
                     <StatusBadge>{ticket.status}</StatusBadge>
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                   <div className="maintenance-card-tags">
                     <PriorityTag priority={ticket.priority} />
                     {ticket.blocksRoom ? (
-                      <span style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                       <span className="maintenance-lock-tag is-blocking">
                         <Lock size={11} /> Bloquea Habitación
                       </span>
                     ) : (
-                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                       <span className="maintenance-lock-tag">
                         <Unlock size={11} /> Sin Bloqueo
                       </span>
                     )}
@@ -794,14 +655,13 @@ export function OperationalMaintenanceView({ notify }) {
                   ]} />
                 </div>
 
-                <div style={{ marginTop: '14px', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
+                 <div className="maintenance-card-footer">
                   <StatusStepper currentStatus={ticket.status} steps={MAINTENANCE_STATUS_STEPS} />
 
-                  <div style={{ marginTop: '14px' }}>
+                   <div className="maintenance-card-actions">
                     {(canUpdateMaintenance || (ticket.status === 'Cerrado' ? canReopenMaintenance : canProgressMaintenance)) ? (
                       <button
-                        className="btn btn-outline btn-sm"
-                        style={{ width: '100%', borderRadius: '10px', fontWeight: '700', padding: '8px 12px' }}
+                         className="btn btn-outline btn-sm"
                         onClick={() => setSelectedId(ticket.id)}
                       >
                         Gestionar Ticket
@@ -1124,42 +984,23 @@ function InventoryItemEditor({ item, onClose, notify }) {
   return (
     <form className="form-grid" onSubmit={submit}>
       {/* Live Item Preview Banner */}
-      <div className="span-2" style={{
-        background: 'linear-gradient(135deg, var(--color-navy, #0f2942) 0%, #1e3a5f 100%)',
-        borderRadius: 10,
-        padding: '14px 18px',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        border: '1px solid rgba(212, 175, 55, 0.4)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 44,
-            height: 44,
-            borderRadius: 10,
-            background: 'rgba(255,255,255,0.1)',
-            border: '1px solid rgba(212, 175, 55, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22
-          }}>
+      <div className="span-2 inventory-editor-preview">
+        <div className="inventory-editor-preview-main">
+          <div className="inventory-editor-preview-icon">
             {categoryInfo.icon}
           </div>
           <div>
-            <span style={{ fontSize: 10.5, textTransform: 'uppercase', fontWeight: 800, color: 'var(--color-gold, #c59d5f)', letterSpacing: '0.05em' }}>
+            <span className="inventory-editor-preview-category">
               {categoryInfo.label}
             </span>
-            <h4 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>
+            <h4 className="inventory-editor-preview-name">
               {form.name.trim() || 'Nombre del Insumo / Mercadería'}
             </h4>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', display: 'block' }}>Costo Unitario</span>
-          <strong style={{ fontSize: 18, color: 'var(--color-gold, #c59d5f)' }}>
+        <div className="inventory-editor-preview-cost">
+          <span className="inventory-editor-preview-cost-label">Costo Unitario</span>
+          <strong className="inventory-editor-preview-cost-value">
             {Number(form.cost) > 0 ? formatMoney(Number(form.cost)) : 'S/ 0.00'}
           </strong>
         </div>
@@ -1174,13 +1015,12 @@ function InventoryItemEditor({ item, onClose, notify }) {
           placeholder="Ej: Pisco Quebranta 42°, Lomo Fino de Res, Aceite de Oliva Extra Virgen..."
           onChange={(e) => set('name', e.target.value)}
           disabled={pending}
-          style={{ fontSize: 13.5, fontWeight: 600 }}
-        />
+          className="inventory-editor-name-input" />
       </label>
 
       <label>
         Unidad de Medida Oficial *
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="inventory-editor-unit-controls">
           <input
             required
             value={form.unit}
@@ -1188,14 +1028,12 @@ function InventoryItemEditor({ item, onClose, notify }) {
             placeholder="Litro, kg, oz, und..."
             onChange={(e) => set('unit', e.target.value)}
             disabled={pending}
-            style={{ flex: 1 }}
-          />
+            className="inventory-editor-unit-input" />
           <select
             value=""
             onChange={(e) => { if (e.target.value) set('unit', e.target.value); }}
             disabled={pending}
-            style={{ width: '110px', fontSize: 11.5 }}
-          >
+            className="inventory-editor-unit-suggestion">
             <option value="">Sugerir...</option>
             <option value="Litro">Litro (L)</option>
             <option value="kg">Kilo (kg)</option>
@@ -1234,7 +1072,7 @@ function InventoryItemEditor({ item, onClose, notify }) {
 
       <label>
         Costo Unitario de Adquisición (S/ PEN) *
-        <div style={{ position: 'relative' }}>
+          <div className="inventory-editor-cost-control">
           <input
             type="number"
             min="0"
@@ -1243,9 +1081,8 @@ function InventoryItemEditor({ item, onClose, notify }) {
             value={form.cost}
             onChange={(e) => set('cost', e.target.value)}
             disabled={pending}
-            style={{ paddingLeft: '32px', fontWeight: 700 }}
-          />
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--color-navy)' }}>
+            className="inventory-editor-cost-input" />
+          <span className="inventory-editor-currency">
             S/
           </span>
         </div>
@@ -1257,8 +1094,7 @@ function InventoryItemEditor({ item, onClose, notify }) {
           value={form.supplierId}
           onChange={(e) => set('supplierId', e.target.value)}
           disabled={pending}
-          style={{ fontSize: 13 }}
-        >
+          className="inventory-editor-supplier-select">
           <option value="">Sin proveedor asignado</option>
           {suppliersList.map((sup) => (
             <option key={sup.id} value={sup.id}>
@@ -1270,9 +1106,9 @@ function InventoryItemEditor({ item, onClose, notify }) {
 
       {formError ? <div className="alert-banner alert-banner-danger span-2" role="alert">{formError}</div> : null}
 
-      <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
+      <div className="form-actions span-2 inventory-editor-actions">
         <button type="button" className="btn btn-outline" onClick={onClose} disabled={pending}>Cancelar</button>
-        <button className="btn btn-primary" disabled={pending} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button className="btn btn-primary inventory-editor-submit" disabled={pending}>
           {pending ? <RefreshCw size={15} className="spin" /> : <Check size={15} />}
           {pending ? 'Guardando…' : (item ? 'Guardar Cambios' : 'Registrar Insumo')}
         </button>
@@ -1344,62 +1180,62 @@ function InventoryAdjustment({ item, onClose, notify }) {
       {/* Visual Live Stock Transition Display */}
       <div className="span-2 inv-adjust-display">
         <div>
-          <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>
+          <span className="inventory-adjust-label">
             Stock Actual
           </span>
-          <strong style={{ fontSize: 20, color: 'var(--color-text)' }}>
-            {currentStock} <small style={{ fontSize: 12 }}>{item.unit}</small>
+          <strong className="inventory-adjust-current-value">
+            {currentStock} <small className="inventory-adjust-unit">{item.unit}</small>
           </strong>
-          <span style={{ fontSize: 10.5, color: 'var(--color-muted)', display: 'block' }}>
+          <span className="inventory-adjust-available">
             Disp: {currentAvailable} {item.unit}
           </span>
         </div>
 
-        <div style={{ fontSize: 22, fontWeight: 900, color: adjustmentNum >= 0 ? '#15803d' : '#b91c1c' }}>
+        <div className="inventory-adjust-symbol">
           {adjustmentNum >= 0 ? '+' : '−'}
         </div>
 
         <div>
-          <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>
+          <span className="inventory-adjust-label">
             Ajuste
           </span>
-          <strong style={{ fontSize: 20, color: adjustmentNum >= 0 ? '#15803d' : '#b91c1c' }}>
-            {adjustmentNum !== 0 ? `${adjustmentNum > 0 ? '+' : ''}${adjustmentNum}` : '0'} <small style={{ fontSize: 12 }}>{item.unit}</small>
+          <strong className="inventory-adjust-value">
+            {adjustmentNum !== 0 ? `${adjustmentNum > 0 ? '+' : ''}${adjustmentNum}` : '0'} <small className="inventory-adjust-unit">{item.unit}</small>
           </strong>
-          <span style={{ fontSize: 10.5, color: 'var(--color-muted)', display: 'block' }}>
+          <span className="inventory-adjust-type">
             {type}
           </span>
         </div>
 
-        <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--color-navy)' }}>
+        <div className="inventory-adjust-result-symbol">
           =
         </div>
 
         <div>
-          <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>
+          <span className="inventory-adjust-label">
             Stock Resultante
           </span>
-          <strong style={{ fontSize: 20, color: 'var(--color-navy)' }}>
-            {resultantStock} <small style={{ fontSize: 12 }}>{item.unit}</small>
+          <strong className="inventory-adjust-result-value">
+            {resultantStock} <small className="inventory-adjust-unit">{item.unit}</small>
           </strong>
-          <span style={{ fontSize: 10.5, color: resultantAvailable < Number(item.minimum) ? '#b45309' : '#15803d', display: 'block', fontWeight: 700 }}>
+          <span className="inventory-adjust-result-status">
             {resultantAvailable < Number(item.minimum) ? '⚠️ Quedará bajo mínimo' : '🟢 Stock suficiente'}
           </span>
         </div>
       </div>
 
       {/* Quick Buttons for One-Click Adjustment */}
-      <div className="span-2" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--color-muted)', marginRight: 4 }}>
+      <div className="span-2 inventory-adjust-quick-actions">
+        <span className="inventory-adjust-quick-label">
           Ajuste rápido:
         </span>
         <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(1)}>+1</button>
         <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(5)}>+5</button>
         <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(10)}>+10</button>
         <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(25)}>+25</button>
-        <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(-1)} style={{ color: '#b91c1c' }}>-1</button>
-        <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(-5)} style={{ color: '#b91c1c' }}>-5</button>
-        <button type="button" className="inv-quick-qty-btn" onClick={() => setQuickAdjustment(-10)} style={{ color: '#b91c1c' }}>-10</button>
+        <button type="button" className="inv-quick-qty-btn inventory-adjust-negative" onClick={() => setQuickAdjustment(-1)}>-1</button>
+        <button type="button" className="inv-quick-qty-btn inventory-adjust-negative" onClick={() => setQuickAdjustment(-5)}>-5</button>
+        <button type="button" className="inv-quick-qty-btn inventory-adjust-negative" onClick={() => setQuickAdjustment(-10)}>-10</button>
       </div>
 
       <label>
@@ -1412,8 +1248,7 @@ function InventoryAdjustment({ item, onClose, notify }) {
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           disabled={pending}
-          style={{ fontSize: 14, fontWeight: 700 }}
-        />
+         className="inventory-adjust-quantity-input" />
         <small>Valores positivos suman stock; negativos descuentan merma o consumo.</small>
       </label>
 
@@ -1442,9 +1277,9 @@ function InventoryAdjustment({ item, onClose, notify }) {
 
       {formError ? <div className="alert-banner alert-banner-danger span-2" role="alert">{formError}</div> : null}
 
-      <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
+      <div className="form-actions span-2 inventory-adjust-actions">
         <button type="button" className="btn btn-outline" onClick={onClose} disabled={pending}>Cancelar</button>
-        <button className="btn btn-primary" disabled={pending} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button className="btn btn-primary inventory-adjust-submit" disabled={pending}>
           {pending ? <RefreshCw size={15} className="spin" /> : <Check size={15} />}
           {pending ? 'Registrando…' : 'Confirmar Ajuste'}
         </button>
@@ -1466,67 +1301,59 @@ function InventoryKardexModal({ item, ledgerEntries, onClose }) {
     <Dialog open={true} onClose={onClose} title={`Kardex Operativo: ${item.name}`} wide>
       <div className="detail-stack">
         {/* Item Header Snapshot */}
-        <div style={{
-          background: 'var(--color-surface-soft)',
-          padding: '16px',
-          borderRadius: 10,
-          border: '1px solid var(--color-border)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-          gap: 12
-        }}>
+        <div className="inventory-kardex-summary">
           <div>
-            <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block' }}>Rubro</span>
-            <strong style={{ fontSize: 13, color: 'var(--color-navy)' }}>
+            <span className="inventory-kardex-label">Rubro</span>
+            <strong className="inventory-kardex-category">
               {categoryInfo.icon} {categoryInfo.label}
             </strong>
           </div>
           <div>
-            <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block' }}>Stock Físico Actual</span>
-            <strong style={{ fontSize: 16, color: 'var(--color-text)' }}>
+            <span className="inventory-kardex-label">Stock Físico Actual</span>
+            <strong className="inventory-kardex-stock">
               {item.stock} {item.unit}
             </strong>
           </div>
           <div>
-            <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block' }}>Stock Disponible</span>
-            <strong style={{ fontSize: 16, color: inventoryAvailable(item) <= Number(item.minimum) ? '#b45309' : '#15803d' }}>
+            <span className="inventory-kardex-label">Stock Disponible</span>
+            <strong className="inventory-kardex-available">
               {inventoryAvailable(item)} {item.unit}
             </strong>
           </div>
           <div>
-            <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block' }}>Stock Mínimo</span>
-            <strong style={{ fontSize: 13, color: 'var(--color-muted)' }}>
+            <span className="inventory-kardex-label">Stock Mínimo</span>
+            <strong className="inventory-kardex-minimum">
               {item.minimum} {item.unit}
             </strong>
           </div>
           <div>
-            <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'block' }}>Valorización en Almacén</span>
-            <strong style={{ fontSize: 16, color: 'var(--color-navy)' }}>
+            <span className="inventory-kardex-label">Valorización en Almacén</span>
+            <strong className="inventory-kardex-valuation">
               {formatMoney(totalValuation)}
             </strong>
           </div>
         </div>
 
         {/* Ledger History Table */}
-        <h4 style={{ margin: '8px 0 0', fontSize: 14, fontWeight: 800, color: 'var(--color-navy)' }}>
+        <h4 className="inventory-kardex-title">
           Libro de Movimientos Históricos ({filteredLedger.length})
         </h4>
 
         {filteredLedger.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', background: 'var(--color-surface-soft)', borderRadius: 8 }}>
-            <Package size={28} color="var(--color-muted)" style={{ margin: '0 auto 6px', display: 'block' }} />
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)' }}>
+          <div className="inventory-kardex-empty">
+            <Package size={28} color="var(--color-muted)"  className="inventory-kardex-empty-icon" />
+            <p className="inventory-kardex-empty-text">
               Este insumo no tiene movimientos registrados en el libro aún.
             </p>
           </div>
         ) : (
-          <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-            <table className="custom-table" style={{ fontSize: 12 }}>
+          <div className="inventory-kardex-table-container">
+            <table className="custom-table inventory-kardex-table">
               <thead>
                 <tr>
                   <th>Fecha y Hora</th>
                   <th>Tipo</th>
-                  <th style={{ textAlign: 'right' }}>Cantidad</th>
+                  <th className="inventory-kardex-quantity-header">Cantidad</th>
                   <th>Referencia</th>
                   <th>Nota / Glosa</th>
                   <th>Responsable</th>
@@ -1538,25 +1365,18 @@ function InventoryKardexModal({ item, ledgerEntries, onClose }) {
                   const isPositive = qty > 0;
                   return (
                     <tr key={entry.id}>
-                      <td style={{ whiteSpace: 'nowrap' }}>{displayDateTime(entry.createdAt)}</td>
+                      <td className="inventory-kardex-date">{displayDateTime(entry.createdAt)}</td>
                       <td>
-                        <span style={{
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          fontSize: 10.5,
-                          fontWeight: 700,
-                          background: entry.type === 'Entrada' ? 'rgba(34, 197, 94, 0.15)' : entry.type === 'Merma' ? 'rgba(239, 68, 68, 0.15)' : 'var(--color-surface-soft)',
-                          color: entry.type === 'Entrada' ? '#15803d' : entry.type === 'Merma' ? '#b91c1c' : 'var(--color-text)'
-                        }}>
+                        <span className="inventory-kardex-type">
                           {entry.type}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, color: isPositive ? '#15803d' : '#b91c1c' }}>
+                      <td className="inventory-kardex-quantity">
                         {isPositive ? '+' : ''}{qty} {item.unit}
                       </td>
                       <td>{entry.referenceId || 'Manual'}</td>
                       <td>{entry.note || '—'}</td>
-                      <td style={{ color: 'var(--color-muted)' }}>{entry.responsible || '—'}</td>
+                      <td className="inventory-kardex-responsible">{entry.responsible || '—'}</td>
                     </tr>
                   );
                 })}
@@ -1565,7 +1385,7 @@ function InventoryKardexModal({ item, ledgerEntries, onClose }) {
           </div>
         )}
 
-        <div className="form-actions" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+        <div className="form-actions inventory-kardex-actions">
           <button type="button" className="btn btn-outline" onClick={onClose}>Cerrar Kardex</button>
         </div>
       </div>
@@ -1749,9 +1569,8 @@ export function OperationalInventoryView({ notify }) {
           canCreate ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary inventory-page-create"
               onClick={() => setEditor(null)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 700 }}
             >
               <Plus size={16} /> Nuevo Insumo
             </button>
@@ -1770,7 +1589,7 @@ export function OperationalInventoryView({ notify }) {
       ]} />
 
       {inventoryResource.data.some(isCritical) ? (
-        <div className="alert-banner alert-banner-danger" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="alert-banner alert-banner-danger inventory-critical-alert">
           <AlertTriangle size={16} />
           <span>Existen insumos con stock agotado o sobre-reservado que requieren compra urgente para no interrumpir el servicio.</span>
         </div>
@@ -1792,7 +1611,7 @@ export function OperationalInventoryView({ notify }) {
         ) : inventoryStatus === 'error' ? (
           <div className="alert-banner alert-banner-danger">
             {inventoryResource.error || 'No se pudo cargar el inventario.'}
-            <button className="btn btn-sm btn-outline" style={{ marginLeft: '12px' }} onClick={() => inventoryResource.reload()}>Reintentar</button>
+            <button className="btn btn-sm btn-outline inventory-retry" onClick={() => inventoryResource.reload()}>Reintentar</button>
           </div>
         ) : inventoryStatus === 'forbidden' ? (
           <div className="alert-banner alert-banner-danger">No tienes permiso para ver el inventario físico.</div>
@@ -1861,9 +1680,9 @@ export function OperationalInventoryView({ notify }) {
             </div>
 
             {/* ─── Filter & Search Toolbar ──────────────────────────────────── */}
-            <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: '280px' }}>
-                <label className="search-label" style={{ flex: 1 }}>
+            <FilterBar label="Filtros de inventario" className="inventory-filter-toolbar">
+              <div className="inventory-filter-group">
+                <label className="search-label inventory-filter-search">
                   <Search size={16} />
                   <input
                     value={query}
@@ -1872,7 +1691,7 @@ export function OperationalInventoryView({ notify }) {
                     aria-label="Buscar insumos"
                   />
                 </label>
-                <label style={{ margin: 0 }}>
+                <label className="inventory-filter-status">
                   <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                     <option value="todos">Todos los estados</option>
                     <option value="optimo">🟢 Stock Óptimo</option>
@@ -1881,7 +1700,7 @@ export function OperationalInventoryView({ notify }) {
                     <option value="archivados">📦 Archivados</option>
                   </select>
                 </label>
-                <label style={{ margin: 0 }}>
+                <label className="inventory-filter-sort">
                   <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <option value="name">Nombre: A - Z</option>
                     <option value="stock_asc">Stock: Menor a Mayor</option>
@@ -1891,10 +1710,10 @@ export function OperationalInventoryView({ notify }) {
                 </label>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="inventory-filter-result">
                 <span className="filter-result">{records.length} insumos listados</span>
               </div>
-            </div>
+            </FilterBar>
 
             {/* ─── Table View (Directorio de Almacén) ───────────────────────── */}
             <DataTable
@@ -1919,32 +1738,20 @@ export function OperationalInventoryView({ notify }) {
                 const resolvedSupplierName = item.supplierName || (item.supplierId && suppliersMap.get(item.supplierId)?.tradeName) || (item.supplierId && suppliersMap.get(item.supplierId)?.legalName) || null;
 
                 return (
-                  <tr key={item.id} style={{ opacity: archived ? 0.6 : 1 }}>
+                  <tr key={item.id} className="inventory-row">
                     {/* 1. Name, Rubro & SKU */}
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 8,
-                          background: 'var(--color-navy, #0f172a)',
-                          color: '#fff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          border: '1px solid rgba(212, 175, 55, 0.4)',
-                          flexShrink: 0
-                        }}>
+                      <div className="inventory-item-cell">
+                        <div className="inventory-item-icon">
                           {category.icon}
                         </div>
                         <div>
-                          <strong style={{ fontSize: 13.5, color: 'var(--color-text)' }}>{item.name}</strong>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--color-surface-soft)', padding: '1px 6px', borderRadius: 4, color: 'var(--color-navy)' }}>
+                          <strong className="inventory-item-name">{item.name}</strong>
+                          <div className="inventory-item-meta">
+                            <span className="inventory-item-sku">
                               {sku}
                             </span>
-                            <span style={{ fontSize: 10, color: 'var(--color-muted)' }}>
+                            <span className="inventory-item-lot">
                               {item.lot ? `Lote: ${item.lot}` : 'Sin lote'}
                             </span>
                           </div>
@@ -1953,31 +1760,30 @@ export function OperationalInventoryView({ notify }) {
                     </td>
 
                     {/* 2. Physical Stock & Health Bar */}
-                    <td style={{ minWidth: '120px' }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                        <strong style={{ fontSize: 14, color: 'var(--color-text)' }}>{item.stock}</strong>
-                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{item.unit}</span>
+                    <td className="inventory-stock-cell">
+                      <div className="inventory-stock-value">
+                        <strong className="inventory-stock-number">{item.stock}</strong>
+                        <span className="inventory-stock-unit">{item.unit}</span>
                       </div>
                       <div className="inv-health-bar" title={`Stock Físico: ${item.stock} / Mínimo: ${item.minimum}`}>
                         <div
-                          className={`inv-health-fill ${critical ? 'critical' : belowMin ? 'warning' : 'optimal'}`}
-                          style={{ width: `${healthRatio}%` }}
+                        className={`inv-health-fill ${critical ? 'critical' : belowMin ? 'warning' : 'optimal'} health-ratio-${healthRatio >= 75 ? 'high' : healthRatio >= 35 ? 'medium' : 'low'}`}
                         />
                       </div>
-                      <small style={{ fontSize: 10, color: 'var(--color-muted)' }}>Min: {item.minimum} {item.unit}</small>
+                      <small className="inventory-stock-minimum">Min: {item.minimum} {item.unit}</small>
                     </td>
 
                     {/* 3. Reserved */}
                     <td>
-                      <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>
+                      <span className="inventory-reserved-value">
                         {item.reserved} {item.unit}
                       </span>
                     </td>
 
                     {/* 4. Available with Smart Pill */}
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <strong style={{ fontSize: 14, color: critical ? '#b91c1c' : belowMin ? '#b45309' : '#15803d' }}>
+                      <div className="inventory-available-cell">
+                        <strong className="inventory-available-value">
                           {availableNum} {item.unit}
                         </strong>
                         {critical ? (
@@ -1992,11 +1798,11 @@ export function OperationalInventoryView({ notify }) {
 
                     {/* 5. Unit Cost & Total Line Value */}
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>
+                      <div className="inventory-cost-cell">
+                        <span className="inventory-cost-unit">
                           Unit: {formatMoney(costNum)}
                         </span>
-                        <strong style={{ fontSize: 13.5, color: 'var(--color-navy)' }}>
+                        <strong className="inventory-line-value">
                           {formatMoney(lineValuation)}
                         </strong>
                       </div>
@@ -2005,12 +1811,12 @@ export function OperationalInventoryView({ notify }) {
                     {/* 6. Supplier */}
                     <td>
                       {resolvedSupplierName ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--color-text)', fontSize: 12 }}>
+                        <div className="inventory-supplier-value">
                           <Building2 size={13} color="var(--color-gold)" />
-                          <span style={{ fontWeight: 600 }}>{resolvedSupplierName}</span>
+                          <span className="inventory-supplier-name">{resolvedSupplierName}</span>
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--color-muted)', fontSize: 11, fontStyle: 'italic' }}>
+                        <span className="inventory-no-supplier">
                           Sin proveedor
                         </span>
                       )}
@@ -2023,31 +1829,29 @@ export function OperationalInventoryView({ notify }) {
 
                     {/* 8. Quick Actions */}
                     <td>
-                      <div className="quick-actions-row" style={{ justifyContent: 'flex-start', gap: 6 }}>
+                      <div className="quick-actions-row inventory-row-actions">
                         {!archived ? (
                           <>
                             {canAdjust ? (
                               <button
                                 type="button"
-                                className="quick-action-btn btn-action-view"
+                                className="quick-action-btn btn-action-view inventory-adjust-action"
                                 data-tooltip="Ajustar stock (Entrada / Merma)"
                                 onClick={() => setAdjustId(item.id)}
-                                style={{ padding: '6px 8px', gap: 4 }}
                               >
                                 <Plus size={13} />
-                                <span style={{ fontSize: 11, fontWeight: 700 }}>Ajustar</span>
+                                <span className="inventory-action-label">Ajustar</span>
                               </button>
                             ) : null}
 
                             <button
                               type="button"
-                              className="quick-action-btn"
+                              className="quick-action-btn inventory-kardex-action"
                               data-tooltip="Ver Kardex / Historial de movimientos"
                               onClick={() => setKardexItem(item)}
-                              style={{ padding: '6px 8px', gap: 4, background: 'var(--color-surface-soft)' }}
                             >
                               <History size={13} />
-                              <span style={{ fontSize: 11, fontWeight: 700 }}>Kardex</span>
+                              <span className="inventory-action-label">Kardex</span>
                             </button>
 
                             {canUpdate ? (
@@ -2075,9 +1879,8 @@ export function OperationalInventoryView({ notify }) {
                         ) : (
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline"
+                            className="btn btn-sm btn-outline inventory-reactivate-action"
                             onClick={() => handleReactivate(item)}
-                            style={{ fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           >
                             <RotateCcw size={12} /> Reactivar
                           </button>
@@ -2099,7 +1902,7 @@ export function OperationalInventoryView({ notify }) {
         ) : ledgerStatus === 'error' ? (
           <div className="alert-banner alert-banner-danger">
             {ledgerResource.error || 'No se pudo cargar el libro.'}
-            <button className="btn btn-sm btn-outline" style={{ marginLeft: '12px' }} onClick={() => ledgerResource.reload()}>Reintentar</button>
+            <button className="btn btn-sm btn-outline ledger-retry-action" onClick={() => ledgerResource.reload()}>Reintentar</button>
           </div>
         ) : ledgerStatus === 'forbidden' ? (
           <div className="alert-banner alert-banner-danger">No tienes permiso para ver el libro de movimientos.</div>
@@ -2118,39 +1921,32 @@ export function OperationalInventoryView({ notify }) {
 
               return (
                 <tr key={entry.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{displayDateTime(entry.createdAt)}</td>
+                  <td className="ledger-date">{displayDateTime(entry.createdAt)}</td>
                   <td>
                     {item ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="ledger-item-cell">
                         <span>{cat?.icon || '📦'}</span>
                         <div>
-                          <strong style={{ fontSize: 13 }}>{item.name}</strong>
+                          <strong className="ledger-item-name">{item.name}</strong>
                           <br />
-                          <small style={{ color: 'var(--color-muted)' }}>{getCleanSku(item)} · Lote: {item.lot || 'Sin lote'}</small>
+                          <small className="ledger-item-meta">{getCleanSku(item)} · Lote: {item.lot || 'Sin lote'}</small>
                         </div>
                       </div>
                     ) : (
-                      <span style={{ color: 'var(--color-muted)' }}>Insumo no disponible</span>
+                      <span className="ledger-item-unavailable">Insumo no disponible</span>
                     )}
                   </td>
                   <td>
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      background: entry.type === 'Entrada' ? 'rgba(34, 197, 94, 0.15)' : entry.type === 'Merma' ? 'rgba(239, 68, 68, 0.15)' : 'var(--color-surface-soft)',
-                      color: entry.type === 'Entrada' ? '#15803d' : entry.type === 'Merma' ? '#b91c1c' : 'var(--color-navy)'
-                    }}>
+                    <span className="ledger-movement-type">
                       {entry.type}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 800, color: isPositive ? '#15803d' : '#b91c1c' }}>
+                  <td className="ledger-quantity">
                     {isPositive ? '+' : ''}{qty}{item ? ` ${item.unit}` : ''}
                   </td>
                   <td>{entry.referenceId || 'Manual'}</td>
                   <td>{entry.note || '—'}</td>
-                  <td style={{ color: 'var(--color-muted)' }}>{entry.responsible || '—'}</td>
+                  <td className="ledger-responsible">{entry.responsible || '—'}</td>
                 </tr>
               );
             }) : null}
@@ -2275,10 +2071,10 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
   if (!allowed) return null;
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <form className="form-grid cash-count-form" onSubmit={submit}>
       {/* Pestañas de modo y control de Arqueo Ciego */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="cash-count-mode-bar">
+        <div className="cash-count-mode-tabs">
           <button
             type="button"
             className={`btn btn-sm ${mode === 'calculator' ? 'btn-primary' : 'btn-outline'}`}
@@ -2297,15 +2093,7 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
 
         <button
           type="button"
-          className={`btn btn-sm ${blindMode ? 'btn-primary' : 'btn-outline'}`}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: blindMode ? '#334155' : 'transparent',
-            borderColor: blindMode ? '#334155' : '#cbd5e1',
-            color: blindMode ? '#ffffff' : '#475569',
-          }}
+          className={`btn btn-sm ${blindMode ? 'btn-primary' : 'btn-outline'} cash-blind-toggle ${blindMode ? 'blind-mode-active' : ''}`}
           onClick={() => {
             setBlindMode(!blindMode);
             setRevealed(false);
@@ -2337,33 +2125,21 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
 
       {/* Tarjeta de Comparativa y Cuadre (Soporta Arqueo Ciego) */}
       {blindMode && !revealed ? (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          backgroundColor: '#f8fafc',
-          borderRadius: '10px',
-          border: '1px dashed #94a3b8',
-          textAlign: 'center',
-          gap: '8px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155', fontWeight: '700', fontSize: '0.85rem' }}>
+        <div className="cash-blind-panel">
+          <div className="cash-blind-heading">
             <Lock size={16} />
             <span>Modo Arqueo Ciego Activo (Control Antifraude)</span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+          <div className="cash-blind-description">
             El saldo esperado y el cuadre se mantienen ocultos para garantizar un conteo objetivo en gaveta.
           </div>
-          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '0.9rem' }}>
-              Efectivo Contado: <strong style={{ color: '#0f172a' }}>{formatMoney(Number(countedAmount) || 0)}</strong>
+          <div className="cash-blind-summary">
+            <span className="cash-counted-amount">
+              Efectivo Contado: <strong className="cash-counted-amount-value">{formatMoney(Number(countedAmount) || 0)}</strong>
             </span>
             <button
               type="button"
-              className="btn btn-xs btn-outline"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              className="btn btn-xs btn-outline cash-reveal-action"
               onClick={() => setRevealed(true)}
             >
               <Eye size={13} />
@@ -2372,30 +2148,18 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
           </div>
         </div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '12px',
-          padding: '12px 16px',
-          backgroundColor: '#f8fafc',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          textAlign: 'center'
-        }}>
+        <div className="cash-reconciliation">
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Esperado en Sistema</span>
-            <strong style={{ fontSize: '1.05rem', color: '#1e293b' }}>{formatMoney(expected)}</strong>
+            <span className="cash-reconciliation-label">Esperado en Sistema</span>
+            <strong className="cash-reconciliation-expected">{formatMoney(expected)}</strong>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Total Contado Físico</span>
-            <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>{formatMoney(Number(countedAmount) || 0)}</strong>
+            <span className="cash-reconciliation-label">Total Contado Físico</span>
+            <strong className="cash-reconciliation-counted">{formatMoney(Number(countedAmount) || 0)}</strong>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Diferencia / Cuadre</span>
-            <strong style={{
-              fontSize: '1.05rem',
-              color: Math.abs(difference) < 0.01 ? '#16a34a' : difference > 0 ? '#d97706' : '#dc2626'
-            }}>
+            <span className="cash-reconciliation-label">Diferencia / Cuadre</span>
+            <strong className={`cash-reconciliation-difference ${Math.abs(difference) < 0.01 ? 'difference-exact' : difference > 0 ? 'difference-surplus' : 'difference-shortage'}`}>
               {Math.abs(difference) < 0.01
                 ? 'Exacto (S/ 0.00)'
                 : difference > 0
@@ -2408,17 +2172,7 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
 
       {/* Alerta de Descuadre Significativo */}
       {isDiscrepancy && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 12px',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px',
-          fontSize: '0.8rem',
-          color: '#b91c1c',
-        }}>
+        <div className="cash-discrepancy-alert">
           <AlertTriangle size={16} />
           <span>
             Descuadre de {formatMoney(difference)} detectado. Por política hotelera, debe ingresar una justificación detallada antes de cerrar.
@@ -2427,7 +2181,7 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
       )}
 
       <label className="span-2">
-        <span style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>
+        <span className="cash-notes-label">
           Observaciones o justificación {isDiscrepancy ? '⚠️ (OBLIGATORIO por descuadre >= S/ 5.00)' : Math.abs(difference) >= 0.01 ? '(Recomendado)' : '(Opcional)'}
         </span>
         <textarea
@@ -2435,11 +2189,10 @@ function CashCountForm({ close, expected, onClose, onSessionClosed, notify }) {
           required={isDiscrepancy}
           placeholder="Ej: Conteo físico verificado en gaveta. Descuadre atribuible a..."
           onChange={(event) => setNote(event.target.value)}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: isDiscrepancy ? '1px solid #f87171' : '1px solid #cbd5e1' }}
-        />
+         className="cash-notes-input" />
       </label>
 
-      <div className="form-actions span-2" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+      <div className="form-actions span-2 cash-count-actions">
         <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary">{close ? 'Cerrar caja' : 'Guardar arqueo'}</button>
       </div>
@@ -2536,283 +2289,137 @@ export function OperationalCashView({ notify }) {
   const isLongShift = openSession && (Date.now() - new Date(openSession.openedAt).getTime()) > 12 * 60 * 60 * 1000;
 
   return (
-    <div className="view-container" style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 8px 32px' }}>
-      <style>{`
-        @media (max-width: 1024px) {
-          .cash-dashboard-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .cash-kpi-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-        }
-        @media (max-width: 640px) {
-          .cash-kpi-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
+    <div className="view-container cash-dashboard">
 
       {/* Encabezado Ejecutivo Limpio (Sin duplicidades) */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px',
-        marginBottom: '20px',
-        paddingBottom: '16px',
-        borderBottom: '1px solid var(--color-border, #e2e8f0)',
-      }}>
+      <div className="cash-dashboard-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{
-              fontSize: '11px',
-              fontWeight: '800',
-              letterSpacing: '0.08em',
-              color: '#b45309',
-              textTransform: 'uppercase',
-              backgroundColor: '#fef3c7',
-              padding: '3px 8px',
-              borderRadius: '6px'
-            }}>
+          <div className="cash-dashboard-kicker">
+            <span className="cash-dashboard-brand">
               Park Plaza · Front Desk & POS
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--color-muted, #64748b)' }}>
+            <span className="cash-dashboard-module">
               Módulo de Tesorería & Caja
             </span>
           </div>
-          <h2 style={{ margin: 0, fontSize: '1.7rem', fontWeight: '800', color: 'var(--color-navy, #0f172a)', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, serif)' }}>
+          <h2 className="cash-dashboard-title">
             Control de Caja & Turnos
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--color-muted, #64748b)' }}>
+          <p className="cash-dashboard-description">
             Apertura por turno, movimientos categorizados, arqueo ciego, control de remesas e historial auditable.
           </p>
         </div>
 
         {/* Chip de Estado en la esquina superior derecha */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="cash-session-status">
           {openSession ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '8px 16px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '999px',
-              boxShadow: '0 2px 8px -2px rgba(22, 163, 74, 0.12)',
-            }}>
-              <span style={{
-                display: 'inline-block',
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: '#16a34a',
-                boxShadow: '0 0 0 3px rgba(22, 163, 74, 0.25)',
-              }} />
+            <div className="cash-session-status-active">
+              <span  className="cash-session-status-dot" />
               <div>
-                <strong style={{ fontSize: '12.5px', color: '#15803d', display: 'block', lineHeight: 1.2 }}>
+                <strong className="cash-session-status-title">
                   Turno Activo: {openSession.shift}
                 </strong>
-                <span style={{ fontSize: '11px', color: '#4b5563' }}>
+                <span className="cash-session-status-responsible">
                   Responsable: {openSession.responsible}
                 </span>
               </div>
             </div>
           ) : (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '999px',
-            }}>
-              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
-              <strong style={{ fontSize: '12.5px', color: '#64748b' }}>Caja Cerrada</strong>
+            <div className="cash-session-status-closed">
+              <span  className="cash-session-status-closed-dot" />
+              <strong className="cash-session-status-closed-title">Caja Cerrada</strong>
             </div>
           )}
         </div>
       </div>
 
       {/* Workspace Principal en 2 Columnas */}
-      <div className="cash-dashboard-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(330px, 370px) 1fr',
-        gap: '24px',
-        alignItems: 'start',
-      }}>
+      <div className="cash-dashboard-grid cash-workspace">
         {/* ============================================================ */}
         {/* COLUMNA 1: Panel de Control del Turno y Botonera (Izquierda) */}
         {/* ============================================================ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="cash-shift-column">
           {openSession ? (
-            <div style={{
-              background: 'linear-gradient(145deg, #0B132B 0%, #1E293B 100%)',
-              color: '#ffffff',
-              borderRadius: '18px',
-              padding: '24px',
-              border: '1px solid rgba(212, 175, 55, 0.3)',
-              boxShadow: '0 16px 36px -8px rgba(11, 19, 43, 0.35)',
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
+            <div className="cash-shift-card">
               {/* Resplandor decorativo dorado de fondo */}
-              <div style={{
-                position: 'absolute',
-                top: '-40px',
-                right: '-40px',
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(212, 175, 55, 0.18) 0%, rgba(212, 175, 55, 0) 70%)',
-                pointerEvents: 'none',
-              }} />
+              <div  className="cash-shift-decoration" />
 
               {/* Cabecera del Turno con Avatar */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #d4af37, #f59e0b)',
-                    color: '#0f172a',
-                    fontWeight: '800',
-                    fontSize: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(212, 175, 55, 0.35)',
-                  }}>
+              <div className="cash-shift-header">
+                <div className="cash-shift-identity">
+                  <div className="cash-shift-avatar">
                     {openSession.responsible?.charAt(0).toUpperCase() || 'C'}
                   </div>
                   <div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
+                    <div className="cash-shift-role">
                       Cajero en Turno
                     </div>
-                    <strong style={{ fontSize: '16px', color: '#f8fafc', display: 'block' }}>
+                    <strong className="cash-shift-responsible">
                       {openSession.responsible}
                     </strong>
                   </div>
                 </div>
 
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#34d399' }} />
+                <span className="cash-shift-badge">
+                  <span  className="cash-shift-badge-dot" />
                   {openSession.shift}
                 </span>
               </div>
 
               {/* Tiempo Transcurrido del Turno */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '10px',
-                marginBottom: '16px',
-                fontSize: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+              <div className="cash-shift-duration">
+                <div className="cash-shift-opened">
                   <Clock size={14} color="#f59e0b" />
                   <span>Apertura: {displayDateTime(openSession.openedAt)}</span>
                 </div>
-                <strong style={{ color: isLongShift ? '#f87171' : '#f59e0b', fontSize: '11.5px' }}>
+                <strong className="cash-shift-elapsed">
                   {getShiftElapsed(openSession.openedAt)}
                 </strong>
               </div>
 
               {isLongShift && (
-                <div style={{
-                  padding: '8px 12px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '8px',
-                  fontSize: '11.5px',
-                  color: '#fca5a5',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}>
+                <div className="cash-long-shift-alert">
                   <AlertTriangle size={14} />
                   <span>Turno prolongado (+12h). Se sugiere realizar el arqueo y cierre.</span>
                 </div>
               )}
 
               {/* Barra de Límite de Seguridad en Gaveta (Gauge) */}
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px' }}>
-                  <span style={{ color: '#cbd5e1' }}>Límite de Mostrador</span>
-                  <span style={{ fontWeight: '700', color: isCashExceeded ? '#f87171' : '#f59e0b' }}>
+              <div className="cash-safety-gauge">
+                <div className="cash-safety-gauge-header">
+                  <span className="cash-safety-label">Límite de Mostrador</span>
+                  <span className="cash-safety-values">
                     {formatMoney(expected)} / {formatMoney(CASH_SAFETY_LIMIT)}
                   </span>
                 </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '999px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    width: `${cashLimitPercentage}%`,
-                    height: '100%',
-                    background: isCashExceeded
-                      ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                      : cashLimitPercentage > 70
-                      ? 'linear-gradient(90deg, #10b981, #f59e0b)'
-                      : 'linear-gradient(90deg, #10b981, #059669)',
-                    borderRadius: '999px',
-                    transition: 'width 0.4s ease-in-out',
-                  }} />
+                <div className="cash-safety-track">
+                  <div
+                    className={`cash-safety-progress ${isCashExceeded ? 'is-exceeded' : ''}`}
+                    style={{ '--cash-safety-width': `${cashLimitPercentage}%` }}
+                  />
                 </div>
                 {isCashExceeded ? (
-                  <div style={{ fontSize: '11px', color: '#f87171', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="cash-safety-alert">
                     <ShieldAlert size={12} />
                     <span>Excedente en gaveta. Realice un pase a bóveda.</span>
                   </div>
                 ) : (
-                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                  <div className="cash-safety-status">
                     Nivel de efectivo seguro en mostrador ({cashLimitPercentage}%)
                   </div>
                 )}
               </div>
 
               {/* Botonera Operativa Integrada */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
+              <div className="cash-quick-actions">
+                <div className="cash-quick-actions-title">
                   Acciones Rápidas
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className="cash-primary-actions">
                   <PermissionButton
                     actionType="CASH_MOVEMENT"
-                    className="btn btn-sm btn-primary"
-                    style={{
-                      backgroundColor: '#10b981',
-                      borderColor: '#10b981',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '9px 12px',
-                    }}
+                    className="btn btn-sm btn-primary cash-movement-action"
                     onClick={() => { setMovementPreset(null); setDialog('movement'); }}
                   >
                     <Plus size={15} />
@@ -2821,16 +2428,7 @@ export function OperationalCashView({ notify }) {
 
                   <PermissionButton
                     actionType="CASH_COUNT"
-                    className="btn btn-sm btn-outline"
-                    style={{
-                      borderColor: 'rgba(255, 255, 255, 0.25)',
-                      color: '#ffffff',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '9px 12px',
-                    }}
+                    className="btn btn-sm btn-outline cash-count-action"
                     onClick={() => setDialog('count')}
                   >
                     <SlidersHorizontal size={14} />
@@ -2838,19 +2436,10 @@ export function OperationalCashView({ notify }) {
                   </PermissionButton>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className="cash-secondary-actions">
                   <button
                     type="button"
-                    className="btn btn-sm btn-outline"
-                    style={{
-                      borderColor: 'rgba(212, 175, 55, 0.4)',
-                      color: '#fef08a',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '9px 12px',
-                    }}
+                    className="btn btn-sm btn-outline cash-ticket-action"
                     onClick={() => setReportSession(session)}
                     title="Ver / Imprimir Comprobante Corte Z"
                   >
@@ -2860,16 +2449,7 @@ export function OperationalCashView({ notify }) {
 
                   <PermissionButton
                     actionType="CASH_CLOSE"
-                    className="btn btn-sm btn-outline"
-                    style={{
-                      borderColor: 'rgba(239, 68, 68, 0.4)',
-                      color: '#fca5a5',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '9px 12px',
-                    }}
+                    className="btn btn-sm btn-outline cash-close-action"
                     onClick={() => setDialog('close')}
                   >
                     <Lock size={14} />
@@ -2880,17 +2460,7 @@ export function OperationalCashView({ notify }) {
                 {isCashExceeded && (
                   <button
                     type="button"
-                    className="btn btn-sm btn-primary"
-                    style={{
-                      backgroundColor: '#d97706',
-                      borderColor: '#d97706',
-                      marginTop: '4px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '9px 12px',
-                    }}
+                    className="btn btn-sm btn-primary cash-drop-action"
                     onClick={handleTriggerCashDrop}
                     title="Realizar pase de remesa a bóveda por exceso de efectivo en gaveta"
                   >
@@ -2901,52 +2471,29 @@ export function OperationalCashView({ notify }) {
               </div>
             </div>
           ) : (
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '28px 20px',
-              border: '1px solid #e2e8f0',
-              textAlign: 'center',
-              boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.06)',
-            }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
-                backgroundColor: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
-                color: '#64748b',
-              }}>
+            <div className="cash-closed-state">
+              <div className="cash-closed-icon">
                 <Lock size={26} />
               </div>
-              <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: '800', color: '#0f172a' }}>
+              <h3 className="cash-closed-title">
                 Caja Cerrada
               </h3>
-              <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b', lineHeight: 1.4 }}>
+              <p className="cash-closed-description">
                 No hay ningún turno activo. Inicie un nuevo turno para admitir ingresos y egresos de mostrador.
               </p>
-              <PermissionButton actionType="CASH_OPEN" className="btn btn-primary" style={{ width: '100%' }} onClick={() => setDialog('open')}>
+              <PermissionButton actionType="CASH_OPEN" className="btn btn-primary cash-open-action" onClick={() => setDialog('open')}>
                 Abrir nuevo turno de caja
               </PermissionButton>
             </div>
           )}
 
           {/* Tarjeta Informativa de Atajos & Control */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '18px 20px',
-            border: '1px solid var(--color-border, #e2e8f0)',
-            boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
-          }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--color-navy, #0f172a)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="cash-policy-card">
+            <div className="cash-policy-title">
               <Sparkles size={15} color="#d97706" />
               <span>Políticas Operativas de Turno</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11.5px', color: 'var(--color-muted, #64748b)' }}>
+            <div className="cash-policy-list">
               <div>• <strong>Arqueo ciego obligatorio:</strong> Realice conteo sin condicionamiento de saldo.</div>
               <div>• <strong>Tope de seguridad:</strong> Máx {formatMoney(CASH_SAFETY_LIMIT)} en gaveta física.</div>
               <div>• <strong>Corte Z:</strong> Entregar ticket impreso y firmado al relevo o supervisor.</div>
@@ -2957,48 +2504,26 @@ export function OperationalCashView({ notify }) {
         {/* ============================================================ */}
         {/* COLUMNA 2: Centro Financiero y Movimientos en Vivo (Derecha) */}
         {/* ============================================================ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="cash-finance-column">
           {/* Banner de Seguridad por Exceso de Efectivo (Cash Drop) */}
           {isCashExceeded && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 18px',
-              backgroundColor: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: '14px',
-              gap: '14px',
-              boxShadow: '0 4px 12px -2px rgba(217, 119, 6, 0.12)',
-              flexWrap: 'wrap',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: '#fef3c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#b45309',
-                  flexShrink: 0,
-                }}>
+            <div className="cash-drop-banner">
+              <div className="cash-drop-content">
+                <div className="cash-drop-icon">
                   <ShieldAlert size={22} />
                 </div>
                 <div>
-                  <strong style={{ color: '#92400e', fontSize: '13.5px', display: 'block' }}>
+                  <strong className="cash-drop-title">
                     Límite de seguridad en mostrador alcanzado (Saldo en gaveta: {formatMoney(expected)})
                   </strong>
-                  <span style={{ color: '#78350f', fontSize: '12px' }}>
+                  <span className="cash-drop-description">
                     El saldo en efectivo excede el límite recomendado de {formatMoney(CASH_SAFETY_LIMIT)}. Realice un pase de remesa a bóveda (Cash Drop) para minimizar riesgos.
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                className="btn btn-sm btn-primary"
-                style={{ backgroundColor: '#d97706', borderColor: '#d97706', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                className="btn btn-sm btn-primary cash-drop-action-primary"
                 onClick={handleTriggerCashDrop}
               >
                 <ShieldAlert size={15} />
@@ -3008,106 +2533,75 @@ export function OperationalCashView({ notify }) {
           )}
 
           {/* Barra de KPIs Financieros 5 Estrellas (High Contrast & Luxury) */}
-          <div className="cash-kpi-grid" style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '14px',
-          }}>
+          <div className="cash-kpi-grid">
             {/* KPI 1: Fondo Inicial */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              padding: '16px 18px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 14px -2px rgba(15, 23, 42, 0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div className="cash-kpi-card-initial">
+              <div className="cash-kpi-header">
+                <span className="cash-kpi-label-initial">
                   Fondo Inicial
                 </span>
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+                <div className="cash-kpi-icon-initial">
                   <Building2 size={15} />
                 </div>
               </div>
-              <strong style={{ fontSize: '1.25rem', color: '#0f172a', display: 'block', fontWeight: '800' }}>
+              <strong className="cash-kpi-value-initial">
                 {formatMoney(session?.openingAmount)}
               </strong>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fondo base en apertura</span>
+              <span className="cash-kpi-meta-initial">Fondo base en apertura</span>
             </div>
 
             {/* KPI 2: Ingresos del Turno */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              padding: '16px 18px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 14px -2px rgba(15, 23, 42, 0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div className="cash-kpi-card-income">
+              <div className="cash-kpi-header">
+                <span className="cash-kpi-label-income">
                   Ingresos Turno
                 </span>
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                <div className="cash-kpi-icon-income">
                   <TrendingUp size={15} />
                 </div>
               </div>
-              <strong style={{ fontSize: '1.25rem', color: '#15803d', display: 'block', fontWeight: '800' }}>
+              <strong className="cash-kpi-value-income">
                 +{formatMoney(income)}
               </strong>
-              <span style={{ fontSize: '11px', color: '#16a34a' }}>
+              <span className="cash-kpi-meta-income">
                 {incomeMovements.length} {incomeMovements.length === 1 ? 'cobro' : 'cobros'} en turno
               </span>
             </div>
 
             {/* KPI 3: Egresos del Turno */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              padding: '16px 18px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 14px -2px rgba(15, 23, 42, 0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div className="cash-kpi-card-expense">
+              <div className="cash-kpi-header">
+                <span className="cash-kpi-label-expense">
                   Egresos Turno
                 </span>
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                <div className="cash-kpi-icon-expense">
                   <TrendingDown size={15} />
                 </div>
               </div>
-              <strong style={{ fontSize: '1.25rem', color: '#b91c1c', display: 'block', fontWeight: '800' }}>
+              <strong className="cash-kpi-value-expense">
                 -{formatMoney(expenses)}
               </strong>
-              <span style={{ fontSize: '11px', color: '#b91c1c' }}>
+              <span className="cash-kpi-meta-expense">
                 {expenseMovements.length} {expenseMovements.length === 1 ? 'salida' : 'salidas'} en turno
               </span>
             </div>
 
             {/* KPI 4: Esperado en Gaveta (KPI Estrella) */}
-            <div style={{
-              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-              color: '#ffffff',
-              borderRadius: '14px',
-              padding: '16px 18px',
-              border: '1px solid rgba(212, 175, 55, 0.35)',
-              boxShadow: '0 8px 20px -4px rgba(15, 23, 42, 0.25)',
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#fef08a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div className="cash-kpi-card-expected">
+              <div className="cash-kpi-header">
+                <span className="cash-kpi-label-expected">
                   Esperado en Gaveta
                 </span>
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: 'rgba(212, 175, 55, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fef08a' }}>
+                <div className="cash-kpi-icon-expected">
                   <DollarSign size={15} />
                 </div>
               </div>
-              <strong style={{ fontSize: '1.35rem', color: '#ffffff', display: 'block', fontWeight: '900', letterSpacing: '-0.01em' }}>
+              <strong className="cash-kpi-value-expected">
                 {formatMoney(expected)}
               </strong>
-              <div style={{ fontSize: '11px', color: '#cbd5e1', display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+              <div className="cash-kpi-footer">
                 <span>Cuadre teórico</span>
-                <span style={{ color: session?.difference == null ? '#fef08a' : Math.abs(session.difference) < 0.01 ? '#86efac' : '#fca5a5' }}>
+                <span className="cash-kpi-difference">
                   {session?.difference == null ? 'Por arquear' : formatMoney(session.difference)}
                 </span>
               </div>
@@ -3115,52 +2609,39 @@ export function OperationalCashView({ notify }) {
           </div>
 
           {/* Tarjeta de Movimientos del Turno con Filtros y Buscador */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '20px',
-            border: '1px solid var(--color-border, #e2e8f0)',
-            boxShadow: '0 6px 20px -3px rgba(15, 23, 42, 0.05)',
-          }}>
+          <div className="cash-movements-card">
             {/* Header de la tarjeta */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+            <div className="cash-movements-header">
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--color-navy, #0f172a)' }}>
+                <h3 className="cash-movements-title">
                   Movimientos de la Sesión
                 </h3>
-                <span style={{ fontSize: '12px', color: 'var(--color-muted, #64748b)' }}>
+                <span className="cash-movements-count">
                   {displayedMovements.length} transacciones registradas en efectivo
                 </span>
               </div>
 
               {/* Buscador Rápido */}
-              <div style={{ position: 'relative', width: '220px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <div className="cash-movement-search">
+                <Search size={14} className="cash-movement-search-icon" />
                 <input
                   type="text"
                   placeholder="Buscar movimiento..."
                   value={movementSearch}
                   onChange={(e) => setMovementSearch(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px 6px 30px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '12px',
-                  }}
-                />
+                 className="cash-movement-search-input" />
               </div>
             </div>
 
             {/* Barra de Filtros Píldora */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Filter size={14} style={{ color: '#64748b' }} />
-                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569' }}>
+            <div className="cash-movement-filters">
+              <div className="cash-movement-filter-label">
+                <Filter size={14} className="cash-movement-filter-icon" />
+                <span className="cash-movement-filter-title">
                   Filtrar movimientos:
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div className="cash-movement-filter-tabs">
                 {[
                   { key: 'ALL', label: `Todos (${movements.length})` },
                   { key: 'INGRESO', label: `Ingresos (+) (${incomeMovements.length})` },
@@ -3170,8 +2651,7 @@ export function OperationalCashView({ notify }) {
                   <button
                     key={tab.key}
                     type="button"
-                    className={`btn btn-xs ${movementFilter === tab.key ? 'btn-primary' : 'btn-outline'}`}
-                    style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '999px' }}
+                    className={`btn btn-xs ${movementFilter === tab.key ? 'btn-primary' : 'btn-outline'} cash-movement-filter-tab`}
                     onClick={() => setMovementFilter(tab.key)}
                   >
                     {tab.label}
@@ -3181,16 +2661,16 @@ export function OperationalCashView({ notify }) {
             </div>
 
             {/* Tabla Estilizada */}
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+            <div className="cash-movement-table-wrap">
+              <table className="data-table cash-movement-table">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #f1f5f9', textAlign: 'left', color: '#64748b', fontSize: '11px', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '10px 8px' }}>Hora / ID</th>
-                    <th style={{ padding: '10px 8px' }}>Tipo</th>
-                    <th style={{ padding: '10px 8px' }}>Concepto & Categoría</th>
-                    <th style={{ padding: '10px 8px' }}>Comprobante</th>
-                    <th style={{ padding: '10px 8px' }}>Responsable</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Importe (PEN)</th>
+                  <tr className="cash-movement-table-header">
+                    <th className="cash-movement-header-cell">Hora / ID</th>
+                    <th className="cash-movement-header-cell">Tipo</th>
+                    <th className="cash-movement-header-cell">Concepto & Categoría</th>
+                    <th className="cash-movement-header-cell">Comprobante</th>
+                    <th className="cash-movement-header-cell">Responsable</th>
+                    <th className="cash-movement-amount-header">Importe (PEN)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3198,51 +2678,34 @@ export function OperationalCashView({ notify }) {
                     const isIncome = item.type === 'Ingreso';
                     const isExpense = item.type === 'Egreso';
                     return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #f8fafc', transition: 'background-color 0.15s' }}>
-                        <td style={{ padding: '10px 8px', color: '#475569', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontWeight: '600', display: 'block' }}>{new Date(item.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span>
-                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>#{item.id.slice(0, 6)}</span>
+                      <tr key={item.id} className="cash-movement-row">
+                        <td className="cash-movement-time-cell">
+                          <span className="cash-movement-time">{new Date(item.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="cash-movement-id">#{item.id.slice(0, 6)}</span>
                         </td>
-                        <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            backgroundColor: isIncome ? '#f0fdf4' : isExpense ? '#fef2f2' : '#eff6ff',
-                            color: isIncome ? '#15803d' : isExpense ? '#b91c1c' : '#1d4ed8',
-                            border: `1px solid ${isIncome ? '#bbf7d0' : isExpense ? '#fecaca' : '#bfdbfe'}`,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}>
+                        <td className="cash-movement-type-cell">
+                          <span className="cash-movement-type">
                             {isIncome ? <ArrowUpRight size={12} /> : isExpense ? <ArrowDownRight size={12} /> : null}
                             {item.type}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 8px', color: '#1e293b', fontWeight: '500' }}>
+                        <td className="cash-movement-concept">
                           {item.concept}
                         </td>
-                        <td style={{ padding: '10px 8px', color: '#64748b', fontSize: '11.5px', fontFamily: 'var(--font-mono, monospace)' }}>
+                        <td className="cash-movement-reference">
                           {item.referenceId || '—'}
                         </td>
-                        <td style={{ padding: '10px 8px', color: '#475569', fontSize: '11.5px' }}>
+                        <td className="cash-movement-responsible">
                           {item.responsible}
                         </td>
-                        <td style={{
-                          padding: '10px 8px',
-                          textAlign: 'right',
-                          fontWeight: '800',
-                          fontSize: '13px',
-                          color: isIncome ? '#15803d' : isExpense ? '#b91c1c' : '#0f172a',
-                        }}>
+                        <td className="cash-session-movement-amount">
                           {isIncome ? '+' : isExpense ? '-' : ''}{formatMoney(item.amount)}
                         </td>
                       </tr>
                     );
                   }) : (
                     <tr>
-                      <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td colSpan={6} className="cash-movement-empty">
                         No se encontraron movimientos registrados con los filtros seleccionados.
                       </td>
                     </tr>
@@ -3253,71 +2716,51 @@ export function OperationalCashView({ notify }) {
           </div>
 
           {/* Historial de Turnos de Caja (Auditoría) */}
-          <section style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '20px',
-            border: '1px solid var(--color-border, #e2e8f0)',
-            boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <section className="cash-session-history">
+            <div className="cash-session-history-header">
               <div>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <span className="cash-session-history-eyebrow">
                   Auditoría
                 </span>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
+                <h3 className="cash-session-history-title">
                   Historial de sesiones
                 </h3>
               </div>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
+              <span className="cash-session-history-count">
                 {state.cashSessions.length} turnos registrados
               </span>
             </div>
 
-            <div className="record-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="record-list cash-session-history-list">
               {state.cashSessions.map((item) => {
                 const isExact = item.difference != null && Math.abs(item.difference) < 0.01;
                 return (
-                  <article key={item.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f8fafc',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                  }}>
+                  <article key={item.id} className="cash-session-history-item">
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                        <strong style={{ fontSize: '13px', color: '#0f172a' }}>
+                      <div className="cash-session-history-item-header">
+                        <strong className="cash-session-history-item-title">
                           Turno {item.shift} · {item.responsible}
                         </strong>
-                        <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>
+                        <span className="cash-session-history-item-id">
                           #{item.id.slice(0, 8).toUpperCase()}
                         </span>
                       </div>
-                      <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                      <span className="cash-session-history-item-dates">
                         Apertura: {displayDateTime(item.openedAt)} · Cierre: {displayDateTime(item.closedAt)}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '10px', color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Diferencia</span>
-                        <strong style={{
-                          fontSize: '12px',
-                          color: item.difference == null ? '#64748b' : isExact ? '#16a34a' : '#dc2626',
-                        }}>
+                    <div className="cash-session-history-item-actions">
+                      <div className="cash-session-difference">
+                        <span className="cash-session-difference-label">Diferencia</span>
+                        <strong className="cash-session-difference-value">
                           {item.difference == null ? 'Pendiente' : isExact ? 'Cuadre Exacto' : formatMoney(item.difference)}
                         </strong>
                       </div>
 
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                        className="btn btn-sm btn-outline cash-session-report-action"
                         onClick={() => setReportSession(item)}
                         title="Ver e Imprimir Comprobante Corte Z"
                       >
@@ -3497,49 +2940,49 @@ function IncidentEditor({ incident, onClose, notify }) {
     }[incident.status] || 'Avanzar Estado';
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="incident-detail">
         {/* Header Banner */}
-        <div style={{ background: 'linear-gradient(135deg, var(--color-navy), var(--color-navy-deep))', color: '#fff', padding: '16px 20px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>{getIncidentTypeIcon(incident.type)}</span>
+        <div className="incident-banner">
+          <div className="incident-banner-content">
+            <span className="incident-type-icon">{getIncidentTypeIcon(incident.type)}</span>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              <div className="incident-reference">
                 INC-{incident.id.slice(0, 8).toUpperCase()} · {incident.type}
               </div>
-              <strong style={{ fontSize: '16px', color: '#fff' }}>{roomLabel}</strong>
+              <strong className="incident-room">{roomLabel}</strong>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="incident-status">
             <PriorityTag priority={incident.priority} />
-            <span style={{ background: 'rgba(255,255,255,0.12)', padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: '700', color: '#fff' }}>
+            <span className="incident-status-label">
               Estado: {incident.status}
             </span>
           </div>
         </div>
 
         {/* Stepper */}
-        <div style={{ background: 'var(--color-surface-soft)', padding: '12px 16px', borderRadius: '14px', border: '1px solid var(--color-border)' }}>
+        <div className="incident-stepper">
           <StatusStepper currentStatus={incident.status} steps={['Pendiente', 'Asignada', 'En proceso', 'Resuelta', 'Cerrada']} />
         </div>
 
         {/* Description info */}
-        <div style={{ background: 'var(--color-surface-soft)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '12px 16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+        <div className="incident-description">
+          <div className="incident-description-label">
             Descripción Reportada:
           </div>
-          <div style={{ fontSize: '13.5px', color: 'var(--color-text)', fontWeight: '500' }}>
+          <div className="incident-description-text">
             {incident.description}
           </div>
         </div>
 
         {/* Form Fields */}
-        <div className="form-grid" style={{ gap: '12px' }}>
-          <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <div className="form-grid incident-form">
+          <label className="incident-field">
             <span>Personal Responsable Asignado</span>
             <input value={form.responsible} onChange={(event) => set('responsible', event.target.value)} placeholder="Personal encargado" />
           </label>
 
-          <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+          <label className="incident-field">
             <span>Prioridad</span>
             <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
               {['Baja', 'Media', 'Alta', 'Urgente'].map((item) => (
@@ -3548,46 +2991,46 @@ function IncidentEditor({ incident, onClose, notify }) {
             </select>
           </label>
 
-          <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+          <label className="span-2 incident-field">
             <span>Nueva Evidencia / Enlace</span>
             <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="URL de fotos o comprobante de solución" />
           </label>
 
-          <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+          <label className="span-2 incident-field">
             <span>Solución / Informe de Atención</span>
             <textarea rows={2} value={form.solution} onChange={(event) => set('solution', event.target.value)} placeholder="Detalle la solución aplicada para resolver la incidencia..." />
           </label>
 
-          <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+          <label className="span-2 incident-field">
             <span>Nota Interna / Motivo</span>
             <textarea rows={2} value={form.note} onChange={(event) => set('note', event.target.value)} placeholder="Observaciones adicionales para el historial..." />
           </label>
 
           {incident.blocksRoom && (incident.status === 'Resuelta' || incident.status === 'En proceso') ? (
-            <div className="span-2" style={{ background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: '12px', padding: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                <input type="checkbox" checked={form.releaseRoom} onChange={(event) => set('releaseRoom', event.target.checked)} style={{ width: '16px', height: '16px' }} />
-                <strong style={{ fontSize: '12.5px', color: '#065f46' }}>
+            <div className="span-2 incident-room-release">
+              <label className="incident-room-release-label">
+                <input type="checkbox" checked={form.releaseRoom} onChange={(event) => set('releaseRoom', event.target.checked)}  className="incident-room-release-checkbox" />
+                <strong className="incident-room-release-text">
                   🔓 Liberar habitación y reincorporar al inventario disponible al cerrar la incidencia
                 </strong>
               </label>
             </div>
           ) : null}
 
-          <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="form-actions span-2 incident-form-actions">
             {canUpdate ? (
-              <PermissionButton actionType="INCIDENT_UPDATE" className="btn btn-outline" disabled={busy} onClick={save} style={{ padding: '10px 20px', borderRadius: '12px' }}>
+              <PermissionButton actionType="INCIDENT_UPDATE" className="btn btn-outline incident-save-action" disabled={busy} onClick={save}>
                 {busy ? 'Guardando…' : 'Guardar Cambios'}
               </PermissionButton>
             ) : <div />}
 
             {canProgress ? (
               incident.status === 'Cerrada' ? (
-                <PermissionButton actionType={progressActionType} className="btn btn-outline" disabled={busy} onClick={reopen} style={{ padding: '10px 22px', borderRadius: '12px', fontWeight: '700' }}>
+                <PermissionButton actionType={progressActionType} className="btn btn-outline incident-reopen-action" disabled={busy} onClick={reopen}>
                   {busy ? 'Procesando…' : '🔄 Reabrir Incidencia'}
                 </PermissionButton>
               ) : (
-                <PermissionButton actionType={progressActionType} className="btn btn-primary" disabled={busy} onClick={advance} style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}>
+                <PermissionButton actionType={progressActionType} className="btn btn-primary incident-advance-action" disabled={busy} onClick={advance}>
                   {busy ? 'Procesando…' : nextActionLabel}
                 </PermissionButton>
               )
@@ -3628,37 +3071,26 @@ function IncidentEditor({ incident, onClose, notify }) {
   };
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: '14px' }}>
+    <form className="form-grid incident-create-form" onSubmit={submit}>
       {/* Presets Bar */}
-      <div className="span-2" style={{ background: 'var(--color-surface-soft)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--color-border)' }}>
-        <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+      <div className="span-2 incident-presets">
+        <div className="incident-presets-label">
           Plantillas Rápidas de Incidencia Frecuente:
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="incident-preset-list">
           {COMMON_INCIDENT_PRESETS.map((p, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => applyPreset(p)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '16px',
-                fontSize: '11.5px',
-                fontWeight: '600',
-                background: '#fff',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
+             className="incident-preset-button">
               {p.label}
             </button>
           ))}
         </div>
       </div>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="incident-create-field">
         <span>Tipo de Incidencia</span>
         <select value={form.type} onChange={(event) => set('type', event.target.value)}>
           <option value="Limpieza">🧹 Limpieza</option>
@@ -3667,7 +3099,7 @@ function IncidentEditor({ incident, onClose, notify }) {
         </select>
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="incident-create-field">
         <span>Habitación Afectada</span>
         <select value={form.roomId} onChange={(event) => set('roomId', event.target.value)}>
           <option value="">🏢 Sin habitación (Incidencia General)</option>
@@ -3679,7 +3111,7 @@ function IncidentEditor({ incident, onClose, notify }) {
         </select>
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="incident-create-field">
         <span>Nivel de Prioridad & SLA</span>
         <select value={form.priority} onChange={(event) => set('priority', event.target.value)}>
           <option value="Baja">🟢 Baja (Atención dentro de 24h)</option>
@@ -3689,40 +3121,40 @@ function IncidentEditor({ incident, onClose, notify }) {
         </select>
       </label>
 
-      <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="incident-create-field">
         <span>Responsable Inicial</span>
         <input value={form.responsible} onChange={(event) => set('responsible', event.target.value)} placeholder="Ej: Personal de piso / Por asignar" />
       </label>
 
-      <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="span-2 incident-create-field">
         <span>Descripción del Suceso</span>
         <textarea required rows={3} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Describa la incidencia reportada en detalle..." />
       </label>
 
-      <label className="span-2" style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+      <label className="span-2 incident-create-field">
         <span>Evidencia / URL de Referencia (Opcional)</span>
         <input value={form.evidence} onChange={(event) => set('evidence', event.target.value)} placeholder="https://... URL de foto o referencia" />
       </label>
 
-      <div className="span-2" style={{ background: form.blocksRoom ? '#fef2f2' : 'var(--color-surface-soft)', border: form.blocksRoom ? '1.5px solid #f87171' : '1px solid var(--color-border)', borderRadius: '14px', padding: '14px', transition: 'all 0.2s ease' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
-          <input type="checkbox" disabled={!form.roomId} checked={form.blocksRoom} onChange={(event) => set('blocksRoom', event.target.checked)} style={{ width: '18px', height: '18px' }} />
+      <div className="span-2 incident-room-block">
+        <label className="incident-room-block-label">
+          <input type="checkbox" disabled={!form.roomId} checked={form.blocksRoom} onChange={(event) => set('blocksRoom', event.target.checked)}  className="incident-room-block-checkbox" />
           <div>
-            <strong style={{ fontSize: '13px', color: form.blocksRoom ? '#991b1b' : 'var(--color-text)' }}>
+            <strong className="incident-room-block-title">
               🔒 Bloquear Operativamente la Habitación (Fuera de Servicio)
             </strong>
-            <div style={{ fontSize: '11.5px', color: form.blocksRoom ? '#b91c1c' : 'var(--color-muted)', marginTop: '2px' }}>
+            <div className="incident-room-block-help">
               {form.roomId ? 'La habitación no podrá ser asignada a reservas mientras la incidencia permanezca activa.' : 'Seleccione una habitación para habilitar el bloqueo preventivo.'}
             </div>
           </div>
         </label>
       </div>
 
-      <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-        <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose} style={{ padding: '10px 20px', borderRadius: '12px' }}>
+      <div className="form-actions span-2 incident-create-actions">
+        <button type="button" className="btn btn-outline incident-cancel-action" disabled={busy} onClick={onClose}>
           Cancelar
         </button>
-        <button className="btn btn-primary" disabled={busy} style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}>
+        <button className="btn btn-primary incident-create-action" disabled={busy}>
           {busy ? 'Registrando incidencia…' : 'Crear Incidencia'}
         </button>
       </div>
@@ -3771,100 +3203,6 @@ export function OperationalIncidentsView({ notify }) {
 
   return (
     <div className="view-container">
-      <style>{`
-        .incident-metric-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 14px;
-          margin-bottom: 20px;
-        }
-        .incident-metric-card {
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 16px;
-          padding: 16px 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          box-shadow: var(--shadow-sm);
-          transition: all 0.2s ease;
-        }
-        .incident-metric-card:hover {
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-card);
-        }
-        .custom-filter-bar {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 14px;
-          background: var(--color-surface);
-          padding: 16px 20px;
-          border-radius: 16px;
-          border: 1px solid var(--color-border);
-          margin-bottom: 20px;
-          align-items: center;
-          box-shadow: var(--shadow-sm);
-        }
-        .custom-filter-bar label {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          font-weight: 700;
-          font-size: 11.5px;
-          color: var(--color-navy-soft);
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-        .custom-filter-bar select, .custom-filter-bar input {
-          padding: 8px 12px;
-          border-radius: 10px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg);
-          font-size: 13px;
-          outline: none;
-          min-width: 170px;
-          transition: all 0.2s ease;
-        }
-        .custom-filter-bar select:focus, .custom-filter-bar input:focus {
-          border-color: var(--color-gold);
-          box-shadow: 0 0 0 3px rgba(197, 157, 95, 0.15);
-        }
-        .incident-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-          gap: 18px;
-          margin-top: 8px;
-        }
-        .incident-card {
-          position: relative;
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 16px;
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          overflow: hidden;
-        }
-        .incident-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 25px rgba(15,23,42,0.08);
-        }
-        .incident-card::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 5px;
-        }
-        .priority-Baja::before, .priority-low::before { background-color: #94a3b8; }
-        .priority-Media::before, .priority-medium::before { background-color: #0284c7; }
-        .priority-Alta::before, .priority-high::before { background-color: #d97706; }
-        .priority-Urgente::before, .priority-urgent::before { background-color: #dc2626; }
-      `}</style>
 
       <PageHeader
         actionType="INCIDENT_CREATE"
@@ -3872,50 +3210,50 @@ export function OperationalIncidentsView({ notify }) {
         title="Incidencias"
         description="Monitoreo centralizado de incidencias de limpieza, mantenimiento y servicio con bloqueo preventivo."
         action={
-          <PermissionButton actionType="INCIDENT_CREATE" className="btn btn-primary" onClick={() => setEditor(null)} style={{ borderRadius: '12px', padding: '10px 20px', fontWeight: '700' }}>
-            <Plus size={16} style={{ marginRight: '6px' }} /> Nueva incidencia
+          <PermissionButton actionType="INCIDENT_CREATE" className="btn btn-primary incident-new-action" onClick={() => setEditor(null)}>
+            <Plus size={16} /> Nueva incidencia
           </PermissionButton>
         }
       />
 
       {/* Modern KPI Strip */}
       <div className="incident-metric-grid">
-        <div className="incident-metric-card" style={{ borderLeft: '4px solid #d97706' }}>
+        <div className="incident-metric-card incident-metric-pending">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pendientes de Cierre</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--color-navy-deep)', marginTop: '2px' }}>{pendingCount}</div>
+            <div className="incident-metric-label">Pendientes de Cierre</div>
+            <div className="incident-metric-value incident-metric-pending-value">{pendingCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>⏳</span>
+          <span className="incident-metric-icon">⏳</span>
         </div>
 
-        <div className="incident-metric-card" style={{ borderLeft: '4px solid #0284c7' }}>
+        <div className="incident-metric-card incident-metric-in-process">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En Proceso</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#0284c7', marginTop: '2px' }}>{inProcessCount}</div>
+            <div className="incident-metric-label">En Proceso</div>
+            <div className="incident-metric-value incident-metric-in-process-value">{inProcessCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>🔄</span>
+          <span className="incident-metric-icon">🔄</span>
         </div>
 
-        <div className="incident-metric-card" style={{ borderLeft: '4px solid #dc2626', background: urgentCount > 0 ? '#fef2f2' : undefined }}>
+        <div className="incident-metric-card incident-metric-urgent">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: urgentCount > 0 ? '#991b1b' : 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Urgentes / Críticas</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>{urgentCount}</div>
+            <div className="incident-metric-urgent-label">Urgentes / Críticas</div>
+            <div className="incident-metric-value incident-metric-urgent-value">{urgentCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>🚨</span>
+          <span className="incident-metric-icon">🚨</span>
         </div>
 
-        <div className="incident-metric-card" style={{ borderLeft: '4px solid #059669' }}>
+        <div className="incident-metric-card incident-metric-closed">
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cerradas / Resueltas</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#059669', marginTop: '2px' }}>{closedCount}</div>
+            <div className="incident-metric-label">Cerradas / Resueltas</div>
+            <div className="incident-metric-value incident-metric-closed-value">{closedCount}</div>
           </div>
-          <span style={{ fontSize: '26px' }}>✅</span>
+          <span className="incident-metric-icon">✅</span>
         </div>
       </div>
 
       {/* Filter Toolbar */}
       <div className="custom-filter-bar">
-        <label style={{ flex: '1 1 200px' }}>
+        <label className="incident-filter-search">
           <span>Búsqueda Rápida</span>
           <input
             type="text"
@@ -3969,14 +3307,14 @@ export function OperationalIncidentsView({ notify }) {
             return (
               <article className={`incident-card ${pClass}`} key={incident.id}>
                 <div>
-                  <div className="row-between" style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '24px' }}>{typeIcon}</span>
+                  <div className="row-between incident-card-header">
+                    <div className="incident-card-identity">
+                      <span className="incident-card-icon">{typeIcon}</span>
                       <div>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-gold)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <span className="incident-card-reference">
                           {shortId} · {incident.type}
                         </span>
-                        <h3 style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--color-navy-deep)', margin: '2px 0 0' }}>
+                        <h3 className="incident-card-room">
                           {roomNumber}
                         </h3>
                       </div>
@@ -3984,18 +3322,18 @@ export function OperationalIncidentsView({ notify }) {
                     <StatusBadge>{incident.status}</StatusBadge>
                   </div>
 
-                  <p style={{ color: 'var(--color-text)', fontSize: '13px', margin: '8px 0 12px 0', lineHeight: 1.4 }}>
+                  <p className="incident-card-description">
                     {incident.description}
                   </p>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                  <div className="incident-card-meta">
                     <PriorityTag priority={incident.priority} />
                     {incident.blocksRoom ? (
-                      <span style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="incident-card-blocked">
                         <Lock size={11} /> Bloquea Habitación
                       </span>
                     ) : (
-                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="incident-card-unblocked">
                         <Unlock size={11} /> Sin Bloqueo
                       </span>
                     )}
@@ -4009,14 +3347,13 @@ export function OperationalIncidentsView({ notify }) {
                   ]} />
                 </div>
 
-                <div style={{ marginTop: '14px', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
+                <div className="incident-card-footer">
                   <StatusStepper currentStatus={incident.status} steps={INCIDENT_STATUS_STEPS} />
 
-                  <div style={{ marginTop: '14px' }}>
+                  <div className="incident-card-actions">
                     {(canUpdateIncident || (incident.status === 'Cerrada' ? canReopenIncident : canProgressIncident)) ? (
                       <button
-                        className="btn btn-outline btn-sm"
-                        style={{ width: '100%', borderRadius: '10px', fontWeight: '700', padding: '8px 12px' }}
+                        className="btn btn-outline btn-sm incident-manage-action"
                         onClick={() => setEditor(incident)}
                       >
                         Gestionar Incidencia

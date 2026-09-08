@@ -82,11 +82,11 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
       wide
     >
       {fetching ? (
-        <div className="card route-loading" role="status" style={{ padding: '36px', textAlign: 'center' }}>
+        <div className="card route-loading schedule-loading-state" role="status">
           Cargando esquemas de horario disponibles…
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="form-grid" style={{ gap: '18px' }}>
+        <form onSubmit={handleSubmit} className="form-grid schedule-form">
           {/* Top Banner */}
           <div className="schedule-hero-banner span-2">
             <div className="schedule-hero-icon">
@@ -109,7 +109,7 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
           )}
 
           <label>
-            <span>Esquema de Horario <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
+            <span>Esquema de Horario <strong className="required-marker">*</strong></span>
             <div className="field-icon-wrap">
               <Clock size={16} />
               <select
@@ -133,7 +133,7 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
           </label>
 
           <label>
-            <span>Válido Desde <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
+            <span>Válido Desde <strong className="required-marker">*</strong></span>
             <div className="field-icon-wrap">
               <Calendar size={16} />
               <input
@@ -166,7 +166,7 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
               </div>
               <div className="schedule-day-item rest">
                 <span className="day-name">Domingos</span>
-                <strong className="day-hours" style={{ color: 'var(--color-muted)' }}>Descanso</strong>
+                <strong className="day-hours day-hours-rest">Descanso</strong>
                 <small className="day-type">Sin turno asignado</small>
               </div>
             </div>
@@ -178,7 +178,7 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
           </div>
 
           {/* Form Actions */}
-          <div className="form-actions span-2" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <div className="form-actions span-2 schedule-form-actions">
             <button
               type="button"
               className="btn btn-outline"

@@ -82,20 +82,25 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
     perPerson: true
   });
 
-  useEffect(() => { 
-    eventsClient.getSpaces().then(sp => {
+  useEffect(() => {
+    const controller = new AbortController();
+    eventsClient.getSpaces(controller.signal).then(sp => {
+      if (controller.signal.aborted) return;
       setSpaces(sp);
-      if (sp.length > 0 && !spaceId) {
-        setSpaceId(sp[0].id);
-      }
-    }).catch((err) => setError(err.message)); 
+      if (sp.length > 0) setSpaceId((currentSpaceId) => currentSpaceId || sp[0].id);
+    }).catch((err) => {
+      if (!controller.signal.aborted) setError(err.message);
+    });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    if (!spaceId) { setForm(null); return; }
+    const controller = new AbortController();
+    if (!spaceId) { setForm(null); return () => controller.abort(); }
     setError('');
     setSuccessMsg('');
-    eventsClient.getSpacePolicy(spaceId).then((policy) => {
+    eventsClient.getSpacePolicy(spaceId, controller.signal).then((policy) => {
+      if (controller.signal.aborted) return;
       setForm(policy);
       
       // Parse or load rules
@@ -120,7 +125,10 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
 
       // Parse or load services
       setServices(Array.isArray(policy.services) ? policy.services : []);
-    }).catch((err) => setError(err.message));
+    }).catch((err) => {
+      if (!controller.signal.aborted) setError(err.message);
+    });
+    return () => controller.abort();
   }, [spaceId]);
 
   const change = (name, value) => setForm((current) => ({ ...current, [name]: value }));
@@ -175,41 +183,40 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
   };
 
   return (
-    <div className="view-container" style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 60 }}>
+    <div className="view-container event-space-policy-editor">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="event-policy-header">
         <div>
           <button 
             type="button" 
             onClick={onClose}
-            className="btn btn-outline"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '6px 14px', fontSize: 13 }}
+            className="btn btn-outline event-policy-back"
           >
             <ArrowLeft size={14} /> Volver a eventos
           </button>
-          <h2 style={{ fontSize: 24, fontWeight: 900, color: 'var(--color-navy, #1E3A8A)', margin: 0 }}>
+          <h2 className="event-policy-title">
             Configuración & Políticas de Salones
           </h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-muted, #6B7280)', fontSize: 13.5 }}>
+          <p className="event-policy-subtitle">
             Ajuste capacidades, tarifas por hora, tiempos de preparación y políticas operativas por ambiente.
           </p>
         </div>
       </div>
 
       {error && (
-        <div style={{ padding: '14px 18px', background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, fontWeight: 600 }}>
+        <div className="event-policy-message event-policy-message--error">
           <AlertTriangle size={18} /> {error}
         </div>
       )}
 
       {successMsg && (
-        <div style={{ padding: '14px 18px', background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, fontWeight: 600 }}>
+        <div className="event-policy-message event-policy-message--success">
           <CheckCircle2 size={18} /> {successMsg}
         </div>
       )}
 
       {/* Selector de Ambiente */}
-      <div className="card" style={{ padding: 22, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)', marginBottom: 20 }}>
+      <div className="card event-policy-card event-policy-space-selector">
         <P1Select 
           label="Seleccionar Salón o Espacio para Configurar" 
           value={spaceId} 
@@ -223,13 +230,13 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
       </div>
 
       {form ? (
-        <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <form onSubmit={save} className="event-policy-form">
           {/* Card: Tarifas y Capacidad */}
-          <div className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 16px', borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="card event-policy-card">
+            <h3 className="event-policy-section-title">
               1. Tarifas, Tiempos de Montaje y Capacidad
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <div className="event-policy-grid event-policy-grid--three">
               {numericFields.map((f) => (
                 <P1Input 
                   key={f.key} 
@@ -244,11 +251,11 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
           </div>
 
           {/* Card: Horarios de Operación */}
-          <div className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 16px', borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="card event-policy-card">
+            <h3 className="event-policy-section-title">
               2. Horario de Disponibilidad del Ambiente
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="event-policy-grid event-policy-grid--two">
               <P1Input 
                 type="time" 
                 label="Horario de Apertura" 
@@ -265,68 +272,68 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
           </div>
 
           {/* Card: Reglas Operativas Visuales (SIN JSON) */}
-          <div className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 16px', borderBottom: '1px solid #F3F4F6', paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card event-policy-card">
+            <h3 className="event-policy-section-title event-policy-section-title--icon">
               <ShieldCheck size={18} color="#C59D5F" /> 3. Reglas y Restricciones del Salón
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 20 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, border: '1px solid #E5E7EB', background: rules.liveMusicAllowed ? '#F0FDF4' : '#F9FAFB', cursor: 'pointer' }}>
+            <div className="event-policy-grid event-policy-grid--two event-policy-rules-grid">
+              <label className={`event-policy-rule${rules.liveMusicAllowed ? ' is-enabled' : ''}`}>
                 <input 
                   type="checkbox" 
                   checked={rules.liveMusicAllowed} 
                   onChange={(e) => setRules(r => ({ ...r, liveMusicAllowed: e.target.checked }))} 
-                  style={{ width: 18, height: 18 }}
+                  className="event-policy-checkbox"
                 />
                 <div>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block' }}>Música en Vivo / Orquesta Permitida</strong>
-                  <span style={{ fontSize: 11.5, color: '#6B7280' }}>Permite bandas y equipos de amplificación alta</span>
+                  <strong className="event-policy-rule-title">Música en Vivo / Orquesta Permitida</strong>
+                  <span className="event-policy-rule-copy">Permite bandas y equipos de amplificación alta</span>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, border: '1px solid #E5E7EB', background: rules.externalCateringAllowed ? '#F0FDF4' : '#F9FAFB', cursor: 'pointer' }}>
+              <label className={`event-policy-rule${rules.externalCateringAllowed ? ' is-enabled' : ''}`}>
                 <input 
                   type="checkbox" 
                   checked={rules.externalCateringAllowed} 
                   onChange={(e) => setRules(r => ({ ...r, externalCateringAllowed: e.target.checked }))} 
-                  style={{ width: 18, height: 18 }}
+                  className="event-policy-checkbox"
                 />
                 <div>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block' }}>Catering Externo Permitido</strong>
-                  <span style={{ fontSize: 11.5, color: '#6B7280' }}>Si se desmarca, solo se admiten consumos del hotel</span>
+                  <strong className="event-policy-rule-title">Catering Externo Permitido</strong>
+                  <span className="event-policy-rule-copy">Si se desmarca, solo se admiten consumos del hotel</span>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, border: '1px solid #E5E7EB', background: rules.securityRequired ? '#F0FDF4' : '#F9FAFB', cursor: 'pointer' }}>
+              <label className={`event-policy-rule${rules.securityRequired ? ' is-enabled' : ''}`}>
                 <input 
                   type="checkbox" 
                   checked={rules.securityRequired} 
                   onChange={(e) => setRules(r => ({ ...r, securityRequired: e.target.checked }))} 
-                  style={{ width: 18, height: 18 }}
+                  className="event-policy-checkbox"
                 />
                 <div>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block' }}>Personal de Seguridad Obligatorio</strong>
-                  <span style={{ fontSize: 11.5, color: '#6B7280' }}>Requiere al menos 1 agente asignado por la propiedad</span>
+                  <strong className="event-policy-rule-title">Personal de Seguridad Obligatorio</strong>
+                  <span className="event-policy-rule-copy">Requiere al menos 1 agente asignado por la propiedad</span>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, border: '1px solid #E5E7EB', background: rules.smokingAllowed ? '#F0FDF4' : '#F9FAFB', cursor: 'pointer' }}>
+              <label className={`event-policy-rule${rules.smokingAllowed ? ' is-enabled' : ''}`}>
                 <input 
                   type="checkbox" 
                   checked={rules.smokingAllowed} 
                   onChange={(e) => setRules(r => ({ ...r, smokingAllowed: e.target.checked }))} 
-                  style={{ width: 18, height: 18 }}
+                  className="event-policy-checkbox"
                 />
                 <div>
-                  <strong style={{ fontSize: 13, color: '#111827', display: 'block' }}>Terraza / Zona de Fumadores Habilitada</strong>
-                  <span style={{ fontSize: 11.5, color: '#6B7280' }}>Habilita ceniceros y ventilación de terraza</span>
+                  <strong className="event-policy-rule-title">Terraza / Zona de Fumadores Habilitada</strong>
+                  <span className="event-policy-rule-copy">Habilita ceniceros y ventilación de terraza</span>
                 </div>
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="event-policy-grid event-policy-grid--two event-policy-volume-grid">
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-policy-field-label">
                   Límite Máximo de Volumen Acústico (dB)
                 </label>
                 <input 
@@ -335,33 +342,33 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
                   max="120"
                   value={rules.maxDecibels}
                   onChange={(e) => setRules(r => ({ ...r, maxDecibels: Number(e.target.value) }))}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 14 }}
+                  className="event-policy-field-control"
                 />
               </div>
             </div>
 
             {/* Custom Rules List */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+              <label className="event-policy-field-label">
                 Restricciones Específicas del Ambiente
               </label>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <div className="event-policy-custom-rule-entry">
                 <input 
                   type="text"
                   placeholder="Ej: No se permite pirotecnia en interiores, Prohibido confeti metálico..."
                   value={newCustomRule}
                   onChange={(e) => setNewCustomRule(e.target.value)}
-                  style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                  className="event-policy-field-control event-policy-custom-rule-input"
                 />
-                <button type="button" onClick={addCustomRule} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <button type="button" onClick={addCustomRule} className="btn btn-outline event-policy-inline-button">
                   <Plus size={15} /> Agregar Regla
                 </button>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="event-policy-custom-rules">
                 {rules.customRules.map((rule, idx) => (
-                  <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#F1F5F9', borderRadius: 9999, fontSize: 12, color: '#334155' }}>
+                  <span key={idx} className="event-policy-custom-rule">
                     {rule}
-                    <button type="button" onClick={() => removeCustomRule(idx)} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}>
+                    <button type="button" onClick={() => removeCustomRule(idx)} className="event-policy-remove-button">
                       <X size={13} />
                     </button>
                   </span>
@@ -371,13 +378,13 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
           </div>
 
           {/* Card: Política de Cancelación Visual (SIN JSON) */}
-          <div className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: '0 0 16px', borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="card event-policy-card">
+            <h3 className="event-policy-section-title">
               4. Política de Cancelación y Penalidades
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 16 }}>
+            <div className="event-policy-grid event-policy-grid--three event-policy-cancellation-grid">
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-policy-field-label">
                   Días Mínimos para Reembolso Completo
                 </label>
                 <input 
@@ -385,12 +392,12 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
                   min="0"
                   value={cancellation.daysBeforeFullRefund}
                   onChange={(e) => setCancellation(c => ({ ...c, daysBeforeFullRefund: Number(e.target.value) }))}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 14 }}
+                  className="event-policy-field-control"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                <label className="event-policy-field-label">
                   Penalidad por Cancelación Tardía (%)
                 </label>
                 <input 
@@ -399,47 +406,46 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
                   max="100"
                   value={cancellation.penaltyPercentage}
                   onChange={(e) => setCancellation(c => ({ ...c, penaltyPercentage: Number(e.target.value) }))}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 14 }}
+                  className="event-policy-field-control"
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', paddingTop: 20 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <div className="event-policy-refund-field">
+                <label className="event-policy-checkbox-label">
                   <input 
                     type="checkbox"
                     checked={cancellation.guaranteeRefundable}
                     onChange={(e) => setCancellation(c => ({ ...c, guaranteeRefundable: e.target.checked }))}
-                    style={{ width: 18, height: 18 }}
+                    className="event-policy-checkbox"
                   />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Garantía Reembolsable al 100%</span>
+                  <span className="event-policy-rule-title">Garantía Reembolsable al 100%</span>
                 </label>
               </div>
             </div>
 
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+              <label className="event-policy-field-label">
                 Cláusula o Nota Aclaratoria
               </label>
               <textarea 
                 rows={2}
                 value={cancellation.notes}
                 onChange={(e) => setCancellation(c => ({ ...c, notes: e.target.value }))}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, boxSizing: 'border-box' }}
+                className="event-policy-field-control event-policy-notes"
               />
             </div>
           </div>
 
           {/* Card: Catálogo de Servicios por Salón (SIN JSON) */}
-          <div className="card" style={{ padding: 24, borderRadius: 14, background: '#FFFFFF', border: '1px solid var(--color-border, #E5E7EB)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: 0 }}>
+          <div className="card event-policy-card">
+            <div className="event-policy-services-header">
+              <h3 className="event-policy-section-title event-policy-section-title--services">
                 5. Catálogo de Servicios & Paquetes Disponibles en este Salón
               </h3>
               <button 
                 type="button" 
                 onClick={() => setShowAddService(!showAddService)}
-                className="btn btn-primary"
-                style={{ fontSize: 12.5, padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                className="btn btn-primary event-policy-service-toggle"
               >
                 <Plus size={14} /> {showAddService ? 'Cerrar Formulario' : '+ Agregar Servicio'}
               </button>
@@ -447,49 +453,49 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
 
             {/* Formulario Agregar Servicio */}
             {showAddService && (
-              <div style={{ background: '#F8FAFC', padding: 18, borderRadius: 12, border: '1px solid #E2E8F0', marginBottom: 18 }}>
-                <h4 style={{ margin: '0 0 12px', fontSize: 13.5, fontWeight: 800, color: '#1E3A8A' }}>Nuevo Servicio para el Ambiente</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 100px 120px auto', gap: 12, alignItems: 'flex-end' }}>
+              <div className="event-policy-add-service">
+                <h4 className="event-policy-add-service-title">Nuevo Servicio para el Ambiente</h4>
+                <div className="event-policy-service-grid">
                   <div>
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4 }}>Nombre del Servicio *</label>
+                    <label className="event-policy-service-label">Nombre del Servicio *</label>
                     <input 
                       type="text" 
                       placeholder="Ej: Open Bar Autor, Coffee Break..." 
                       value={newService.name} 
                       onChange={(e) => setNewService(s => ({ ...s, name: e.target.value }))}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}
+                      className="event-policy-service-control"
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4 }}>Categoría</label>
+                    <label className="event-policy-service-label">Categoría</label>
                     <select 
                       value={newService.category} 
                       onChange={(e) => setNewService(s => ({ ...s, category: e.target.value }))}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}
+                      className="event-policy-service-control"
                     >
                       {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4 }}>Tarifa (S/)</label>
+                    <label className="event-policy-service-label">Tarifa (S/)</label>
                     <input 
                       type="number" 
                       step="0.50" 
                       min="0" 
                       value={newService.unitAmount} 
                       onChange={(e) => setNewService(s => ({ ...s, unitAmount: Number(e.target.value) }))}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}
+                      className="event-policy-service-control"
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4 }}>Modalidad</label>
+                    <label className="event-policy-service-label">Modalidad</label>
                     <select 
                       value={newService.perPerson ? 'person' : 'fixed'} 
                       onChange={(e) => setNewService(s => ({ ...s, perPerson: e.target.value === 'person' }))}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}
+                      className="event-policy-service-control"
                     >
                       <option value="person">Por Persona</option>
                       <option value="fixed">Tarifa Plana</option>
@@ -499,8 +505,7 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
                   <button 
                     type="button" 
                     onClick={handleAddService} 
-                    className="btn btn-primary"
-                    style={{ padding: '8px 16px', fontSize: 13, fontWeight: 800 }}
+                    className="btn btn-primary event-policy-service-save"
                   >
                     Guardar
                   </button>
@@ -510,38 +515,38 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
 
             {/* Tabla de Servicios */}
             {services.length > 0 ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table className="event-policy-services-table">
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', textAlign: 'left' }}>
-                    <th style={{ padding: '10px 12px', color: '#475569' }}>Servicio</th>
-                    <th style={{ padding: '10px 12px', color: '#475569' }}>Categoría</th>
-                    <th style={{ padding: '10px 12px', color: '#475569' }}>Modalidad</th>
-                    <th style={{ padding: '10px 12px', color: '#475569', textAlign: 'right' }}>Tarifa Unit.</th>
-                    <th style={{ padding: '10px 12px', color: '#475569', textAlign: 'center' }}>Acciones</th>
+                  <tr className="event-policy-services-heading">
+                    <th>Servicio</th>
+                    <th>Categoría</th>
+                    <th>Modalidad</th>
+                    <th className="is-right">Tarifa Unit.</th>
+                    <th className="is-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {services.map((s, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#111827' }}>
+                    <tr key={idx}>
+                      <td className="event-policy-service-name">
                         {s.name || s.serviceCode || s.code}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#64748B' }}>
+                      <td className="event-policy-service-category">
                         {s.category || 'General'}
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{ fontSize: 11.5, padding: '3px 8px', borderRadius: 6, background: s.perPerson ? '#EFF6FF' : '#F1F5F9', color: s.perPerson ? '#1D4ED8' : '#475569', fontWeight: 600 }}>
+                      <td>
+                        <span className={`event-policy-service-mode${s.perPerson ? ' is-per-person' : ''}`}>
                           {s.perPerson ? 'Por persona' : 'Tarifa fija'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#15803D' }}>
+                      <td className="event-policy-service-amount">
                         S/ {Number(s.unitAmount || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <td className="event-policy-service-actions">
                         <button 
                           type="button" 
                           onClick={() => removeService(idx)} 
-                          style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: 4 }}
+                           className="event-policy-delete-service"
                           title="Eliminar servicio"
                         >
                           <Trash2 size={15} />
@@ -552,28 +557,27 @@ export function EventSpacePolicyEditor({ onClose, onSaved }) {
                 </tbody>
               </table>
             ) : (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: '#94A3B8', fontSize: 13 }}>
+              <div className="event-policy-no-services">
                 No hay servicios adicionales configurados específicamente para este salón.
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 10 }}>
-            <button type="button" onClick={onClose} className="btn btn-outline" style={{ padding: '12px 24px' }}>
+          <div className="event-policy-form-actions">
+            <button type="button" onClick={onClose} className="btn btn-outline event-policy-cancel">
               Cancelar
             </button>
             <button 
               type="submit" 
               disabled={saving} 
-              className="btn btn-primary" 
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 32px', fontWeight: 800, fontSize: 14 }}
+              className="btn btn-primary event-policy-submit"
             >
               <Save size={16} /> {saving ? 'Guardando...' : 'Guardar Políticas del Ambiente'}
             </button>
           </div>
         </form>
       ) : (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#6B7280' }}>
+        <div className="event-policy-no-space">
           Seleccione un salón para cargar sus parámetros.
         </div>
       )}

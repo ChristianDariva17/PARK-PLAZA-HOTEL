@@ -45,10 +45,11 @@ const STANDARD_CATERING_SERVICES = [
   { code: 'wireless_mics_podium', name: 'Set de Micrófonos Inalámbricos & Podio', unitAmount: 120, perPerson: false, icon: Mic },
   { code: 'floral_decoration', name: 'Decoración Floral & Mantelería Fina', unitAmount: 180, perPerson: false, icon: Flower2 },
 ];
+const EMPTY_GUESTS = [];
 
 export function EventEditor({ eventId, onSaved, onCancel }) {
   const { state } = useHotel();
-  const hotelGuests = state.guests || [];
+  const hotelGuests = state.guests ?? EMPTY_GUESTS;
   const hotelStays = state.stays || [];
 
   const [loading, setLoading] = useState(false);
@@ -94,24 +95,29 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchSpaces = async () => {
       try {
-        const sp = await eventsClient.getSpaces();
+        const sp = await eventsClient.getSpaces(controller.signal);
+        if (controller.signal.aborted) return;
         setSpaces(sp);
-        if (sp.length > 0 && !formData.spaceId) {
-          setFormData(prev => ({ ...prev, spaceId: sp[0].id }));
-        }
+        if (sp.length > 0) setFormData(prev => prev.spaceId ? prev : ({ ...prev, spaceId: sp[0].id }));
       } catch (e) {
-        console.error(e);
+        if (!controller.signal.aborted) console.error(e);
       }
     };
     fetchSpaces();
+    return () => controller.abort();
+  }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
     if (eventId) {
       const fetchEvent = async () => {
         try {
           setLoading(true);
-          const ev = await eventsClient.getEventDetail(eventId);
+          const ev = await eventsClient.getEventDetail(eventId, controller.signal);
+          if (controller.signal.aborted) return;
           setExpectedVersion(ev.version);
 
           // Restore services
@@ -142,9 +148,9 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
             recurrenceWeeks: 4
           });
         } catch (e) {
-          setError(e.message);
+          if (!controller.signal.aborted) setError(e.message);
         } finally {
-          setLoading(false);
+          if (!controller.signal.aborted) setLoading(false);
         }
       };
       fetchEvent();
@@ -153,7 +159,8 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         setFormData(prev => ({ ...prev, identityId: hotelGuests[0].id }));
       }
     }
-  }, [eventId]);
+    return () => controller.abort();
+  }, [eventId, hotelGuests]);
 
   const selectedSpace = useMemo(() => {
     return spaces.find(s => s.id === formData.spaceId);
@@ -374,25 +381,24 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
   };
 
   return (
-    <div className="view-container" style={{ maxWidth: 1040, margin: '0 auto', paddingBottom: 60 }}>
+    <div className="view-container event-editor-view">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="event-editor-header">
         <div>
           <button 
             type="button" 
             onClick={onCancel}
-            className="btn btn-outline"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '6px 14px', fontSize: 13 }}
+            className="btn btn-outline event-editor-back-button"
           >
             <ArrowLeft size={14} /> Volver a la agenda
           </button>
-          <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#D97706', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="event-editor-kicker">
             <Sparkles size={14} /> Gestión de Salones, Banquetería & Eventos 5★
           </div>
-          <h2 style={{ fontSize: 26, fontWeight: 900, color: '#1E3A8A', margin: '4px 0 0', letterSpacing: '-0.02em' }}>
+          <h2 className="event-editor-title">
             {eventId ? 'Editar Reserva de Evento' : 'Registrar Nuevo Evento'}
           </h2>
-          <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: 13.5 }}>
+          <p className="event-editor-description">
             Complete los datos del anfitrión, selección del salón, paquetes de catering de cocina/bar y horarios de servicio.
           </p>
         </div>
@@ -400,9 +406,9 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
 
       {/* Conflict Warning Alert */}
       {conflictWarning && (
-        <div style={{ padding: '14px 18px', background: '#FEF3C7', border: '1.5px solid #F59E0B', color: '#92400E', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, fontSize: 13.5, fontWeight: 700, boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
+        <div className="event-editor-alert event-editor-conflict-alert">
           <AlertTriangle size={22} color="#D97706" />
-          <div style={{ flex: 1 }}>
+          <div className="event-editor-alert-content">
             <span>⚠️ Conflicto de Disponibilidad: El salón ya tiene agendado el evento <strong>"{conflictWarning.title}"</strong> ({new Date(conflictWarning.startsAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })} a {new Date(conflictWarning.endsAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}).</span>
           </div>
         </div>
@@ -410,35 +416,24 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
 
       {/* Error Alert */}
       {error && (
-        <div style={{ padding: '14px 18px', background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, fontWeight: 600 }}>
+        <div className="event-editor-alert event-editor-error-alert">
           <AlertTriangle size={18} /> {error}
         </div>
       )}
 
       {/* Quick Templates Bar */}
       {!eventId && (
-        <div style={{ background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(30, 58, 138, 0.04))', border: '1px solid rgba(212, 175, 55, 0.25)', borderRadius: 14, padding: '14px 18px', marginBottom: 22 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', display: 'block', marginBottom: 8, letterSpacing: '0.05em' }}>
+        <div className="event-editor-templates">
+          <span className="event-editor-templates-label">
             Plantillas Rápidas de Evento:
           </span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="event-editor-template-list">
             {QUICK_TEMPLATES.map((tpl, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => applyTemplate(tpl)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 20,
-                  background: '#FFFFFF',
-                  border: '1px solid #E5E7EB',
-                  color: '#111827',
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                }}
+                className="event-editor-template-button"
               >
                 {tpl.label}
               </button>
@@ -447,16 +442,16 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit} className="event-editor-form">
         
         {/* SECTION 1: Información General & Espacio */}
-        <div className="card" style={{ padding: 24, borderRadius: 16, border: '1px solid #E5E7EB', background: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
+        <div className="card event-editor-card">
+          <div className="event-editor-section-heading">
             <Layers size={20} color="#D97706" />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>1. Información del Evento & Salón</h3>
+            <h3 className="event-editor-section-title">1. Información del Evento & Salón</h3>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div className="event-editor-grid event-editor-grid-two event-editor-grid-spaced">
             <P1Input 
               label="Título del Evento *" 
               name="title" 
@@ -483,7 +478,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
               </P1Select>
 
               {selectedSpace && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                <div className="event-editor-space-meta">
                   <P1Badge variant="gold">
                     <Users size={12} /> Aforo: {selectedSpace.capacity || 'N/A'} pers.
                   </P1Badge>
@@ -497,7 +492,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="event-editor-grid event-editor-grid-two">
             <P1Select
               label="Tipo de Modalidad *"
               name="timeKind"
@@ -509,8 +504,8 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
               <option value="multi_day">Varios días (Evento continuo)</option>
             </P1Select>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A' }}>
+            <div className="event-editor-field">
+              <label className="event-editor-field-label">
                 Descripción / Notas de Coordinación
               </label>
               <input
@@ -519,59 +514,33 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 value={formData.description}
                 onChange={handleChange}
                 placeholder="Ej: Proyector 4K, catering 3 tiempos, sonido y luces..."
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 10,
-                  border: '1px solid #E5E7EB',
-                  fontSize: 13.5,
-                  outline: 'none'
-                }}
+                className="event-editor-text-input"
               />
             </div>
           </div>
         </div>
 
         {/* SECTION 2: Anfitrión / Titular */}
-        <div className="card" style={{ padding: 24, borderRadius: 16, border: '1px solid #E5E7EB', background: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="card event-editor-card">
+          <div className="event-editor-section-heading event-editor-section-heading-between">
+            <div className="event-editor-section-heading-content">
               <UserCheck size={20} color="#D97706" />
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>2. Anfitrión & Titular de la Reserva</h3>
+              <h3 className="event-editor-section-title">2. Anfitrión & Titular de la Reserva</h3>
             </div>
             
             {/* Segmented Control */}
-            <div style={{ display: 'flex', background: '#F3F4F6', padding: '3px', borderRadius: 10 }}>
+            <div className="event-editor-segmented-control">
               <button
                 type="button"
                 onClick={() => setFormData(p => ({ ...p, identityType: 'guest', identityId: hotelGuests[0]?.id || '' }))}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: formData.identityType === 'guest' ? '#FFFFFF' : 'transparent',
-                  color: formData.identityType === 'guest' ? '#1E3A8A' : '#6B7280',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  boxShadow: formData.identityType === 'guest' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                }}
+                className={`event-editor-segment-button${formData.identityType === 'guest' ? ' is-selected' : ''}`}
               >
                 👤 Huésped del Hotel
               </button>
               <button
                 type="button"
                 onClick={() => setFormData(p => ({ ...p, identityType: 'account', identityId: '' }))}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: formData.identityType === 'account' ? '#FFFFFF' : 'transparent',
-                  color: formData.identityType === 'account' ? '#1E3A8A' : '#6B7280',
-                  fontWeight: 800,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  boxShadow: formData.identityType === 'account' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                }}
+                className={`event-editor-segment-button${formData.identityType === 'account' ? ' is-selected' : ''}`}
               >
                 🏢 Cliente Externo / Corporativo
               </button>
@@ -580,24 +549,15 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
 
           {formData.identityType === 'guest' ? (
             <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
+              <div className="event-editor-grid event-editor-grid-guest">
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                  <label className="event-editor-field-label">
                     Seleccionar Huésped Registrado *
                   </label>
                   <select
                     value={formData.identityId}
                     onChange={(e) => setFormData(p => ({ ...p, identityId: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: '1px solid #E5E7EB',
-                      fontSize: 14,
-                      color: '#111827',
-                      background: '#FFFFFF',
-                      outline: 'none'
-                    }}
+                    className="event-editor-select"
                     required
                   >
                     <option value="">-- Seleccionar Huésped --</option>
@@ -616,7 +576,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                  <label className="event-editor-field-label">
                     Filtrar lista de huéspedes
                   </label>
                   <input
@@ -624,18 +584,11 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                     placeholder="Buscar por nombre o DNI..."
                     value={guestSearch}
                     onChange={(e) => setGuestSearch(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: '1px solid #E5E7EB',
-                      fontSize: 13,
-                      boxSizing: 'border-box'
-                    }}
+                    className="event-editor-text-input"
                   />
                 </div>
               </div>
-              <span style={{ fontSize: 11.5, color: '#6B7280', marginTop: 6, display: 'block' }}>
+              <span className="event-editor-helper-text">
                 💡 El evento quedará vinculado al perfil del huésped y sus consumos podrán ser cargados a su folio de habitación.
               </span>
             </div>
@@ -655,21 +608,21 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         </div>
 
         {/* SECTION 3: Fechas, Horarios & Duración */}
-        <div className="card" style={{ padding: 24, borderRadius: 16, border: '1px solid #E5E7EB', background: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="card event-editor-card">
+          <div className="event-editor-section-heading event-editor-section-heading-between">
+            <div className="event-editor-section-heading-content">
               <Clock size={20} color="#D97706" />
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>3. Fechas, Horarios & Duración</h3>
+              <h3 className="event-editor-section-title">3. Fechas, Horarios & Duración</h3>
             </div>
 
             {durationInfo && durationInfo.isValid && (
-              <P1Badge variant="success" style={{ fontSize: 12.5, padding: '4px 12px' }}>
+              <P1Badge variant="success" className="p1-badge-prominent">
                 <Clock size={13} /> Duración: {durationInfo.text}
               </P1Badge>
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 14 }}>
+          <div className="event-editor-grid event-editor-grid-three event-editor-grid-spaced">
             <P1Input 
               type="datetime-local" 
               label="Fecha y Hora de Inicio *" 
@@ -700,8 +653,8 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
           </div>
 
           {/* Quick Duration Presets */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>Ajuste rápido de duración:</span>
+          <div className="event-editor-duration-presets">
+            <span className="event-editor-muted-label">Ajuste rápido de duración:</span>
             {[
               { label: '+2 Horas', hours: 2 },
               { label: '+4 Horas', hours: 4 },
@@ -713,16 +666,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 key={idx}
                 type="button"
                 onClick={() => adjustDuration(p.hours)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid #E5E7EB',
-                  background: '#F9FAFB',
-                  color: '#4B5563',
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                className="event-editor-duration-button"
               >
                 {p.label}
               </button>
@@ -731,22 +675,22 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         </div>
 
         {/* SECTION 4: Paquetes de Catering & Servicios del Salón (Recomendación 1) */}
-        <div className="card" style={{ padding: 24, borderRadius: 16, border: '1px solid #E5E7EB', background: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="card event-editor-card">
+          <div className="event-editor-section-heading event-editor-section-heading-between">
+            <div className="event-editor-section-heading-content">
               <UtensilsCrossed size={20} color="#D97706" />
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>4. Paquetes de Catering & Servicios del Salón</h3>
+              <h3 className="event-editor-section-title">4. Paquetes de Catering & Servicios del Salón</h3>
             </div>
             <P1Badge variant="gold">
               Conectado a Cocina y Bar
             </P1Badge>
           </div>
 
-          <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 16px' }}>
+          <p className="event-editor-section-copy">
             Seleccione los servicios de banquetería, coffee break y tecnología que se prepararán para el evento:
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="event-editor-services-grid">
             {STANDARD_CATERING_SERVICES.map(svc => {
               const isSelected = !!selectedServices[svc.code];
               const Icon = svc.icon;
@@ -757,40 +701,29 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 <div
                   key={svc.code}
                   onClick={() => toggleService(svc)}
-                  style={{
-                    padding: '14px 16px',
-                    borderRadius: 12,
-                    border: `1.5px solid ${isSelected ? '#D97706' : '#E5E7EB'}`,
-                    background: isSelected ? 'rgba(212, 175, 55, 0.05)' : '#F9FAFB',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    transition: 'all 0.15s'
-                  }}
+                  className={`event-editor-service${isSelected ? ' is-selected' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ padding: 8, borderRadius: 8, background: isSelected ? '#FEF3C7' : '#FFFFFF', border: '1px solid #E5E7EB' }}>
-                      <Icon size={18} color={isSelected ? '#D97706' : '#6B7280'} />
+                  <div className="event-editor-service-main">
+                    <div className="event-editor-service-icon">
+                      <Icon size={18} />
                     </div>
                     <div>
-                      <strong style={{ fontSize: 13, color: '#111827', display: 'block' }}>{svc.name}</strong>
-                      <span style={{ fontSize: 11.5, color: '#6B7280' }}>
+                      <strong className="event-editor-service-name">{svc.name}</strong>
+                      <span className="event-editor-service-meta">
                         S/ {svc.unitAmount.toFixed(2)} {svc.perPerson ? 'por persona' : 'tarifa plana'}
                       </span>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: isSelected ? '#B45309' : '#4B5563', display: 'block' }}>
+                  <div className="event-editor-service-total" onClick={e => e.stopPropagation()}>
+                    <span className="event-editor-service-price">
                       S/ {subtotal.toFixed(2)}
                     </span>
                     {!svc.perPerson && isSelected && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <button type="button" onClick={() => updateServiceQty(svc.code, currentQty - 1)} style={{ padding: '2px 6px', border: '1px solid #E5E7EB', borderRadius: 4, background: '#FFF', cursor: 'pointer' }}>-</button>
-                        <span style={{ fontSize: 11, fontWeight: 700 }}>{currentQty}</span>
-                        <button type="button" onClick={() => updateServiceQty(svc.code, currentQty + 1)} style={{ padding: '2px 6px', border: '1px solid #E5E7EB', borderRadius: 4, background: '#FFF', cursor: 'pointer' }}>+</button>
+                      <div className="event-editor-quantity-controls">
+                        <button type="button" onClick={() => updateServiceQty(svc.code, currentQty - 1)} className="event-editor-quantity-button">-</button>
+                        <span className="event-editor-quantity-value">{currentQty}</span>
+                        <button type="button" onClick={() => updateServiceQty(svc.code, currentQty + 1)} className="event-editor-quantity-button">+</button>
                       </div>
                     )}
                   </div>
@@ -801,13 +734,13 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         </div>
 
         {/* SECTION 5: Aforo, Presupuesto & Recurrencia */}
-        <div className="card" style={{ padding: 24, borderRadius: 16, border: '1px solid #E5E7EB', background: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid #F3F4F6', paddingBottom: 12 }}>
+        <div className="card event-editor-card">
+          <div className="event-editor-section-heading">
             <DollarSign size={20} color="#D97706" />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#111827' }}>5. Asistentes, Presupuesto & Recurrencia</h3>
+            <h3 className="event-editor-section-title">5. Asistentes, Presupuesto & Recurrencia</h3>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div className="event-editor-grid event-editor-grid-three">
             <div>
               <P1Input 
                 type="number" 
@@ -819,7 +752,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 required
               />
               {isOverCapacity && (
-                <div style={{ fontSize: 11.5, color: '#B91C1C', marginTop: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div className="event-editor-capacity-warning">
                   <AlertTriangle size={13} /> Supera el aforo máximo de {selectedSpace?.capacity} personas.
                 </div>
               )}
@@ -839,17 +772,7 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
                 <button
                   type="button"
                   onClick={applyCalculatedBudget}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#D97706',
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    marginTop: 4,
-                    padding: 0,
-                    textDecoration: 'underline'
-                  }}
+                  className="event-editor-budget-link"
                 >
                   Usar presupuesto sugerido (S/ {calculatedBudget.toFixed(2)})
                 </button>
@@ -868,13 +791,13 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
           </div>
 
           {formData.recurrence === 'weekly' && (
-            <div style={{ marginTop: 14, padding: '12px 16px', background: '#FEF3C7', borderRadius: 10, border: '1px solid #FDE047', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="event-editor-recurrence-alert">
               <Repeat size={18} color="#B45309" />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 800, color: '#92400E', display: 'block' }}>Repetición Semanal</span>
-                <span style={{ fontSize: 11.5, color: '#B45309' }}>Se generarán instancias automáticas para las semanas indicadas.</span>
+              <div className="event-editor-alert-content">
+                <span className="event-editor-recurrence-title">Repetición Semanal</span>
+                <span className="event-editor-recurrence-copy">Se generarán instancias automáticas para las semanas indicadas.</span>
               </div>
-              <div style={{ width: 140 }}>
+              <div className="event-editor-recurrence-weeks">
                 <P1Input 
                   type="number" 
                   label="Semanas a repetir" 
@@ -890,30 +813,20 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
         </div>
 
         {/* SECTION 6: Summary & Final Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
+        <div className="event-editor-footer">
           <button 
             type="button" 
-            className="btn btn-outline"
             onClick={onCancel}
-            style={{ padding: '12px 24px', fontSize: 14, fontWeight: 700 }}
+            className="btn btn-outline event-editor-cancel-button"
           >
             Cancelar
           </button>
 
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div className="event-editor-submit-actions">
             <button 
               type="submit" 
               disabled={loading}
-              className="btn btn-primary"
-              style={{
-                padding: '12px 32px',
-                fontSize: 14,
-                fontWeight: 800,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-              }}
+              className="btn btn-primary event-editor-submit-button"
             >
               <CheckCircle2 size={18} />
               {loading ? 'Guardando Evento...' : eventId ? 'Actualizar Evento' : 'Crear y Agendar Evento'}

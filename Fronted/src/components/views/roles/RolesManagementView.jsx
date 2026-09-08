@@ -205,11 +205,11 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <form onSubmit={handleSubmit} className="roles-form">
       {/* Cabecera del Rol */}
-      <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ flex: 1, marginRight: '16px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
+      <div className="roles-editor-header">
+        <div className="roles-editor-name">
+          <label className="roles-label roles-label-uppercase">
             Nombre del Rol
           </label>
           <input
@@ -217,29 +217,29 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ej. Supervisor de Alojamiento"
-            style={{ width: '100%', height: '40px', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '0 12px', fontSize: '14px', fontWeight: '600' }}
+            className="roles-input roles-input-name"
           />
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Identificador</span>
-          <code style={{ background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>
+        <div className="roles-identifier">
+          <span className="roles-identifier-label">Identificador</span>
+          <code className="roles-identifier-code">
             {role.key}
           </code>
         </div>
       </div>
 
       {/* Buscador y Controles Rápidos */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ position: 'relative', flex: '1 1 240px' }}>
-          <Search size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
+      <div className="roles-search-controls">
+        <div className="roles-search-wrap">
+          <Search size={15} className="roles-search-icon" />
           <input
             placeholder="Buscar permiso específico (ej. check_in, compras, caja)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', height: '38px', borderRadius: '10px', border: '1px solid #cbd5e1', paddingLeft: '34px', fontSize: '13px' }}
+            className="roles-input roles-search-input"
           />
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="roles-inline-actions">
           <button type="button" className="btn btn-sm btn-outline" onClick={selectAllSystem}>
             Seleccionar Todos ({ALL_SYSTEM_PERMS.length})
           </button>
@@ -250,7 +250,7 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
       </div>
 
       {/* Lista de Módulos y Permisos */}
-      <div style={{ maxHeight: '52vh', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div className="roles-permission-list">
         {filteredModules.map((module) => {
           const modPermKeys = module.permissions.map((p) => p.key);
           const selectedInMod = modPermKeys.filter((k) => selectedPerms.has(k)).length;
@@ -258,44 +258,26 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
           const isExpanded = expandedModules.has(module.id);
 
           return (
-            <div key={module.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
+            <div key={module.id} className="roles-module">
               {/* Header del Módulo */}
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  padding: '10px 14px', 
-                  background: selectedInMod > 0 ? '#f0fdf4' : '#f8fafc',
-                  borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none',
-                  cursor: 'pointer',
-                }}
+              <div className={`roles-module-header ${selectedInMod > 0 ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
                 onClick={() => toggleModuleAccordion(module.id)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '18px' }}>{module.icon}</span>
+                <div className="roles-module-heading">
+                  <span className="roles-module-icon">{module.icon}</span>
                   <div>
-                    <strong style={{ fontSize: '13.5px', color: '#0f172a' }}>{module.name}</strong>
-                    <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '8px' }}>
+                    <strong className="roles-module-name">{module.name}</strong>
+                    <span className="roles-module-count">
                       ({selectedInMod} de {modPermKeys.length} asignados)
                     </span>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="roles-module-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     onClick={() => toggleModuleAll(module)}
-                    style={{
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '3px 8px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      background: allModSelected ? '#0f172a' : '#fff',
-                      color: allModSelected ? '#fff' : '#334155',
-                      cursor: 'pointer',
-                    }}
+                    className={`roles-module-select ${allModSelected ? 'is-selected' : ''}`}
                   >
                     {allModSelected ? '✓ Todo asignado' : 'Seleccionar módulo'}
                   </button>
@@ -304,36 +286,26 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
 
               {/* Grid de Permisos del Módulo */}
               {isExpanded && (
-                <div style={{ padding: '12px 14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px', background: '#fff' }}>
+                <div className="roles-permission-grid">
                   {module.permissions.map((perm) => {
                     const isChecked = selectedPerms.has(perm.key);
                     return (
                       <div
                         key={perm.key}
                         onClick={() => togglePermission(perm.key)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          border: isChecked ? '1px solid #10b981' : '1px solid #f1f5f9',
-                          background: isChecked ? '#f0fdf4' : '#fafafa',
-                          cursor: 'pointer',
-                          transition: 'all 120ms ease',
-                        }}
+                        className={`roles-permission ${isChecked ? 'is-selected' : ''}`}
                       >
-                        <div style={{ marginTop: '2px', color: isChecked ? '#10b981' : '#94a3b8' }}>
+                        <div className={`roles-permission-check ${isChecked ? 'is-selected' : ''}`}>
                           {isChecked ? <CheckSquare size={16} /> : <Square size={16} />}
                         </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '12.5px', fontWeight: '700', color: isChecked ? '#065f46' : '#1e293b' }}>
+                        <div className="roles-permission-content">
+                          <div className={`roles-permission-label ${isChecked ? 'is-selected' : ''}`}>
                             {perm.label}
                           </div>
-                          <div style={{ fontSize: '10.5px', color: '#64748b', lineHeight: 1.2 }}>
+                          <div className="roles-permission-description">
                             {perm.desc}
                           </div>
-                          <code style={{ fontSize: '9.5px', color: '#94a3b8', marginTop: '2px', display: 'inline-block' }}>
+                          <code className="roles-permission-key">
                             {perm.key}
                           </code>
                         </div>
@@ -348,11 +320,11 @@ function RoleEditorModal({ role, onClose, onSave, saving }) {
       </div>
 
       {/* Barra de Acciones Final */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-        <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '700' }}>
-          Total seleccionados: <span className="badge badge-green" style={{ marginLeft: '4px' }}>{selectedPerms.size} permisos</span>
+      <div className="roles-form-footer">
+        <div className="roles-selected-total">
+          Total seleccionados: <span className="badge badge-green roles-selected-badge">{selectedPerms.size} permisos</span>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="roles-form-actions">
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
             Cancelar
           </button>
@@ -417,10 +389,10 @@ function RoleCreateModal({ onClose, onCreated, notify, existingRoles }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+    <form onSubmit={handleSubmit} className="roles-form">
+      <div className="roles-create-fields">
         <div>
-          <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+          <label className="roles-label">
             Nombre del Nuevo Rol *
           </label>
           <input
@@ -429,30 +401,30 @@ function RoleCreateModal({ onClose, onCreated, notify, existingRoles }) {
             placeholder="Ej. Seguridad Nocturna"
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            style={{ width: '100%', height: '40px', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '0 12px', fontSize: '13.5px' }}
+            className="roles-input"
           />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+          <label className="roles-label">
             Clave del Rol (código)
           </label>
           <input
             placeholder="ej. seguridad_nocturna"
             value={key}
             onChange={(e) => setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-            style={{ width: '100%', height: '40px', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '0 12px', fontSize: '13px', fontFamily: 'monospace' }}
+            className="roles-input roles-input-key"
           />
         </div>
       </div>
 
-      <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12.5px', color: '#475569', fontWeight: '600' }}>
+      <div className="roles-template-row">
+        <span className="roles-template-label">
           💡 Copiar permisos base desde otro rol:
         </span>
         <select 
           value={templateRole} 
           onChange={(e) => handleTemplateChange(e.target.value)}
-          style={{ height: '34px', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '12.5px', background: '#fff' }}
+          className="roles-template-select"
         >
           <option value="">(En blanco / Personalizado)</option>
           {existingRoles.map((r) => (
@@ -464,8 +436,8 @@ function RoleCreateModal({ onClose, onCreated, notify, existingRoles }) {
       </div>
 
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', color: '#475569' }}>
+        <div className="roles-selection-header">
+          <span className="roles-selection-title">
             Selección Inicial de Permisos ({selectedPerms.size} marcados)
           </span>
           <button
@@ -477,28 +449,19 @@ function RoleCreateModal({ onClose, onCreated, notify, existingRoles }) {
           </button>
         </div>
 
-        <div style={{ maxHeight: '40vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px', background: '#fff' }}>
+        <div className="roles-create-permission-list">
           {PERMISSION_MODULES.map((mod) => (
-            <div key={mod.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-              <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0f172a', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div key={mod.id} className="roles-create-module">
+              <div className="roles-create-module-title">
                 <span>{mod.icon}</span> {mod.name}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
+              <div className="roles-create-permission-grid">
                 {mod.permissions.map((p) => {
                   const isChecked = selectedPerms.has(p.key);
                   return (
                     <label
                       key={p.key}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '11.5px',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        background: isChecked ? '#f0fdf4' : '#fafafa',
-                        cursor: 'pointer',
-                      }}
+                      className={`roles-create-permission ${isChecked ? 'is-selected' : ''}`}
                     >
                       <input
                         type="checkbox"
@@ -515,7 +478,7 @@ function RoleCreateModal({ onClose, onCreated, notify, existingRoles }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+      <div className="roles-form-actions roles-create-footer">
         <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
           Cancelar
         </button>
@@ -623,37 +586,37 @@ export function RolesManagementView({ notify }) {
       />
 
       {status === 'loading' ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-          <div style={{ display: 'inline-block', width: '30px', height: '30px', border: '3px solid #cbd5e1', borderTopColor: '#0f172a', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '12px' }}></div>
-          <p style={{ margin: 0, fontSize: '13.5px' }}>Cargando matriz de roles y permisos...</p>
+        <div className="roles-loading-state">
+          <div className="roles-loading-spinner"></div>
+          <p className="roles-loading-text">Cargando matriz de roles y permisos...</p>
         </div>
       ) : status === 'error' ? (
-        <div className="alert-banner alert-banner-danger" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="alert-banner alert-banner-danger roles-error-state">
           <span>{error}</span>
           <button className="btn btn-sm btn-outline" onClick={loadData}>Reintentar</button>
         </div>
       ) : (
         <>
           {/* Selector de Modo de Vista */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="roles-view-toolbar">
+            <div className="roles-view-switcher">
               <button
                 type="button"
-                className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-outline'}`}
+                className={`btn btn-sm roles-view-button ${viewMode === 'cards' ? 'is-active btn-primary' : 'btn-outline'}`}
                 onClick={() => setViewMode('cards')}
               >
                 <Grid size={15} /> Tarjetas de Roles
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${viewMode === 'matrix' ? 'btn-primary' : 'btn-outline'}`}
+                className={`btn btn-sm roles-view-button ${viewMode === 'matrix' ? 'is-active btn-primary' : 'btn-outline'}`}
                 onClick={() => setViewMode('matrix')}
               >
                 <TableIcon size={15} /> Matriz Comparativa
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="roles-toolbar-actions">
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
@@ -669,7 +632,7 @@ export function RolesManagementView({ notify }) {
 
           {/* VISTA 1: TARJETAS DE ROLES */}
           {viewMode === 'cards' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+            <div className="roles-card-grid">
               {rolesList.map((role) => {
                 const permsCount = role.permissions?.length || 0;
                 const pct = Math.round((permsCount / totalPermissionsCount) * 100);
@@ -682,29 +645,19 @@ export function RolesManagementView({ notify }) {
                 return (
                   <article 
                     key={role.id} 
-                    className="card"
-                    style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between', 
-                      padding: '20px', 
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                      background: '#fff'
-                    }}
+                    className="card roles-card"
                   >
                     <div>
                       {/* Top Row: Icon, Name & Badges */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div className="roles-card-top">
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className="roles-card-title">
                             <Shield size={20} color="#0f172a" />
-                            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0f172a' }}>
+                            <h3 className="roles-card-name">
                               {role.name}
                             </h3>
                           </div>
-                          <code style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'inline-block' }}>
+                          <code className="roles-card-key">
                             {role.key}
                           </code>
                         </div>
@@ -721,43 +674,34 @@ export function RolesManagementView({ notify }) {
                       </div>
 
                       {/* Info Strip */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '10px', marginBottom: '14px', fontSize: '12px' }}>
+                      <div className="roles-card-info">
                         <div>
-                          <span style={{ color: '#64748b', display: 'block', fontSize: '10.5px' }}>Usuarios Asignados</span>
-                          <strong style={{ color: '#0f172a', fontSize: '14px' }}>{role.usersCount}</strong> cuenta(s)
+                          <span className="roles-card-info-label">Usuarios Asignados</span>
+                          <strong className="roles-card-info-value">{role.usersCount}</strong> cuenta(s)
                         </div>
                         <div>
-                          <span style={{ color: '#64748b', display: 'block', fontSize: '10.5px' }}>Cobertura Permisos</span>
-                          <strong style={{ color: '#10b981', fontSize: '14px' }}>{permsCount}</strong> / {totalPermissionsCount} ({pct}%)
+                          <span className="roles-card-info-label">Cobertura Permisos</span>
+                          <strong className="roles-card-info-value is-success">{permsCount}</strong> / {totalPermissionsCount} ({pct}%)
                         </div>
                       </div>
 
                       {/* Módulos Habilitados */}
-                      <div style={{ marginBottom: '16px' }}>
-                        <span style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                      <div className="roles-card-modules">
+                        <span className="roles-card-section-label">
                           Módulos Habilitados
                         </span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        <div className="roles-module-tags">
                           {activeModules.length > 0 ? (
                             activeModules.map((m) => (
                               <span 
                                 key={m.id} 
-                                style={{ 
-                                  fontSize: '11px', 
-                                  padding: '3px 8px', 
-                                  borderRadius: '6px', 
-                                  background: '#f1f5f9', 
-                                  color: '#334155', 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px' 
-                                }}
+                                className="roles-module-tag"
                               >
                                 {m.icon} {m.name.split(' ')[0]}
                               </span>
                             ))
                           ) : (
-                            <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic' }}>
+                            <span className="roles-no-permissions">
                               Sin permisos asignados
                             </span>
                           )}
@@ -766,22 +710,20 @@ export function RolesManagementView({ notify }) {
                     </div>
 
                     {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+                    <div className="roles-card-actions">
                       <button
                         type="button"
-                        className="btn btn-sm btn-primary"
+                        className="btn btn-sm btn-primary roles-edit-action"
                         onClick={() => setEditingRole(role)}
-                        style={{ flex: 1 }}
                       >
                         <Edit2 size={13} /> Modificar Permisos
                       </button>
                       {!role.isSystem && role.usersCount === 0 && (
                         <button
                           type="button"
-                          className="btn btn-sm btn-outline"
+                          className="btn btn-sm btn-outline roles-delete-action"
                           onClick={() => setDeletingRole(role)}
                           title="Eliminar rol personalizado"
-                          style={{ color: '#ef4444', borderColor: '#fca5a5' }}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -795,15 +737,15 @@ export function RolesManagementView({ notify }) {
 
           {/* VISTA 2: MATRIZ COMPARATIVA DE PERMISOS */}
           {viewMode === 'matrix' && (
-            <div className="table-container card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-              <table className="custom-table permission-table" style={{ width: '100%' }}>
+            <div className="table-container card roles-matrix-container">
+              <table className="custom-table permission-table roles-matrix-table">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ minWidth: '220px' }}>Módulo o Alcance</th>
+                    <th scope="col" className="roles-matrix-module-heading">Módulo o Alcance</th>
                     {rolesList.map((role) => (
-                      <th scope="col" key={role.id} style={{ textAlign: 'center', minWidth: '130px' }}>
-                        <div style={{ fontWeight: '800', color: '#0f172a' }}>{role.name}</div>
-                        <small style={{ color: '#64748b' }}>{role.usersCount} usuario(s)</small>
+                      <th scope="col" key={role.id} className="roles-matrix-role-heading">
+                        <div className="roles-matrix-role-name">{role.name}</div>
+                        <small className="roles-matrix-role-users">{role.usersCount} usuario(s)</small>
                       </th>
                     ))}
                   </tr>
@@ -811,12 +753,12 @@ export function RolesManagementView({ notify }) {
                 <tbody>
                   {PERMISSION_MODULES.map((module) => (
                     <tr key={module.id}>
-                      <th scope="row" style={{ background: '#fafafa' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '18px' }}>{module.icon}</span>
+                      <th scope="row" className="roles-matrix-module-cell">
+                        <div className="roles-matrix-module-content">
+                          <span className="roles-module-icon">{module.icon}</span>
                           <div>
                             <strong>{module.name}</strong>
-                            <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 'normal' }}>
+                            <div className="roles-matrix-module-count">
                               {module.permissions.length} permisos
                             </div>
                           </div>
@@ -829,24 +771,15 @@ export function RolesManagementView({ notify }) {
                         const isNone = assignedInMod === 0;
 
                         return (
-                          <td key={role.id} style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <td key={role.id} className="roles-matrix-permission-cell">
                             <button
                               type="button"
                               onClick={() => setEditingRole(role)}
                               title={`Editar permisos de ${role.name}`}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                padding: '4px 8px',
-                                borderRadius: '12px',
-                              }}
+                              className="roles-matrix-permission-button"
                             >
                               <span
-                                className={`badge ${
-                                  isFull ? 'badge-green' : isNone ? 'badge-gray' : 'badge-yellow'
-                                }`}
-                                style={{ fontSize: '11px', padding: '4px 10px' }}
+                                className={`badge roles-matrix-badge ${isFull ? 'badge-green' : isNone ? 'badge-gray' : 'badge-yellow'}`}
                               >
                                 {isFull ? '✓ Completo' : isNone ? 'No asignado' : `${assignedInMod} / ${modPermKeys.length}`}
                               </span>
@@ -904,14 +837,14 @@ export function RolesManagementView({ notify }) {
         title={`¿Eliminar el rol "${deletingRole?.name}"?`}
       >
         {deletingRole && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <p style={{ margin: 0, fontSize: '13.5px', color: '#475569' }}>
+          <div className="roles-delete-confirmation">
+            <p className="roles-delete-description">
               Esta acción eliminará de forma permanente el rol personalizado <strong>{deletingRole.name}</strong> ({deletingRole.key}) y todas sus asignaciones de permisos.
             </p>
             <div className="alert-banner alert-banner-warning">
               Solo se pueden eliminar roles personalizados que no tengan ninguna cuenta de usuario asignada actualmente.
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+            <div className="roles-delete-actions">
               <button type="button" className="btn btn-outline" onClick={() => setDeletingRole(null)} disabled={saving}>
                 Cancelar
               </button>

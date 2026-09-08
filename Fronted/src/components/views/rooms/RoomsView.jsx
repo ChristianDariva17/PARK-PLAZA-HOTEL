@@ -62,7 +62,7 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
   };
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: '18px' }}>
+    <form className="form-grid rooms-form rooms-form-room" onSubmit={submit}>
       {/* Live Preview Card */}
       <div className="modal-live-preview span-2">
         <div className="modal-live-preview-header">
@@ -89,7 +89,7 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
       </div>
 
       <label>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+        <span className="rooms-field-label">
           <Key size={14} color="var(--color-navy)" /> Número de habitación
         </span>
         <div className="field-icon-wrap">
@@ -104,7 +104,7 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
       </label>
 
       <label>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+        <span className="rooms-field-label">
           <Layers size={14} color="var(--color-navy)" /> Piso / Nivel
         </span>
         <div className="field-icon-wrap">
@@ -120,15 +120,14 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
       </label>
 
       <label className="span-2">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700' }}>
+        <div className="rooms-field-heading">
+          <span className="rooms-field-label rooms-field-label-inline">
             <Bed size={14} color="var(--color-navy)" /> Categoría y Tarifa asignada
           </span>
           {onEditCategory ? (
             <button
               type="button"
-              className="btn btn-sm btn-outline"
-              style={{ fontSize: '11px', padding: '2px 8px' }}
+              className="btn btn-sm btn-outline rooms-compact-button"
               onClick={() => {
                 onClose();
                 onEditCategory(selectedCategory);
@@ -142,7 +141,7 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
           <select
             value={form.categoryId}
             onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
-            style={{ fontWeight: '600' }}
+            className="rooms-category-select"
           >
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
@@ -153,13 +152,13 @@ function RoomForm({ room, categories, onClose, notify, onEditCategory }) {
         </div>
       </label>
 
-      <div className="form-actions span-2" style={{ marginTop: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+      <div className="form-actions span-2 rooms-form-actions">
         <button type="button" className="btn btn-outline" disabled={saving} onClick={onClose}>
           Cancelar
         </button>
         <button className="btn btn-primary" disabled={saving}>
           {saving ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="rooms-saving-label">
               <RefreshCw size={14} className="spin" /> Guardando…
             </span>
           ) : (
@@ -249,30 +248,27 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
   };
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: '16px' }}>
+    <form className="form-grid rooms-form rooms-form-category" onSubmit={submit}>
       {/* TABS DE CATEGORÍA */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '10px', gridColumn: 'span 2' }}>
+      <div className="rooms-category-tabs">
         <button
           type="button"
-          className={`btn btn-sm ${tab === 'details' ? 'btn-primary' : 'btn-outline'}`}
+          className={`btn btn-sm ${tab === 'details' ? 'btn-primary' : 'btn-outline'} rooms-tab-button`}
           onClick={() => setTab('details')}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Bed size={14} /> Datos y Tarifa
         </button>
         <button
           type="button"
-          className={`btn btn-sm ${tab === 'amenities' ? 'btn-primary' : 'btn-outline'}`}
+          className={`btn btn-sm ${tab === 'amenities' ? 'btn-primary' : 'btn-outline'} rooms-tab-button`}
           onClick={() => setTab('amenities')}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Sparkles size={14} /> Amenities ({selectedAmenities.length})
         </button>
         <button
           type="button"
-          className={`btn btn-sm ${tab === 'audit' ? 'btn-primary' : 'btn-outline'}`}
+          className={`btn btn-sm ${tab === 'audit' ? 'btn-primary' : 'btn-outline'} rooms-tab-button`}
           onClick={() => setTab('audit')}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Clock size={14} /> Historial / Auditoría
         </button>
@@ -303,7 +299,7 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
           </div>
 
           <label>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+            <span className="rooms-field-label">
               Nombre de Categoría
             </span>
             <div className="field-icon-wrap">
@@ -318,7 +314,7 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
           </label>
 
           <label>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+            <span className="rooms-field-label">
               Código Único
             </span>
             <div className="field-icon-wrap">
@@ -333,7 +329,7 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
           </label>
 
           <label>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+            <span className="rooms-field-label">
               Capacidad Máxima (personas)
             </span>
             <div className="field-icon-wrap">
@@ -349,7 +345,7 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
           </label>
 
           <label>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '700' }}>
+            <span className="rooms-field-label">
               Tarifa Base por Noche (S/)
             </span>
             <div className="field-icon-wrap">
@@ -368,63 +364,33 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
       )}
 
       {tab === 'amenities' && (
-        <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ fontSize: '13px', color: 'var(--color-muted)' }}>
+        <div className="rooms-category-panel rooms-amenities-panel">
+          <div className="rooms-muted-copy">
             Selecciona las amenidades y servicios de lujo incluidos para todas las habitaciones de categoría <strong>{category.name}</strong>. Se reflejarán instantáneamente en la recepción y en el portal de clientes.
           </div>
 
           {loadingAmenities ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-muted)' }}>
+            <div className="rooms-loading-state">
               <RefreshCw size={16} className="spin" /> Cargando catálogo de comodidades…
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '10px',
-              maxHeight: '340px',
-              overflowY: 'auto',
-              padding: '4px'
-            }}>
+            <div className="rooms-amenities-grid">
               {Object.entries(MASTER_AMENITY_LABELS).map(([key, info]) => {
                 const isChecked = selectedAmenities.includes(key);
                 return (
                   <div
                     key={key}
                     onClick={() => toggleAmenity(key)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: isChecked ? '1.5px solid var(--color-gold, #d97706)' : '1px solid var(--color-border)',
-                      background: isChecked ? 'rgba(217, 119, 6, 0.08)' : 'var(--color-surface)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      userSelect: 'none',
-                    }}
+                    className={`rooms-amenity-option ${isChecked ? 'is-checked' : ''}`}
                   >
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '5px',
-                      border: isChecked ? 'none' : '1.5px solid var(--color-border)',
-                      background: isChecked ? 'var(--color-gold, #d97706)' : 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: '12px',
-                      flexShrink: 0,
-                    }}>
+                    <div className="rooms-amenity-check">
                       {isChecked && <Check size={14} strokeWidth={3} />}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '13px', fontWeight: isChecked ? '700' : '500', color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div className="rooms-amenity-copy">
+                      <span className={`rooms-amenity-name ${isChecked ? 'is-checked' : ''}`}>
                         {info.icon} {info.label}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                      <span className="rooms-amenity-tag">
                         {info.tag}
                       </span>
                     </div>
@@ -437,49 +403,44 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
       )}
 
       {tab === 'audit' && (
-        <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-          <div style={{ fontSize: '13px', color: 'var(--color-muted)', marginBottom: '4px' }}>
+        <div className="rooms-category-panel rooms-audit-panel">
+          <div className="rooms-muted-copy rooms-audit-intro">
             Historial de cambios de tarifa, capacidad y comodidades registrados en la base de datos de auditoría.
           </div>
           {loadingAudit ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-muted)' }}>
+            <div className="rooms-loading-state">
               <RefreshCw size={16} className="spin" /> Cargando historial de auditoría…
             </div>
           ) : auditLogs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-muted)', background: 'var(--color-surface-soft)', borderRadius: '8px' }}>
+            <div className="rooms-empty-state">
               No hay modificaciones registradas aún para esta categoría.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="rooms-audit-list">
               {auditLogs.map((log) => (
-                <div key={log.id} style={{
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface-soft)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span className={`badge ${log.eventType.includes('amenities') ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '11px' }}>
+                <div key={log.id} className="rooms-audit-entry">
+                  <div className="rooms-audit-header">
+                    <span className={`badge ${log.eventType.includes('amenities') ? 'badge-blue' : 'badge-green'} rooms-audit-badge`}>
                       {log.eventType === 'room_category.updated' ? 'Tarifa / Parámetros' : log.eventType === 'room_category_amenities.updated' ? 'Amenities 5★' : log.eventType}
                     </span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="rooms-audit-date">
                       <Clock size={12} /> {new Date(log.occurredAt).toLocaleString('es-PE')}
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginBottom: '4px' }}>
-                    Modificado por: <strong style={{ color: 'var(--color-text)' }}>{log.actorEmail}</strong>
+                  <div className="rooms-audit-actor">
+                    Modificado por: <strong>{log.actorEmail}</strong>
                   </div>
                   {log.metadata?.changes && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    <div className="rooms-audit-changes">
                       {Object.entries(log.metadata.changes).map(([k, v]) => (
-                        <span key={k} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(217,119,6,0.12)', color: '#b45309', fontWeight: '600' }}>
+                        <span key={k} className="rooms-audit-change">
                           {k === 'baseNightlyRate' ? `Nueva tarifa: S/ ${v}` : `${k}: ${v}`}
                         </span>
                       ))}
                     </div>
                   )}
                   {log.metadata?.amenitiesCount !== undefined && (
-                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                    <div className="rooms-audit-amenities-count">
                       Comodidades asignadas: <strong>{log.metadata.amenitiesCount}</strong> items ({log.metadata.amenityKeys?.slice(0, 3).join(', ')}...)
                     </div>
                   )}
@@ -490,14 +451,14 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
         </div>
       )}
 
-      <div className="form-actions span-2" style={{ marginTop: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+      <div className="form-actions span-2 rooms-form-actions">
         <button type="button" className="btn btn-outline" disabled={saving} onClick={onClose}>
           {tab === 'audit' ? 'Cerrar' : 'Cancelar'}
         </button>
         {tab !== 'audit' && (
           <button className="btn btn-primary" disabled={saving}>
             {saving ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="rooms-saving-label">
                 <RefreshCw size={14} className="spin" /> Guardando…
               </span>
             ) : (
@@ -531,26 +492,26 @@ function BlockForm({ operation, onClose, notify }) {
   };
 
   return (
-    <form className="form-grid" onSubmit={submit} style={{ gap: '16px' }}>
+    <form className="form-grid rooms-form rooms-form-block" onSubmit={submit}>
       <div className={`alert-banner ${operation.blocked ? 'alert-banner-warning' : 'alert-banner-info'} span-2`}>
         {operation.blocked ? '🔒 Bloqueo Operativo:' : '🔓 Desbloqueo Operativo:'} {operation.blocked ? 'La habitación no podrá recibir nuevas asignaciones de reserva hasta su desbloqueo.' : 'La habitación pasará a estar disponible para asignación inmediata.'}
       </div>
       <label className="span-2">
-        <span style={{ fontWeight: '700', marginBottom: '6px' }}>Motivo del {operation.blocked ? 'bloqueo' : 'desbloqueo'}</span>
+        <span className="rooms-field-label">Motivo del {operation.blocked ? 'bloqueo' : 'desbloqueo'}</span>
         <textarea
           required
           maxLength="500"
           placeholder="Ej: Mantenimiento preventivo de aire acondicionado / Pintura y acabados"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          style={{ minHeight: '90px' }}
+          className="rooms-block-reason"
         />
       </label>
-      <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+      <div className="form-actions span-2 rooms-form-actions rooms-form-actions-compact">
         <button type="button" className="btn btn-outline" disabled={saving} onClick={onClose}>Cancelar</button>
         <button className={operation.blocked ? 'btn btn-danger' : 'btn btn-primary'} disabled={saving || !reason.trim()}>
           {saving ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="rooms-saving-label">
               <RefreshCw size={14} className="spin" /> Confirmando…
             </span>
           ) : operation.blocked ? (
@@ -663,13 +624,13 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
         </div>
       ) : null}
 
-      <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1', minWidth: '280px' }}>
-          <label className="search-label" style={{ flex: '1' }}>
+      <div className="filter-bar rooms-filter-bar">
+        <div className="rooms-filter-main">
+          <label className="search-label rooms-search-label">
             <Search size={16} />
             <input aria-label="Buscar habitación" placeholder="Buscar por número o categoría..." value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <label style={{ margin: 0 }}>
+          <label className="rooms-status-filter">
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="Todos">Todos los estados</option>
               {ROOM_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -677,29 +638,26 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
           </label>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="rooms-view-controls">
           <div className="tabs">
             <button
-              className={viewMode === 'table' ? 'active' : ''}
+              className={`${viewMode === 'table' ? 'active' : ''} rooms-tab-control`}
               onClick={() => setViewMode('table')}
               title="Vista de Tabla"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <List size={16} /> Lista
             </button>
             <button
-              className={viewMode === 'grid' ? 'active' : ''}
+              className={`${viewMode === 'grid' ? 'active' : ''} rooms-tab-control`}
               onClick={() => setViewMode('grid')}
               title="Mapa de Habitaciones por Piso"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <LayoutGrid size={16} /> Mapa de Piso
             </button>
             <button
-              className={viewMode === 'categories' ? 'active' : ''}
+              className={`${viewMode === 'categories' ? 'active' : ''} rooms-tab-control`}
               onClick={() => setViewMode('categories')}
               title="Gestión de Categorías y Tarifas"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <Bed size={16} /> Categorías y Tarifas
             </button>
@@ -727,49 +685,33 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
               {table.visible.map((room) => {
                 const isLive = room.id === liveUpdatedRoomId;
                 return (
-                <tr key={room.id} style={{
-                  backgroundColor: isLive ? 'rgba(217, 119, 6, 0.12)' : undefined,
-                  transition: 'background-color 0.4s ease',
-                }}>
+                <tr key={room.id} className={`rooms-table-row ${isLive ? 'is-live' : ''}`}>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '8px',
-                        background: 'var(--color-navy)',
-                        color: 'var(--color-gold)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: '700',
-                        fontSize: '14px',
-                        border: isLive ? '2px solid var(--color-gold)' : '1px solid var(--color-gold-soft)',
-                        boxShadow: isLive ? '0 0 10px rgba(217, 119, 6, 0.4)' : 'var(--shadow-sm)',
-                      }}>
+                    <div className="rooms-table-room-cell">
+                      <div className={`rooms-table-room-number ${isLive ? 'is-live' : ''}`}>
                         {room.number}
                       </div>
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <strong style={{ fontSize: '14px', color: 'var(--color-text)' }}>Habitación {room.number}</strong>
-                          {isLive && <span className="badge badge-green" style={{ fontSize: '10px' }}>En vivo</span>}
+                        <div className="rooms-table-room-title">
+                          <strong>Habitación {room.number}</strong>
+                          {isLive && <span className="badge badge-green rooms-live-badge">En vivo</span>}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>Piso {room.floor}</div>
+                        <div className="rooms-table-floor">Piso {room.floor}</div>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <span style={{ padding: '2px 8px', borderRadius: '6px', background: 'var(--color-surface-soft)', fontSize: '12px', fontWeight: '600', color: 'var(--color-muted)' }}>
+                    <span className="rooms-floor-badge">
                       Piso {room.floor}
                     </span>
                   </td>
                   <td>
-                    <span style={{ fontSize: '13px', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="rooms-category-cell">
                       {getCategoryIcon(room.category)} {room.category}
                     </span>
                   </td>
                   <td>👥 {room.capacity} pers.</td>
-                  <td><strong>{displayRate(room.nightlyRate)}</strong> <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>/ noche</span></td>
+                  <td><strong>{displayRate(room.nightlyRate)}</strong> <span className="rooms-muted-small">/ noche</span></td>
                   <td><StatusBadge>{room.status}</StatusBadge></td>
                   <td>
                     <div className="quick-actions-row">
@@ -831,71 +773,44 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
 
       {/* GRID MAP VIEW */}
       {viewMode === 'grid' && state.roomRequest.status !== 'loading' && records.length ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="rooms-floor-groups">
           {Object.entries(roomsByFloor).map(([floorLabel, floorRooms]) => (
-            <div key={floorLabel} className="card" style={{ padding: '20px' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: 'var(--color-text)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+            <div key={floorLabel} className="card rooms-floor-card">
+              <h3 className="rooms-floor-heading">
                 🏢 {floorLabel} ({floorRooms.length} habitaciones)
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+              <div className="rooms-floor-room-grid">
                 {floorRooms.map((room) => {
                   const isLive = room.id === liveUpdatedRoomId;
                   return (
                   <div
                     key={room.id}
-                    style={{
-                      border: isLive ? '2px solid var(--color-gold, #d97706)' : '1px solid var(--color-border)',
-                      borderRadius: '10px',
-                      padding: '14px',
-                      background: 'var(--color-surface)',
-                      boxShadow: isLive ? '0 0 20px rgba(217, 119, 6, 0.45)' : 'var(--shadow-sm)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
-                      transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                      transform: isLive ? 'scale(1.02)' : 'none',
-                      position: 'relative',
-                    }}
+                    className={`rooms-floor-room ${isLive ? 'is-live' : ''}`}
                   >
                     {isLive && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-10px',
-                        right: '12px',
-                        background: 'linear-gradient(135deg, #d97706, #b45309)',
-                        color: '#fff',
-                        fontSize: '10px',
-                        fontWeight: '800',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        zIndex: 2,
-                      }}>
+                      <div className="rooms-live-ribbon">
                         ✨ Actualizado en vivo
                       </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '18px' }}>{getCategoryIcon(room.category)}</span>
-                        <strong style={{ fontSize: '16px', color: 'var(--color-text)' }}>Hab. {room.number}</strong>
+                    <div className="rooms-floor-room-header">
+                      <div className="rooms-floor-room-title">
+                        <span className="rooms-floor-room-icon">{getCategoryIcon(room.category)}</span>
+                        <strong>Hab. {room.number}</strong>
                       </div>
                       <StatusBadge>{room.status}</StatusBadge>
                     </div>
 
-                    <div style={{ fontSize: '12px', color: 'var(--color-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="rooms-floor-room-meta">
                       <span>{room.category}</span>
                       <span>👥 Cap: {room.capacity}</span>
                     </div>
 
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text)', borderTop: '1px dashed var(--color-border)', paddingTop: '8px', marginTop: '2px' }}>
-                      {displayRate(room.nightlyRate)} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--color-muted)' }}>/ noche</span>
+                    <div className="rooms-floor-room-price">
+                      {displayRate(room.nightlyRate)} <span className="rooms-muted-small">/ noche</span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: '600' }}>Acciones:</span>
+                    <div className="rooms-floor-room-actions">
+                      <span className="rooms-actions-label">Acciones:</span>
                       <div className="quick-actions-row">
                         <button
                           type="button"
@@ -974,43 +889,32 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
                 return (
                   <tr key={cat.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '10px',
-                          background: 'var(--color-navy)',
-                          color: '#fff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '20px',
-                          boxShadow: 'var(--shadow-sm)',
-                        }}>
+                      <div className="rooms-category-cell-wrap">
+                        <div className="rooms-category-icon">
                           {getCategoryIcon(cat.name)}
                         </div>
                         <div>
-                          <strong style={{ fontSize: '15px', color: 'var(--color-text)' }}>{cat.name}</strong>
-                          <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>Estándar Park Plaza 5★</div>
+                          <strong className="rooms-category-name">{cat.name}</strong>
+                          <div className="rooms-muted-small">Estándar Park Plaza 5★</div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span style={{ fontFamily: 'monospace', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'var(--color-surface-soft)', fontSize: '12px', border: '1px solid var(--color-border)' }}>
+                      <span className="rooms-category-code">
                         {cat.code}
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text)' }}>
+                      <span className="rooms-category-capacity">
                         👥 Hasta {cat.capacity} huésped(es)
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                        <strong style={{ fontSize: '16px', color: 'var(--color-navy)' }}>
+                      <div className="rooms-category-rate">
+                        <strong>
                           {displayRate(cat.baseNightlyRate)}
                         </strong>
-                        <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>/ noche base</span>
+                        <span className="rooms-muted-small">/ noche base</span>
                       </div>
                     </td>
                     <td>
@@ -1020,43 +924,39 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
                     </td>
                     <td>
                       {can(PERMISSIONS.roomsUpdate) ? (
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div className="rooms-category-actions">
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline"
                             onClick={() => {
                               setCategoryInitialTab('details');
                               setEditingCategory(cat);
                             }}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}
+                             className="btn btn-sm btn-outline rooms-action-button"
                           >
                             <Edit size={13} /> Tarifa
                           </button>
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline"
                             onClick={() => {
                               setCategoryInitialTab('amenities');
                               setEditingCategory(cat);
                             }}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}
                           >
                             <Sparkles size={13} color="var(--color-gold)" /> Amenities ({amenitiesMap[cat.id]?.length || 0})
                           </button>
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline"
-                            onClick={() => {
+                             onClick={() => {
                               setCategoryInitialTab('audit');
                               setEditingCategory(cat);
                             }}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}
+                            className="btn btn-sm btn-outline rooms-action-button"
                           >
                             <Clock size={13} /> Historial
                           </button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Solo lectura</span>
+                        <span className="rooms-muted-copy rooms-read-only">Solo lectura</span>
                       )}
                     </td>
                   </tr>
@@ -1082,7 +982,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
         description={selected ? `Piso ${selected.floor} · ${selected.category}` : ''}
       >
         {selected ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="rooms-drawer-content">
             {/* HERO CARD */}
             <div className="room-hero-card">
               <div className="room-hero-top">
@@ -1098,8 +998,8 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
                   <small>por noche</small>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <span style={{ fontSize: '12px', color: '#cbd5e1' }}>Estado Operativo:</span>
+              <div className="rooms-hero-status">
+                <span>Estado Operativo:</span>
                 <StatusBadge>{selected.status}</StatusBadge>
               </div>
             </div>
@@ -1143,15 +1043,14 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
 
             {/* COMODIDADES Y SERVICIOS */}
             <div className="drawer-section-card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div className="drawer-section-title" style={{ margin: 0 }}>
+              <div className="rooms-drawer-section-header">
+                <div className="drawer-section-title rooms-drawer-section-title">
                   <Sparkles size={16} color="var(--color-gold)" /> Comodidades y Servicios 5★
                 </div>
                 {can(PERMISSIONS.roomsUpdate) && (
                   <button
                     type="button"
-                    className="btn btn-sm btn-outline"
-                    style={{ fontSize: '11px', padding: '3px 8px' }}
+                            className="btn btn-sm btn-outline rooms-compact-button rooms-customize-button"
                     onClick={() => {
                       const cat = state.roomCategories.find((c) => c.id === selected.categoryId);
                       if (cat) {
@@ -1198,14 +1097,14 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
               <div className="drawer-section-title">
                 <Clock size={16} color="var(--color-navy)" /> Registro y Trazabilidad
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-muted)' }}>
+              <div className="rooms-traceability-list">
+                <div className="rooms-traceability-row">
                   <span>Fecha de Registro:</span>
-                  <strong style={{ color: 'var(--color-text)' }}>{new Date(selected.createdAt).toLocaleString('es-PE')}</strong>
+                  <strong>{new Date(selected.createdAt).toLocaleString('es-PE')}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-muted)' }}>
+                <div className="rooms-traceability-row">
                   <span>Identificador Interno:</span>
-                  <strong style={{ color: 'var(--color-text)', fontFamily: 'monospace' }}>HAB-{selected.id.slice(0, 8)}</strong>
+                  <strong className="rooms-traceability-id">HAB-{selected.id.slice(0, 8)}</strong>
                 </div>
               </div>
             </div>
@@ -1216,8 +1115,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
                 <>
                   <button
                     type="button"
-                    className="btn btn-outline"
-                    style={{ width: '100%', justifyContent: 'center' }}
+                    className="btn btn-outline rooms-full-action"
                     onClick={() => {
                       const id = selected.id;
                       setSelectedId(null);
@@ -1228,8 +1126,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
                   </button>
                   <button
                     type="button"
-                    className="btn btn-outline"
-                    style={{ width: '100%', justifyContent: 'center' }}
+                    className="btn btn-outline rooms-full-action"
                     onClick={() => {
                       const cat = state.roomCategories.find((c) => c.id === selected.categoryId);
                       if (cat) {
@@ -1246,8 +1143,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
               {can(PERMISSIONS.roomsBlock) && ['Disponible', 'Bloqueada'].includes(selected.status) ? (
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  className="btn btn-outline rooms-full-action"
                   onClick={() => {
                     const currentRoom = selected;
                     setSelectedId(null);
@@ -1269,8 +1165,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
               {navigate ? (
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  className="btn btn-primary rooms-full-action"
                   onClick={() => {
                     navigate('reservas', { type: 'create-reservation', roomId: selected.id });
                     setSelectedId(null);

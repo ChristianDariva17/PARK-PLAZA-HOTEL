@@ -182,18 +182,17 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
       title="Escanear Asistencia · QR + GPS"
       description="Enfocá el código QR proyectado en la pantalla del hotel con tu cámara."
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <div className="staff-qr-modal-stack">
         {/* Selector opcional de Colaborador */}
         {staffList.length > 0 && !successResult ? (
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+            <label className="staff-qr-staff-label">
               Colaborador que marca:
             </label>
             <select
               value={selectedStaffId}
               onChange={(e) => setSelectedStaffId(e.target.value)}
-              className="select"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              className="select staff-qr-staff-select"
             >
               <option value="">Mi cuenta activa (Autodetectar)</option>
               {staffList.map((m) => (
@@ -206,29 +205,21 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
         ) : null}
 
         {/* Barra de Estado GPS */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderRadius: '10px',
-          backgroundColor: gpsLoading ? '#f1f5f9' : gpsError ? '#fef2f2' : '#f0fdf4',
-          border: `1px solid ${gpsLoading ? '#cbd5e1' : gpsError ? '#fecaca' : '#bbf7d0'}`
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-            <MapPin size={18} style={{ color: gpsLoading ? '#64748b' : gpsError ? '#ef4444' : '#16a34a' }} />
+          <div className={`staff-qr-gps-status ${gpsLoading ? 'is-loading' : gpsError ? 'is-error' : 'is-ok'}`}>
+          <div className="staff-qr-gps-content">
+            <MapPin size={18} className="staff-qr-gps-icon" />
             {gpsLoading ? (
-              <span style={{ color: '#64748b' }}>Sintonizando GPS del teléfono...</span>
+              <span className="staff-qr-gps-message">Sintonizando GPS del teléfono...</span>
             ) : gpsError ? (
-              <span style={{ color: '#dc2626', fontWeight: 500 }}>{gpsError}</span>
+              <span className="staff-qr-gps-message">{gpsError}</span>
             ) : (
-              <span style={{ color: '#15803d', fontWeight: 600 }}>
+              <span className="staff-qr-gps-message">
                 Ubicación detectada (Precisión ±{gpsLocation?.accuracy}m)
               </span>
             )}
           </div>
           {!gpsLoading && !gpsError ? (
-            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#dcfce7', color: '#166534', fontWeight: 600 }}>
+            <span className="staff-qr-geofence-badge">
               Geocerca OK
             </span>
           ) : null}
@@ -238,13 +229,12 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
         {submitError ? (
           <div className="alert-banner alert-banner-danger" role="alert">
             <AlertCircle size={18} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="staff-qr-submit-error-content">
               <strong>No se pudo validar la asistencia</strong>
               <span>{submitError}</span>
               <button
                 onClick={handleManualRetry}
-                className="btn btn-outline btn-sm"
-                style={{ alignSelf: 'flex-start', marginTop: '6px' }}
+                className="btn btn-outline btn-sm staff-qr-retry-button"
               >
                 <RefreshCw size={14} /> Volver a intentar
               </button>
@@ -254,76 +244,37 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
 
         {/* Pantalla de Éxito al validar */}
         {successResult ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            gap: '14px',
-            padding: '24px',
-            backgroundColor: '#f0fdf4',
-            borderRadius: '16px',
-            border: '2px solid #86efac'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#22c55e',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)'
-            }}>
+          <div className="staff-qr-success-state is-success">
+            <div className="staff-qr-success-icon">
               <CheckCircle2 size={36} />
             </div>
             <div>
-              <h3 style={{ margin: '0 0 6px', color: '#14532d', fontSize: '1.35rem' }}>
+              <h3 className="staff-qr-success-title">
                 ¡{successResult.detectedMovement || successResult.movement} Registrado!
               </h3>
-              <p style={{ margin: 0, color: '#166534', fontSize: '0.9rem' }}>
+              <p className="staff-qr-success-description">
                 Validado presencialmente a <strong>{successResult.distanceMeters || 0} metros</strong> del Hotel Park Plaza.
               </p>
             </div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              backgroundColor: '#dcfce7',
-              color: '#15803d',
-              fontSize: '0.85rem',
-              fontWeight: 600
-            }}>
+            <div className="staff-qr-success-method">
               <ShieldCheck size={16} /> Método QR + GPS Verificado
             </div>
             <button
               onClick={onClose}
-              className="btn btn-primary"
-              style={{ width: '100%', marginTop: '10px' }}
+              className="btn btn-primary staff-qr-success-button"
             >
               Listo
             </button>
           </div>
         ) : (
           /* Cuadro del Escáner de Cámara */
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="staff-qr-scanner-section">
             <div
               id={scannerContainerId}
-              style={{
-                width: '100%',
-                maxWidth: '340px',
-                minHeight: '280px',
-                backgroundColor: '#0f172a',
-                borderRadius: '14px',
-                overflow: 'hidden',
-                position: 'relative'
-              }}
+              className="staff-qr-scanner-container"
             />
             {scanning ? (
-              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb', fontWeight: 600 }}>
+              <div className="staff-qr-scanning-status">
                 <RefreshCw className="animate-spin" size={18} />
                 <span>Verificando ubicación y token con el servidor...</span>
               </div>

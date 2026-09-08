@@ -155,27 +155,15 @@ export default function ReceivablesView({ notify }) {
       {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
 
       {/* Navigation Tabs between In-House Stays and Post-Checkout Receivables */}
-      <div style={{ display: 'flex', gap: 10, borderBottom: '2px solid #E2E8F0', margin: '20px 0 16px 0', paddingBottom: 6 }}>
+      <div className="menu-surface-secondary5">
         <button
           type="button"
           onClick={() => setActiveTab('inhouse')}
-          style={{
-            padding: '8px 18px',
-            borderRadius: '6px 6px 0 0',
-            border: 'none',
-            fontSize: 13,
-            fontWeight: 800,
-            cursor: 'pointer',
-            background: activeTab === 'inhouse' ? '#0F172A' : '#F1F5F9',
-            color: activeTab === 'inhouse' ? '#FFFFFF' : '#475569',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
+          className={`menu-surface-secondary ${activeTab === 'inhouse' ? 'is-active' : ''}`}
         >
           <Building2 size={16} /> 🏨 Saldos de Habitaciones en Curso ({activeStaysList.length})
           {inHouseWithDebtCount > 0 && (
-            <span style={{ background: '#D97706', color: '#FFFFFF', padding: '2px 7px', borderRadius: 10, fontSize: 11, fontWeight: 900 }}>
+            <span className="menu-surface-secondary7">
               {inHouseWithDebtCount} con saldo
             </span>
           )}
@@ -184,30 +172,17 @@ export default function ReceivablesView({ notify }) {
         <button
           type="button"
           onClick={() => setActiveTab('receivables')}
-          style={{
-            padding: '8px 18px',
-            borderRadius: '6px 6px 0 0',
-            border: 'none',
-            fontSize: 13,
-            fontWeight: 800,
-            cursor: 'pointer',
-            background: activeTab === 'receivables' ? '#0F172A' : '#F1F5F9',
-            color: activeTab === 'receivables' ? '#FFFFFF' : '#475569',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
+          className={`menu-surface-secondary ${activeTab === 'receivables' ? 'is-active' : ''}`}
         >
           <CreditCard size={16} /> 📋 Cuentas por Cobrar (Post Check-out) ({items.length})
         </button>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+        <div className="menu-surface-secondary9">
           <button
             type="button"
-            className="btn btn-sm btn-outline"
+            className="btn btn-sm btn-outline menu-row0"
             onClick={() => void refreshAll()}
             disabled={loading}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <RefreshCw size={14} className={loading ? 'spin' : ''} /> Actualizar Datos
           </button>
@@ -217,7 +192,7 @@ export default function ReceivablesView({ notify }) {
       {/* TAB 1: IN-HOUSE STAYS (Huéspedes alojados actualmente con consumos o saldos) */}
       {activeTab === 'inhouse' && (
         <div>
-          <div style={{ marginBottom: 12, fontSize: 12.5, color: '#64748B' }}>
+          <div className="menu-row1">
             Huéspedes que se encuentran actualmente hospedados en el hotel. Puedes registrar abonos, liquidar consumos o revisar su estado de cuenta en tiempo real.
           </div>
 
@@ -229,28 +204,27 @@ export default function ReceivablesView({ notify }) {
               <tr key={item.stay.id}>
                 <td>
                   <strong>{item.guestName}</strong>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>Doc: {item.guestDoc}</div>
+                  <div className="menu-row2">Doc: {item.guestDoc}</div>
                 </td>
                 <td>
-                  <strong style={{ fontSize: 14 }}>Hab. {item.roomNumber}</strong>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>{item.roomCategory}</div>
+                  <strong className="menu-row3">Hab. {item.roomNumber}</strong>
+                  <div className="menu-row4">{item.roomCategory}</div>
                 </td>
-                <td style={{ fontSize: 12 }}>
+                <td className="menu-row5">
                   {new Date(item.checkInAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                 </td>
                 <td>
                   <StatusBadge>{item.balance > 0 ? 'Pendiente de pago' : 'Liquidado'}</StatusBadge>
                 </td>
                 <td>
-                  <strong style={{ fontSize: 14, color: item.balance > 0 ? '#B45309' : '#15803D' }}>
+                  <strong className="menu-row6">
                     {money(item.balance)}
                   </strong>
                 </td>
                 <td>
                   <button
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-sm menu-row7"
                     onClick={() => setActiveStayForFolio(item)}
-                    style={{ fontWeight: 700 }}
                   >
                     Ver Folio / Cobrar
                   </button>
@@ -271,15 +245,15 @@ export default function ReceivablesView({ notify }) {
       {/* TAB 2: POST-CHECKOUT RECEIVABLES */}
       {activeTab === 'receivables' && (
         <div>
-          <div className="filter-bar" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
-            <label style={{ margin: 0 }}>
+          <div className="filter-bar menu-row8">
+            <label className="menu-row9">
               Estado
               <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
                 <option value="open">Abiertas</option>
                 <option value="settled">Liquidadas</option>
               </select>
             </label>
-            <label style={{ margin: 0 }}>
+            <label className="menu-text-secondary0">
               Antigüedad
               <select value={filters.age} onChange={(event) => setFilters((current) => ({ ...current, age: event.target.value }))}>
                 <option value="">Todas</option>
@@ -305,7 +279,7 @@ export default function ReceivablesView({ notify }) {
                 <td><StatusBadge>{item.status === 'open' ? 'Abierta' : 'Liquidada'}</StatusBadge></td>
                 <td>{item.ageDays} días</td>
                 <td>{money(item.originalAmount)}</td>
-                <td><strong style={{ color: item.status === 'open' ? '#B45309' : '#15803D' }}>{money(item.outstandingAmount)}</strong></td>
+                <td><strong className="menu-text-secondary1">{money(item.outstandingAmount)}</strong></td>
                 <td>
                   <button className="btn btn-outline btn-sm" onClick={() => void open(item.id)}>
                     Ver detalle
@@ -331,11 +305,11 @@ export default function ReceivablesView({ notify }) {
         title={activeStayForFolio ? `Folio de Habitación ${activeStayForFolio.roomNumber} · ${activeStayForFolio.guestName}` : 'Folio de Habitación'}
       >
         {activeStayForFolio ? (
-          <div className="detail-stack" style={{ gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, background: '#F8FAFC', padding: 12, borderRadius: 8, fontSize: 12 }}>
+          <div className="detail-stack menu-text-secondary2">
+            <div className="menu-text-secondary3">
               <div><span>Huésped:</span> <strong>{activeStayForFolio.guestName}</strong></div>
               <div><span>Habitación:</span> <strong>Hab. {activeStayForFolio.roomNumber} ({activeStayForFolio.roomCategory})</strong></div>
-              <div><span>N.º Estadía:</span> <span style={{ fontFamily: 'monospace' }}>#{activeStayForFolio.stay.id.slice(0, 8)}</span></div>
+              <div><span>N.º Estadía:</span> <span className="menu-text-secondary4">#{activeStayForFolio.stay.id.slice(0, 8)}</span></div>
               <div><span>Ingreso:</span> <span>{new Date(activeStayForFolio.checkInAt).toLocaleString('es-PE')}</span></div>
             </div>
 

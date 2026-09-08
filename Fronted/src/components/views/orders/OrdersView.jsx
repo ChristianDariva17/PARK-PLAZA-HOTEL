@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ShoppingCart, ChefHat, BarChart3, Clock, CheckCircle2, XCircle, Flame, Bell, Star, Filter, Search, RefreshCw, Plus, ArrowRight, Wine, Coffee, UtensilsCrossed } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle2, XCircle, Flame, Bell, Star, Search, RefreshCw, Plus, ArrowRight, Wine, Coffee, UtensilsCrossed, Minus } from 'lucide-react';
 import { useHotel } from '../../../state/hotelContext.js';
 import { formatMoney } from '../../../domain/hotelModel.js';
-import { getItemDisplayPrice } from '../../../restaurant/restaurantModel.js';
 import { useRestaurantResource } from '../../../restaurant/useRestaurantResource.js';
+import { Dialog } from '../../ui/Overlay';
+import { P1Button, P1Input, P1Select } from '../../ui/P1Atoms';
 
 const ORDER_STATUSES = ['Pedido recibido', 'Confirmado', 'En preparacion', 'Listo', 'Entregado', 'Pagado'];
 const KANBAN_STAGES = ['Pedido recibido', 'Confirmado', 'En preparacion', 'Listo'];
@@ -18,16 +19,6 @@ const statusColors = {
   'Pagado': { bg: '#DCFCE7', border: '#22C55E', text: '#15803D', icon: CheckCircle2, label: 'Pagado' },
   'Cancelado': { bg: '#FEE2E2', border: '#EF4444', text: '#B91C1C', icon: XCircle, label: 'Cancelado' },
 };
-
-function StatusBadge({ status }) {
-  const cfg = statusColors[status] || { bg: 'rgba(156,163,175,0.12)', border: '#6b7280', text: '#9ca3af', icon: Clock, label: status };
-  const Icon = cfg.icon;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.text, fontSize: 11, fontWeight: 700 }}>
-      <Icon size={10} />{cfg.label}
-    </span>
-  );
-}
 
 function ElapsedBadge({ createdAt }) {
   const [elapsedMins, setElapsedMins] = useState(0);
@@ -56,8 +47,9 @@ function ElapsedBadge({ createdAt }) {
 }
 
 function MetricCard({ icon: Icon, label, value, color }) {
+  const tone = color === '#9333ea' ? 'purple' : color === '#f97316' ? 'orange' : color === '#b45309' ? 'brown' : 'gold';
   return (
-    <div className="module-metric-card" style={{ '--metric-accent': color }}>
+    <div className={`module-metric-card module-metric-${tone}`}>
       <div className="module-metric-icon"><Icon size={24} /></div>
       <div className="module-metric-content">
         <div className="module-metric-value">{value}</div>
@@ -67,7 +59,7 @@ function MetricCard({ icon: Icon, label, value, color }) {
   );
 }
 
-function OrderCard({ order, onAdvance, onAdvanceItem, onCancel, onSelect, stationFilter }) {
+function OrderCard({ order, onAdvance, onAdvanceItem, onCancel, stationFilter }) {
   const idx = ORDER_STATUSES.indexOf(order.status);
   const canAdvance = idx >= 0 && idx < ORDER_STATUSES.indexOf('Pagado');
   const canCancel = ['Pedido recibido', 'Confirmado', 'En preparacion'].includes(order.status);
@@ -83,43 +75,34 @@ function OrderCard({ order, onAdvance, onAdvanceItem, onCancel, onSelect, statio
   });
 
   return (
-    <div onClick={() => onSelect(order)} style={{ background: '#FFFFFF', borderRadius: 14, border: `1px solid #E5E7EB`, padding: '16px', cursor: 'pointer', marginBottom: 12, boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'transform 0.2s, box-shadow 0.2s' }}>
+    <article className="order-card">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F3F4F6', padding: '2px 8px', borderRadius: 6 }}>
+      <div className="order-card-header">
+        <div className="order-card-meta">
+          <span className="order-source">
             {order.source}
           </span>
           <ElapsedBadge createdAt={order.createdAt} />
         </div>
-        <div style={{ fontWeight: 800, fontSize: 15, color: '#D97706' }}>{formatMoney(order.total)}</div>
+        <div className="order-total">{formatMoney(order.total)}</div>
       </div>
 
       {/* Items Breakdown with Station Badges & Notes */}
-      <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="order-items">
         {(itemsToShow.length ? itemsToShow : order.items || []).map((i, idx) => {
           const isBar = i.station === 'bar';
           const isCoffee = i.station === 'coffee';
           const isReady = i.status === 'listo' || i.status === 'entregado';
 
           return (
-            <div key={i.id || idx} style={{
-              padding: '6px 10px',
-              borderRadius: 8,
-              background: isReady ? 'rgba(34, 197, 94, 0.08)' : '#F9FAFB',
-              border: `1px solid ${isReady ? '#86EFAC' : '#E5E7EB'}`,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: 12.5
-            }}>
+            <div key={i.id || idx} className={`order-item ${isReady ? 'is-ready' : ''}`}>
               <div>
-                <span style={{ fontWeight: 700, color: '#111827' }}>{i.quantity}x {itemDisplayName(i)}</span>
-                <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: isBar ? '#9333EA' : isCoffee ? '#D97706' : '#2563EB' }}>
+                <span className="order-item-name">{i.quantity}x {itemDisplayName(i)}</span>
+                <span className={`order-station order-station-${isBar ? 'bar' : isCoffee ? 'coffee' : 'kitchen'}`}>
                   {isBar ? '🍸 Bar' : isCoffee ? '☕ Café' : '👨‍🍳 Cocina'}
                 </span>
                 {i.notes && (
-                  <div style={{ fontSize: 11, color: '#6B7280', fontStyle: 'italic', marginTop: 2 }}>
+                  <div className="order-item-note">
                     💬 {i.notes}
                   </div>
                 )}
@@ -130,23 +113,14 @@ function OrderCard({ order, onAdvance, onAdvanceItem, onCancel, onSelect, statio
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onAdvanceItem(order.id, i.id, 'listo'); }}
-                  style={{
-                    padding: '3px 8px',
-                    borderRadius: 6,
-                    background: '#DCFCE7',
-                    border: '1px solid #86EFAC',
-                    color: '#15803D',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
+                  className="btn btn-sm btn-success"
                   title="Marcar este ítem como listo en la estación"
                 >
                   ✓ Listo
                 </button>
               )}
               {isReady && (
-                <span style={{ color: '#15803D', fontSize: 11, fontWeight: 800 }}>✓ Listo</span>
+                <span className="order-ready">✓ Listo</span>
               )}
             </div>
           );
@@ -154,42 +128,42 @@ function OrderCard({ order, onAdvance, onAdvanceItem, onCancel, onSelect, statio
       </div>
 
       {order.comment && (
-        <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10, fontStyle: 'italic' }}>
+      <div className="order-comment">
           📝 Nota: {order.comment}
         </div>
       )}
 
       {/* Bottom Footer Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid #F3F4F6' }}>
-        <div style={{ fontSize: 12, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+      <div className="order-card-footer">
+        <div className="order-estimate">
           <Clock size={12} /> {order.estimatedMinutes} min est.
         </div>
-        <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-          {canCancel && <button onClick={() => onCancel(order)} style={{ padding: '6px 12px', borderRadius: 8, background: '#FEE2E2', border: 'none', color: '#DC2626', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>Cancelar</button>}
-          {canAdvance && <button onClick={() => onAdvance(order)} style={{ padding: '6px 14px', borderRadius: 8, background: '#FEF3C7', border: 'none', color: '#D97706', fontSize: 11, cursor: 'pointer', fontWeight: 800 }}>Avanzar Comanda</button>}
+        <div className="order-actions" onClick={e => e.stopPropagation()}>
+          {canCancel && <button className="btn btn-sm btn-danger" onClick={() => onCancel(order)}>Cancelar</button>}
+          {canAdvance && <button className="btn btn-sm btn-warning" onClick={() => onAdvance(order)}>Avanzar Comanda</button>}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
-function KanbanBoard({ orders, onAdvance, onAdvanceItem, onCancel, onSelect, stationFilter }) {
+function KanbanBoard({ orders, onAdvance, onAdvanceItem, onCancel, stationFilter }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, overflowX: 'auto', minWidth: 800 }}>
+    <div className="orders-kanban">
       {KANBAN_STAGES.map(stage => {
         const cfg = statusColors[stage];
         const Icon = cfg.icon;
         const stageOrders = orders.filter(o => o.status === stage);
         return (
-          <div key={stage} style={{ background: '#F9FAFB', borderRadius: 16, border: `1px solid #E5E7EB`, padding: '16px 14px', minHeight: 300 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid #E5E7EB` }}>
-              <Icon size={16} color={cfg.text} />
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>{cfg.label}</span>
-              <span style={{ marginLeft: 'auto', background: cfg.bg, color: cfg.text, borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 800 }}>{stageOrders.length}</span>
+          <div key={stage} className="orders-kanban-column">
+            <div className="orders-kanban-header">
+              <Icon size={16} aria-hidden="true" />
+              <span>{cfg.label}</span>
+              <span className="orders-kanban-count">{stageOrders.length}</span>
             </div>
             {stageOrders.length === 0
-              ? <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: 13, padding: '40px 0', fontWeight: 500 }}>Sin pedidos</div>
-              : stageOrders.map(o => <OrderCard key={o.id} order={o} onAdvance={onAdvance} onAdvanceItem={onAdvanceItem} onCancel={onCancel} onSelect={onSelect} stationFilter={stationFilter} />)
+              ? <div className="orders-empty-column">Sin pedidos</div>
+              : stageOrders.map(o => <OrderCard key={o.id} order={o} onAdvance={onAdvance} onAdvanceItem={onAdvanceItem} onCancel={onCancel} stationFilter={stationFilter} />)
             }
           </div>
         );
@@ -244,80 +218,63 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
       onClose();
     } catch (err) { notify?.('Error', err.message, 'error'); }
   };
-  const inputStyle = { background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 12, padding: '12px 14px', color: '#111827', fontSize: 14, width: '100%', boxSizing: 'border-box', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)', outline: 'none' };
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.3)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#FFFFFF', borderRadius: 20, border: '1px solid #E5E7EB', padding: 28, width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h3 style={{ margin: 0, color: '#111827', fontSize: 18, fontWeight: 800 }}>{order ? 'Editar Comanda' : 'Nueva Comanda (Cocina / Bar)'}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 22 }}>x</button>
-        </div>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Origen</span>
-              <select value={form.source} onChange={e => setField('source', e.target.value)} style={inputStyle}>
+    <Dialog open onClose={onClose} title={order ? 'Editar Comanda' : 'Nueva Comanda (Cocina / Bar)'} wide>
+        <form className="order-form" onSubmit={handleSubmit}>
+          <div className="order-form-grid">
+            <P1Select label="Origen" value={form.source} onChange={e => setField('source', e.target.value)}>
                 {['Barra', 'Habitación', 'Terraza', 'Restaurante'].map(s => <option key={s}>{s}</option>)}
-              </select>
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Método de pago</span>
-              <select value={form.paymentMethod} onChange={e => setField('paymentMethod', e.target.value)} style={inputStyle}>
+            </P1Select>
+            <P1Select label="Método de pago" value={form.paymentMethod} onChange={e => setField('paymentMethod', e.target.value)}>
                 {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </label>
+            </P1Select>
           </div>
           {form.source === 'Habitación' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Estadía / Habitación</span>
-              <select value={form.stayId} onChange={e => setField('stayId', e.target.value)} style={inputStyle}>
+            <P1Select label="Estadía / Habitación" value={form.stayId} onChange={e => setField('stayId', e.target.value)}>
                 <option value="">-- Sin vincular --</option>
                 {(stays||[]).map(s => <option key={s.id} value={s.id}>Hab. {s.roomNumber || s.roomId}</option>)}
-              </select>
-            </label>
+            </P1Select>
           )}
-          <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Productos y Notas de Preparación</span>
-              <button type="button" onClick={addItem} style={{ padding: '4px 12px', background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8, color: '#D97706', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>+ Agregar</button>
+          <div className="order-form-items">
+            <div className="order-form-section-header">
+              <span>Productos y Notas de Preparación</span>
+              <P1Button type="button" variant="secondary" className="btn-sm" onClick={addItem}><Plus size={14} />Agregar</P1Button>
             </div>
             {form.items.map((item, i) => (
-              <div key={i} style={{ marginBottom: 12, background: '#F9FAFB', padding: '10px', borderRadius: 10, border: '1px solid #E5E7EB' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 32px', gap: 8, marginBottom: 6 }}>
-                  <select value={item.menuItemId} onChange={e => setItemField(i, 'menuItemId', e.target.value)} style={{ ...inputStyle, padding: '8px 10px' }}>
+              <div key={i} className="order-form-item">
+                <div className="order-form-item-grid">
+                  <select className="form-control" value={item.menuItemId} onChange={e => setItemField(i, 'menuItemId', e.target.value)} aria-label={`Producto ${i + 1}`}>
                     <option value=''>-- Seleccionar producto --</option>
                     {activeRecipes.map(r => (
                       <option key={r.id} value={r.id}>{r.name} - S/ {Number(r.salePrice || 0).toFixed(2)} ({r.category})</option>
                     ))}
                   </select>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
-                    <button type='button' onClick={() => setItemField(i, 'quantity', Math.max(1, item.quantity - 1))} style={{ padding: '0 8px', background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', fontSize: 18 }}>-</button>
-                    <span style={{ flex: 1, textAlign: 'center', color: '#111827', fontWeight: 700 }}>{item.quantity}</span>
-                    <button type='button' onClick={() => setItemField(i, 'quantity', item.quantity + 1)} style={{ padding: '0 8px', background: 'none', border: 'none', color: '#D97706', cursor: 'pointer', fontSize: 18 }}>+</button>
+                  <div className="order-quantity-control">
+                    <button type="button" className="icon-button" aria-label={`Reducir cantidad del producto ${i + 1}`} onClick={() => setItemField(i, 'quantity', Math.max(1, item.quantity - 1))}><Minus size={14} /></button>
+                    <span aria-live="polite">{item.quantity}</span>
+                    <button type="button" className="icon-button" aria-label={`Aumentar cantidad del producto ${i + 1}`} onClick={() => setItemField(i, 'quantity', item.quantity + 1)}><Plus size={14} /></button>
                   </div>
-                  <button type='button' onClick={() => removeItem(i)} style={{ background: '#FEE2E2', border: '1px solid #EF4444', borderRadius: 8, color: '#DC2626', cursor: 'pointer', fontWeight: 700 }}>x</button>
+                  <button type="button" className="icon-button btn-danger" aria-label={`Eliminar producto ${i + 1}`} onClick={() => removeItem(i)}><XCircle size={15} /></button>
                 </div>
-                <input
-                  type="text"
+                <P1Input
+                  aria-label={`Notas del producto ${i + 1}`}
                   placeholder="Especificación (ej: Sin cebolla, término medio, sin hielo)"
                   value={item.notes || ''}
                   onChange={e => setItemField(i, 'notes', e.target.value)}
-                  style={{ ...inputStyle, padding: '6px 10px', fontSize: 12, color: '#4B5563' }}
                 />
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#FEF3C7', borderRadius: 12, border: '1px solid #FDE047' }}>
-            <span style={{ fontWeight: 700, color: '#92400E' }}>Total Estimado:</span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: '#B45309' }}>{formatMoney(total)}</span>
+          <div className="order-form-total">
+            <span>Total Estimado:</span>
+            <strong>{formatMoney(total)}</strong>
           </div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 6 }}>
-            <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 10, background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#6B7280', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
-            <button type="submit" style={{ padding: '10px 24px', borderRadius: 10, background: '#1E3A8A', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 14 }}>{order ? 'Guardar Cambios' : 'Enviar Comanda'}</button>
+          <div className="form-actions">
+            <P1Button type="button" variant="secondary" onClick={onClose}>Cancelar</P1Button>
+            <P1Button type="submit">{order ? 'Guardar Cambios' : 'Enviar Comanda'}</P1Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -330,7 +287,6 @@ export default function OrdersView({ notify }) {
   const [filterStatus, setFilterStatus] = useState('Activos');
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState(undefined);
-  const [selected, setSelected] = useState(null);
 
   const orders = ordersResource.data;
   const recipes = menuResource.data;
@@ -344,7 +300,6 @@ export default function OrdersView({ notify }) {
   });
 
   const activeOrders = orders.filter(o => !['Pagado','Cancelado'].includes(o.status));
-  const inKitchen = orders.filter(o => ['Confirmado','En preparacion'].includes(o.status));
   const barOrders = orders.filter(o => !['Pagado','Cancelado'].includes(o.status) && (o.items || []).some(i => i.station === 'bar'));
   const kitchenOrders = orders.filter(o => !['Pagado','Cancelado'].includes(o.status) && (o.items || []).some(i => (i.station || 'kitchen') === 'kitchen'));
   const coffeeOrders = orders.filter(o => !['Pagado','Cancelado'].includes(o.status) && (o.items || []).some(i => i.station === 'coffee'));
@@ -374,32 +329,29 @@ export default function OrdersView({ notify }) {
   }, [restaurantCommands, notify]);
 
   return (
-    <div style={{ padding: '28px 36px', height: '100%', overflowY: 'auto', boxSizing: 'border-box', backgroundColor: '#FAFAFA' }}>
+    <div className="view-container orders-view">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="orders-header">
         <div>
-          <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, color: '#111827', display: 'flex', alignItems: 'center', gap: 12, letterSpacing: '-0.02em' }}>
+          <h2>
             <ShoppingCart size={28} color="#D97706" /> Comandas & KDS (Cocina y Bar)
           </h2>
-          <p style={{ margin: '6px 0 0', color: '#6B7280', fontSize: 14, fontWeight: 500 }}>
+          <p>
             División inteligente por estaciones · Tiempos de preparación en vivo · Control de recetas
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => { ordersResource.reload(); menuResource.reload(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '9px 16px', background: '#FFFFFF', border: '1px solid #E5E7EB', color: '#6B7280' }}>
+        <div className="orders-header-actions">
+          <button className="btn btn-outline" onClick={() => { ordersResource.reload(); menuResource.reload(); }}>
             <RefreshCw size={14} /> Actualizar
           </button>
-          <button 
-            onClick={() => setEditor(null)} 
-            style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 800, padding: '9px 20px', background: '#1E3A8A', border: 'none', color: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
-          >
+          <button className="btn btn-primary" onClick={() => setEditor(null)}>
             <Plus size={16} /> Nueva Comanda
           </button>
         </div>
       </div>
 
       {/* Metrics Strip */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 22 }}>
+      <div className="orders-metrics">
         <MetricCard icon={ShoppingCart} label="Comandas Activas" value={activeOrders.length} color="#d4af37" />
         <MetricCard icon={Wine} label="Pendientes en Bar" value={barOrders.length} color="#9333ea" />
         <MetricCard icon={UtensilsCrossed} label="En Cocina" value={kitchenOrders.length} color="#f97316" />
@@ -407,8 +359,8 @@ export default function OrdersView({ notify }) {
       </div>
 
       {/* KDS Station Filter Tabs */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8, background: '#F3F4F6', padding: '4px', borderRadius: 12 }}>
+      <div className="orders-toolbar">
+        <div className="orders-station-tabs" role="tablist" aria-label="Filtrar por estación">
           {[
             { id: 'Todos', label: `Todas (${activeOrders.length})`, icon: ShoppingCart },
             { id: 'bar', label: `🍸 KDS Bar (${barOrders.length})`, icon: Wine },
@@ -418,18 +370,9 @@ export default function OrdersView({ notify }) {
             <button
               key={tab.id}
               onClick={() => setStationFilter(tab.id)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 8,
-                border: 'none',
-                background: stationFilter === tab.id ? '#FFFFFF' : 'transparent',
-                color: stationFilter === tab.id ? '#111827' : '#6B7280',
-                fontWeight: stationFilter === tab.id ? 800 : 600,
-                fontSize: 13,
-                cursor: 'pointer',
-                boxShadow: stationFilter === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s'
-              }}
+              className={`orders-station-tab ${stationFilter === tab.id ? 'active' : ''}`}
+              role="tab"
+              aria-selected={stationFilter === tab.id}
             >
               {tab.label}
             </button>
@@ -437,18 +380,17 @@ export default function OrdersView({ notify }) {
         </div>
 
         {/* Search and Status */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FFFFFF', padding: '6px 12px', borderRadius: 10, border: '1px solid #E5E7EB' }}>
-            <Search size={15} color="#9CA3AF" />
+        <div className="orders-filters">
+          <label className="orders-search"><Search size={15} aria-hidden="true" />
             <input
               type="text"
+              aria-label="Buscar producto en comanda"
               placeholder="Buscar producto en comanda..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ border: 'none', outline: 'none', fontSize: 13, color: '#111827', width: 200 }}
             />
-          </div>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '8px 12px', background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 10, color: '#111827', fontSize: 13, fontWeight: 600 }}>
+          </label>
+          <select className="form-control orders-status-filter" aria-label="Filtrar por estado" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="Activos">Activos</option>
             <option value="Todos">Todos</option>
             <option value="Historial">Historial</option>
@@ -463,7 +405,6 @@ export default function OrdersView({ notify }) {
         onAdvance={handleAdvance}
         onAdvanceItem={handleAdvanceItem}
         onCancel={handleCancel}
-        onSelect={setSelected}
         stationFilter={stationFilter}
       />
 

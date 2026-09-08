@@ -90,37 +90,17 @@ export function AttendanceKioskModal({ open, onClose }) {
       title="Kiosco de Asistencia · Hotel Park Plaza"
       description="Código QR rotativo para auto-registro presencial del personal con geocerca GPS."
     >
-      <div ref={modalContainerRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '10px 0' }}>
+      <div ref={modalContainerRef} className="attendance-kiosk">
         {/* Encabezado del Reloj y Estado */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%',
-          padding: '12px 18px',
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.05) 0%, rgba(30, 41, 59, 0.08) 100%)',
-          borderRadius: '12px',
-          border: '1px solid rgba(15, 23, 42, 0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={20} style={{ color: 'var(--color-primary, #1e3a8a)' }} />
-            <strong style={{ fontSize: '1.25rem', letterSpacing: '0.5px' }}>
+        <div className="attendance-kiosk-header">
+          <div className="attendance-kiosk-clock">
+            <Clock className="attendance-kiosk-clock-icon" size={20} />
+            <strong>
               {currentTime.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </strong>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 10px',
-              borderRadius: '20px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              backgroundColor: '#ecfdf5',
-              color: '#047857',
-              border: '1px solid #a7f3d0'
-            }}>
+          <div className="attendance-kiosk-header-actions">
+            <span className="attendance-kiosk-geofence">
               <ShieldCheck size={14} /> Geocerca 80m Activa
             </span>
             <button
@@ -134,63 +114,41 @@ export function AttendanceKioskModal({ open, onClose }) {
         </div>
 
         {/* Contenedor Central del Código QR */}
-        <div style={{
-          position: 'relative',
-          padding: '20px',
-          backgroundColor: '#ffffff',
-          borderRadius: '20px',
-          boxShadow: '0 12px 32px rgba(15, 23, 42, 0.12)',
-          border: '2px solid rgba(15, 23, 42, 0.06)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
+        <div className="attendance-kiosk-qr-card">
           {loading ? (
-            <div style={{ width: 280, height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <RefreshCw className="animate-spin" size={36} style={{ color: '#64748b' }} />
+            <div className="attendance-kiosk-qr-state">
+              <RefreshCw className="animate-spin attendance-kiosk-muted-icon" size={36} />
             </div>
           ) : error ? (
-            <div style={{ width: 280, height: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', textAlign: 'center', padding: '16px' }}>
-              <span style={{ color: '#ef4444', fontWeight: 600 }}>{error}</span>
+            <div className="attendance-kiosk-qr-state attendance-kiosk-error-state">
+              <span>{error}</span>
               <button className="btn btn-outline" onClick={fetchToken}>
                 <RefreshCw size={14} /> Reintentar
               </button>
             </div>
           ) : (
-            <canvas ref={canvasRef} style={{ borderRadius: '12px' }} />
+            <canvas ref={canvasRef} className="attendance-kiosk-canvas" />
           )}
 
           {/* Barra de Progreso de Rotación */}
-          <div style={{ width: '100%', marginTop: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b', marginBottom: '6px' }}>
+          <div className="attendance-kiosk-progress">
+            <div className="attendance-kiosk-progress-label">
               <span>Rotación de seguridad</span>
               <strong>{timeLeft}s</strong>
             </div>
-            <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${(timeLeft / 20) * 100}%`,
-                backgroundColor: timeLeft <= 5 ? '#f59e0b' : '#3b82f6',
-                transition: 'width 1s linear, background-color 0.3s ease'
-              }} />
+            <div className="attendance-kiosk-progress-track">
+              <div className={`attendance-kiosk-progress-fill attendance-kiosk-progress-${timeLeft} ${timeLeft <= 5 ? 'is-warning' : ''}`} />
             </div>
           </div>
         </div>
 
         {/* Instrucciones Claras para el Colaborador */}
-        <div style={{
-          textAlign: 'center',
-          maxWidth: '380px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#1e293b', fontWeight: 600 }}>
-            <Sparkles size={16} style={{ color: '#eab308' }} />
+        <div className="attendance-kiosk-instructions">
+          <div className="attendance-kiosk-instruction-title">
+            <Sparkles className="attendance-kiosk-sparkle" size={16} />
             <span>Escaneá con tu teléfono en la app</span>
           </div>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4 }}>
+          <p>
             El sistema registrará automáticamente tu <strong>Ingreso o Salida</strong> validando que estés físicamente en el hotel. El código cambia cada 20s para máxima seguridad.
           </p>
         </div>

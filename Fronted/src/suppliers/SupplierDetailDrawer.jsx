@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Drawer } from '../components/ui/Overlay';
 import { StatusBadge } from '../components/views/SharedViewParts';
 import { suppliersClient } from './suppliersClient';
@@ -51,26 +51,37 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
   const [restockNotes, setRestockNotes] = useState('');
   const [restockSuccess, setRestockSuccess] = useState(false);
 
-  const fetchSupplier = async () => {
+  const fetchSupplier = useCallback(async (signal) => {
     if (!supplierId) return;
     try {
       setLoading(true);
-      const sup = await suppliersClient.getSupplierDetail(supplierId);
+      const sup = await suppliersClient.getSupplierDetail(supplierId, signal);
+      if (signal?.aborted) return;
       setSupplier(sup);
-      if (sup.inventory && sup.inventory.length > 0 && !restockItemId) {
-        setRestockItemId(sup.inventory[0].id);
-        setRestockCost(sup.inventory[0].cost ? String(sup.inventory[0].cost) : '');
+      if (sup.inventory && sup.inventory.length > 0) {
+        const firstInventoryItem = sup.inventory[0];
+        setRestockItemId((currentItemId) => {
+          if (currentItemId) return currentItemId;
+          setRestockCost(firstInventoryItem.cost ? String(firstInventoryItem.cost) : '');
+          return firstInventoryItem.id;
+        });
       }
     } catch (e) {
+      if (signal?.aborted) return;
       setError(e.message || 'Error al obtener el detalle del proveedor');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [supplierId]);
 
   useEffect(() => {
-    if (supplierId) fetchSupplier();
-  }, [supplierId]);
+    const controller = new AbortController();
+    setSupplier(null);
+    setError(null);
+    setLoading(Boolean(supplierId));
+    if (supplierId) fetchSupplier(controller.signal);
+    return () => controller.abort();
+  }, [supplierId, fetchSupplier]);
 
   const handleArchive = async () => {
     const reason = window.prompt('Indique el motivo por el cual se archiva este proveedor:');
@@ -157,64 +168,45 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
       description="Información comercial, insumos de cocina/bar que abastece y registro de compras."
     >
       {loading ? (
-        <div style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>Cargando información del proveedor...</div>
+        <div className="supplier-cell-content">Cargando información del proveedor...</div>
       ) : error ? (
         <div className="alert-banner alert-banner-danger">{error}</div>
       ) : supplier ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="supplier-stack-compact">
           
           {/* Header Card */}
-          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+          <div className="supplier-card-action">
+            <div className="supplier-row-variant-o">
               <StatusBadge>{supplier.status === 'active' ? 'Activo' : 'Archivado'}</StatusBadge>
               {supplier.isPreferred && (
                 <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '3px 8px',
-                    borderRadius: 20,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    background: '#FEF3C7',
-                    color: '#92400E',
-                    border: '1px solid #FDE68A',
-                  }}
+                  className="supplier-card-field"
                 >
                   <Star size={12} fill="#D97706" color="#D97706" /> Proveedor Preferido 5★
                 </span>
               )}
             </div>
 
-            <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, color: '#1E3A8A' }}>
+            <h3 className="supplier-element-variant-m">
               {supplier.legalName}
             </h3>
             {supplier.tradeName && (
-              <div style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>
+              <div className="supplier-element-variant-n">
                 {supplier.tradeName}
               </div>
             )}
 
             {/* RUC Badge with Copy */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 700 }}>RUC / Documento:</span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13.5, background: '#FFFFFF', padding: '2px 8px', borderRadius: 6, border: '1px solid #CBD5E1', color: '#0F172A' }}>
+            <div className="supplier-row-variant-p">
+              <span className="supplier-element-variant-o">RUC / Documento:</span>
+              <span className="supplier-card-content">
                 {supplier.taxId}
               </span>
               <button
                 type="button"
                 onClick={() => copyToClipboard(supplier.taxId)}
                 title="Copiar RUC"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 4,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: copiedTaxId ? '#16A34A' : '#64748B',
-                }}
+                className={`supplier-surface ${copiedTaxId ? 'is-copied' : ''}`}
               >
                 {copiedTaxId ? <Check size={14} /> : <Copy size={14} />}
               </button>
@@ -225,119 +217,98 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
           {supplier.status === 'active' && (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary supplier-card-header"
               onClick={() => setShowRestockModal(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '12px 16px',
-                fontWeight: 800,
-                fontSize: 13.5,
-                background: 'linear-gradient(135deg, #1E3A8A, #1E40AF)',
-                color: '#FFF',
-                borderRadius: 10,
-                boxShadow: '0 4px 6px -1px rgba(30, 58, 138, 0.2)'
-              }}
             >
               <ArrowDownToLine size={16} /> Registrar Ingreso / Reabastecimiento de Insumos
             </button>
           )}
 
           {/* Contact Information */}
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.05em' }}>
+          <div className="supplier-card-footer">
+            <h4 className="supplier-element-variant-p">
               Contacto Comercial
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#334155' }}>
+            <div className="supplier-stack-muted">
+              <div className="supplier-row-variant-q">
                 <User size={15} color="#64748B" />
-                <span style={{ fontWeight: 600 }}>{supplier.contactName || 'No especificado'}</span>
+                <span className="supplier-element-variant-q">{supplier.contactName || 'No especificado'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#334155' }}>
+              <div className="supplier-row-variant-q">
                 <Phone size={15} color="#64748B" />
                 {supplier.phone ? (
-                  <a href={`tel:${supplier.phone}`} style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>
+                  <a href={`tel:${supplier.phone}`} className="supplier-element-variant-r">
                     {supplier.phone}
                   </a>
                 ) : (
-                  <span style={{ color: '#94A3B8' }}>Sin teléfono registrado</span>
+                  <span className="supplier-element-accent">Sin teléfono registrado</span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#334155' }}>
+              <div className="supplier-row-variant-q">
                 <Mail size={15} color="#64748B" />
                 {supplier.email ? (
-                  <a href={`mailto:${supplier.email}`} style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>
+                  <a href={`mailto:${supplier.email}`} className="supplier-element-variant-r">
                     {supplier.email}
                   </a>
                 ) : (
-                  <span style={{ color: '#94A3B8' }}>Sin correo registrado</span>
+                  <span className="supplier-element-accent">Sin correo registrado</span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Operational Delivery Condition */}
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.05em' }}>
+          <div className="supplier-card-footer">
+            <h4 className="supplier-element-variant-p">
               Plazos de Entrega & Categorías
             </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#334155', marginBottom: 12 }}>
+            <div className="supplier-row-variant-r">
               <Clock size={15} color="#64748B" />
               <span>
                 Tiempo promedio de despacho: <strong>{supplier.averageDeliveryDays || 0} días hábiles</strong>
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="supplier-row-variant-s">
               {supplier.categories && supplier.categories.length > 0 ? (
                 supplier.categories.map((cat) => (
                   <span
                     key={cat}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 16,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      background: '#EFF6FF',
-                      color: '#1D4ED8',
-                      border: '1px solid #BFDBFE',
-                    }}
+                    className="supplier-card-variant-k"
                   >
                     {CATEGORY_LABELS[cat] || cat}
                   </span>
                 ))
               ) : (
-                <span style={{ fontSize: 12, color: '#94A3B8' }}>Sin categorías asignadas</span>
+                <span className="supplier-element-variant-s">Sin categorías asignadas</span>
               )}
             </div>
           </div>
 
           {/* SECTION: Insumos de Inventario Vinculados */}
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <h4 style={{ margin: 0, fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', letterSpacing: '0.05em' }}>
+          <div className="supplier-card-footer">
+            <div className="supplier-row-variant-t">
+              <h4 className="supplier-element-variant-t">
                 Insumos Abastecidos ({supplier.inventory ? supplier.inventory.length : 0})
               </h4>
-              <span style={{ fontSize: 11, color: '#059669', fontWeight: 700, background: '#D1FAE5', padding: '1px 6px', borderRadius: 4 }}>
+              <span className="supplier-card-variant-l">
                 Cocina & Bar
               </span>
             </div>
 
             {supplier.inventory && supplier.inventory.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              <div className="supplier-stack-accent">
                 {supplier.inventory.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#F8FAFC', borderRadius: 8, fontSize: 12.5 }}>
+                  <div key={item.id} className="supplier-row-variant-u">
                     <div>
-                      <strong style={{ color: '#0F172A', display: 'block' }}>{item.name}</strong>
-                      <span style={{ fontSize: 11, color: '#64748B' }}>Unidad: {item.unit} · Lote: {item.lot || 'N/A'}</span>
+                      <strong className="supplier-element-status">{item.name}</strong>
+                      <span className="supplier-element-variant-u">Unidad: {item.unit} · Lote: {item.lot || 'N/A'}</span>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: '#1E3A8A', display: 'block' }}>
+                    <div className="supplier-cell-header">
+                      <span className="supplier-element-variant-v">
                         Stock: {Number(item.stock || 0).toFixed(1)}
                       </span>
-                      <span style={{ fontSize: 11, color: '#D97706', fontWeight: 700 }}>
+                      <span className="supplier-element-variant-w">
                         {formatMoney(Number(item.cost || 0))} / {item.unit}
                       </span>
                     </div>
@@ -345,30 +316,28 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '14px 0', color: '#94A3B8', fontSize: 12.5 }}>
+              <div className="supplier-element-variant-x">
                 Este proveedor no tiene insumos asignados aún. Edite el proveedor para vincular insumos.
               </div>
             )}
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 14, borderTop: '1px solid #E2E8F0' }}>
+          <div className="supplier-row-variant-v">
             {supplier.status === 'active' ? (
               <>
                 <button
                   type="button"
-                  className="btn btn-outline"
+                  className="btn btn-outline supplier-element-variant-y"
                   onClick={() => onEdit(supplier.id)}
-                  style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
                   disabled={actionLoading}
                 >
                   <Edit2 size={15} /> Editar Proveedor
                 </button>
                 <button
                   type="button"
-                  className="btn btn-danger"
+                  className="btn btn-danger supplier-element-action"
                   onClick={handleArchive}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   disabled={actionLoading}
                 >
                   <Archive size={15} /> Archivar
@@ -377,9 +346,8 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
             ) : (
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary supplier-element-variant-z"
                 onClick={handleReactivate}
-                style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
                 disabled={actionLoading}
               >
                 <RotateCcw size={15} /> Reactivar Proveedor
@@ -391,25 +359,25 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
 
       {/* MODAL: Registrar Reabastecimiento / Ingreso de Insumos */}
       {showRestockModal && supplier && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(2,6,23,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowRestockModal(false)}>
-          <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 26, width: '100%', maxWidth: 480, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="supplier-overlay" onClick={() => setShowRestockModal(false)}>
+          <div className="supplier-card-variant-m" onClick={e => e.stopPropagation()}>
+            <div className="supplier-row-variant-w">
+              <div className="supplier-row-variant-x">
                 <ArrowDownToLine size={22} color="#1E3A8A" />
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827' }}>Ingreso de Mercadería / Insumos</h3>
+                <h3 className="supplier-element-variant-a-extended">Ingreso de Mercadería / Insumos</h3>
               </div>
-              <button type="button" onClick={() => setShowRestockModal(false)} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 20 }}>✕</button>
+              <button type="button" onClick={() => setShowRestockModal(false)} className="supplier-element-variant-b-extended">✕</button>
             </div>
 
             {restockSuccess ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', background: '#DCFCE7', borderRadius: 12, color: '#166534', fontWeight: 700 }}>
-                <CheckCircle2 size={32} color="#16A34A" style={{ margin: '0 auto 8px' }} />
+              <div className="supplier-card-variant-n">
+                <CheckCircle2 size={32} color="#16A34A" className="supplier-element-field" />
                 ¡Reabastecimiento registrado con éxito en inventario y kardex!
               </div>
             ) : (
-              <form onSubmit={handleExecuteRestock} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <form onSubmit={handleExecuteRestock} className="supplier-stack-status">
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                  <label className="supplier-element-variant-c-extended">
                     Insumo a Recibir *
                   </label>
                   <select
@@ -419,7 +387,7 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                       const itm = (supplier.inventory || []).find(i => i.id === e.target.value);
                       if (itm && itm.cost) setRestockCost(String(itm.cost));
                     }}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13.5, color: '#0F172A', boxSizing: 'border-box' }}
+                    className="supplier-element-variant-d-extended"
                     required
                   >
                     <option value="">-- Seleccionar Insumo --</option>
@@ -431,9 +399,9 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="supplier-grid-muted">
                   <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                    <label className="supplier-element-variant-c-extended">
                       Cantidad Ingresada *
                     </label>
                     <input
@@ -442,13 +410,13 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                       min="0.01"
                       value={restockQty}
                       onChange={(e) => setRestockQty(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 14, fontWeight: 700, boxSizing: 'border-box' }}
+                      className="supplier-element-variant-e-extended"
                       required
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                    <label className="supplier-element-variant-c-extended">
                       Costo Unitario (S/)
                     </label>
                     <input
@@ -458,14 +426,14 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                       placeholder="Ej: 45.00"
                       value={restockCost}
                       onChange={(e) => setRestockCost(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 14, boxSizing: 'border-box' }}
+                      className="supplier-element-variant-f-extended"
                     />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="supplier-grid-muted">
                   <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                    <label className="supplier-element-variant-c-extended">
                       N° Factura / Guía de Remisión
                     </label>
                     <input
@@ -473,12 +441,12 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                       placeholder="Ej: F001-002849"
                       value={restockInvoice}
                       onChange={(e) => setRestockInvoice(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, boxSizing: 'border-box' }}
+                      className="supplier-element-variant-g-extended"
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                    <label className="supplier-element-variant-c-extended">
                       N° de Lote / Vencimiento
                     </label>
                     <input
@@ -486,13 +454,13 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                       placeholder="Ej: LOT-2026-09"
                       value={restockLot}
                       onChange={(e) => setRestockLot(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, boxSizing: 'border-box' }}
+                      className="supplier-element-variant-g-extended"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', display: 'block', marginBottom: 6 }}>
+                  <label className="supplier-element-variant-c-extended">
                     Observaciones de Recepción
                   </label>
                   <input
@@ -500,15 +468,15 @@ export function SupplierDetailDrawer({ supplierId, onClose, onEdit, onRefresh })
                     placeholder="Ej: Ingreso conforme en almacén central"
                     value={restockNotes}
                     onChange={(e) => setRestockNotes(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, boxSizing: 'border-box' }}
+                    className="supplier-element-variant-g-extended"
                   />
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 10 }}>
-                  <button type="button" onClick={() => setShowRestockModal(false)} className="btn btn-outline" style={{ padding: '10px 16px' }}>
+                <div className="supplier-row-variant-y">
+                  <button type="button" onClick={() => setShowRestockModal(false)} className="btn btn-outline supplier-spaced-action">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={actionLoading} className="btn btn-primary" style={{ padding: '10px 22px', fontWeight: 800 }}>
+                  <button type="submit" disabled={actionLoading} className="btn btn-primary supplier-element-variant-h-extended">
                     {actionLoading ? 'Registrando...' : 'Confirmar Ingreso a Inventario'}
                   </button>
                 </div>

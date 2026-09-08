@@ -64,7 +64,7 @@ function QuickGuestModal({ open, onClose, onCreated, notify }) {
 
   return (
     <Dialog open={open} onClose={onClose} title="Nuevo Huésped Rápido" description="Registre un cliente para seleccionarlo de inmediato en la reserva.">
-      <form className="form-grid" onSubmit={submit} style={{ gap: '12px' }}>
+      <form className="form-grid reservation-quick-form" onSubmit={submit}>
         <label>Tipo de Documento
           <select value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value })}>
             <option value="dni">DNI (Perú)</option>
@@ -96,7 +96,7 @@ function QuickGuestModal({ open, onClose, onCreated, notify }) {
 
         {error ? <div className="alert-banner alert-banner-danger span-2" role="alert">{error}</div> : null}
 
-        <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '12px', marginTop: '6px' }}>
+        <div className="form-actions span-2 reservation-quick-actions">
           <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" disabled={busy}>
             {busy ? 'Guardando...' : 'Guardar y Seleccionar'}
@@ -259,18 +259,18 @@ function ReservationForm({ onClose, notify }) {
         }}
       />
 
-      <form className="form-grid" onSubmit={submit} style={{ gap: '16px' }}>
-        <div className="alert-banner alert-banner-info span-2" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1px solid #bae6fd' }}>
-          <span style={{ fontSize: '15px' }}>ℹ️</span>
-          <div style={{ fontSize: '13px', color: '#0369a1' }}>
+      <form className="form-grid reservation-form" onSubmit={submit}>
+        <div className="alert-banner alert-banner-info span-2 reservation-info-banner">
+          <span className="reservation-info-icon">ℹ️</span>
+          <div className="reservation-info-copy">
             Seleccione fechas y huéspedes para cotizar disponibilidad de inventario, amenidades y servicios adicionales en tiempo real.
           </div>
         </div>
 
-        <div className="span-2" style={{ background: 'var(--color-surface-soft)', padding: '12px 16px', borderRadius: '14px', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--color-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Atajos rápidos:</span>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="span-2 reservation-presets">
+          <div className="reservation-presets-group">
+            <span className="reservation-presets-label">Atajos rápidos:</span>
+            <div className="reservation-presets-list">
               {[
                 { nights: 1, label: 'Hoy (1 Noche)' },
                 { nights: 2, label: '2 Noches' },
@@ -283,18 +283,7 @@ function ReservationForm({ onClose, notify }) {
                     key={p.nights}
                     type="button"
                     onClick={() => applyPreset(p.nights)}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      border: isActive ? '1px solid var(--color-gold)' : '1px solid var(--color-border)',
-                      background: isActive ? 'var(--color-navy)' : '#fff',
-                      color: isActive ? '#fff' : 'var(--color-text)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: isActive ? '0 2px 8px rgba(15,23,42,0.18)' : 'var(--shadow-sm)',
-                    }}
+                    className={`reservation-preset ${isActive ? 'is-active' : ''}`}
                   >
                     {p.label}
                   </button>
@@ -304,36 +293,35 @@ function ReservationForm({ onClose, notify }) {
           </div>
 
           {stayMetrics ? (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--color-gold-soft)', border: '1px solid var(--color-gold)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: 'var(--color-navy-deep)', fontWeight: '700' }}>
+            <div className="reservation-stay-metrics">
               <span>🌙 {stayMetrics.nights} {stayMetrics.nights === 1 ? 'Noche' : 'Noches'}</span>
-              <span style={{ color: 'var(--color-muted)', fontWeight: '400' }}>({stayMetrics.hours} hrs)</span>
+              <span className="reservation-stay-hours">({stayMetrics.hours} hrs)</span>
             </div>
           ) : null}
         </div>
 
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="reservation-field-label">
           <span>📅 Ingreso (Check-in)</span>
           <input required type="datetime-local" step="1800" value={form.checkInAt} onChange={(event) => change('checkInAt', event.target.value)} />
         </label>
 
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="reservation-field-label">
           <span>📅 Salida (Check-out)</span>
           <input required type="datetime-local" step="1800" value={form.checkOutAt} onChange={(event) => change('checkOutAt', event.target.value)} />
         </label>
 
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
+        <label className="reservation-field-label">
           <span>👥 Cantidad de Huéspedes</span>
           <input required min="1" step="1" type="number" value={form.guestCount} onChange={(event) => change('guestCount', event.target.value)} />
         </label>
 
-        <label style={{ fontWeight: '600', color: 'var(--color-navy-soft)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+        <label className="reservation-field-label">
+          <div className="reservation-guest-heading">
             <span>👤 Huésped Principal</span>
             <button
               type="button"
-              className="btn btn-sm btn-outline"
+              className="btn btn-sm btn-outline reservation-new-guest"
               onClick={() => setQuickGuestOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: '700', borderRadius: '12px', borderColor: 'var(--color-gold)', color: 'var(--color-gold)', background: '#fff' }}
             >
               <UserPlus size={13} /> + Nuevo Huésped
             </button>
@@ -348,23 +336,14 @@ function ReservationForm({ onClose, notify }) {
           </select>
         </label>
 
-        <div className="span-2" style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
+          <div className="span-2 reservation-availability-actions">
           <button
             type="button"
-            className="btn btn-outline"
-            style={{
-              padding: '10px 24px',
-              fontSize: '13px',
-              fontWeight: '700',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #ffffff, #f8fafc)',
-              border: '1.5px solid var(--color-gold)',
-              color: 'var(--color-navy)',
-            }}
+            className="btn btn-outline reservation-availability-button"
             disabled={loadingAvailability || busy || !form.checkInAt || !form.checkOutAt || !form.guestCount}
             onClick={consultAvailability}
           >
-            <CalendarSearch size={16} aria-hidden="true" style={{ marginRight: '8px' }} />
+            <CalendarSearch size={16} aria-hidden="true" className="reservation-button-icon" />
             {loadingAvailability ? 'Consultando disponibilidad en vivo…' : 'Consultar Disponibilidad de Habitaciones'}
           </button>
         </div>
@@ -374,29 +353,29 @@ function ReservationForm({ onClose, notify }) {
         ) : null}
 
         {availability && !availability.rooms.length ? (
-          <div className="alert-banner alert-banner-warning span-2" role="status" style={{ borderRadius: '14px', padding: '16px' }}>
+          <div className="alert-banner alert-banner-warning span-2 reservation-no-rooms" role="status">
             ⚠️ No hay habitaciones disponibles para {availability.guestCount} huésped(es) en el rango de fechas seleccionado.
           </div>
         ) : null}
 
         {availableRooms.length ? (
-          <div className="span-2" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px', background: 'var(--color-bg)', padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--color-navy-deep)' }}>
+          <div className="span-2 reservation-rooms-panel">
+            <div className="reservation-rooms-header">
+              <div className="reservation-rooms-title-group">
+                <span className="reservation-rooms-title">
                   Habitaciones Disponibles
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: '700', background: 'var(--color-gold-soft)', color: 'var(--color-gold)', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--color-gold)' }}>
+                <span className="reservation-room-count">
                   {displayedRooms.length} de {availableRooms.length}
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-muted)' }}>Piso:</span>
+              <div className="reservation-floor-filter">
+                <span className="reservation-filter-label">Piso:</span>
                 <select
                   value={floorFilter}
                   onChange={(e) => setFloorFilter(e.target.value)}
-                  style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '8px', border: '1px solid var(--color-border)', background: '#fff' }}
+                  className="reservation-floor-select"
                 >
                   <option value="ALL">Todos los pisos</option>
                   {uniqueFloors.map((fl) => (
@@ -406,21 +385,11 @@ function ReservationForm({ onClose, notify }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div className="reservation-category-filters">
               <button
                 type="button"
                 onClick={() => setCategoryFilter('ALL')}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '16px',
-                  fontSize: '11.5px',
-                  fontWeight: '700',
-                  border: categoryFilter === 'ALL' ? '1px solid var(--color-gold)' : '1px solid var(--color-border)',
-                  background: categoryFilter === 'ALL' ? 'var(--color-gold)' : '#fff',
-                  color: categoryFilter === 'ALL' ? '#fff' : 'var(--color-muted)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
+                className={`reservation-category-filter reservation-category-filter-all ${categoryFilter === 'ALL' ? 'is-selected' : ''}`}
               >
                 Todas ({availableRooms.length})
               </button>
@@ -432,17 +401,7 @@ function ReservationForm({ onClose, notify }) {
                     key={cat.id}
                     type="button"
                     onClick={() => setCategoryFilter(cat.id)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '16px',
-                      fontSize: '11.5px',
-                      fontWeight: '700',
-                      border: isSelected ? `1.5px solid ${catStyle.badgeColor}` : '1px solid var(--color-border)',
-                      background: isSelected ? catStyle.badgeBg : '#fff',
-                      color: isSelected ? catStyle.badgeColor : 'var(--color-text)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
+                    className={`reservation-category-filter reservation-category-filter-${catStyle.badgeColor.slice(1)} ${isSelected ? 'is-selected' : ''}`}
                   >
                     {catStyle.icon} {cat.name} ({cat.count})
                   </button>
@@ -450,7 +409,7 @@ function ReservationForm({ onClose, notify }) {
               })}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div className="reservation-rooms-grid">
               {displayedRooms.map((room) => {
                 const isSelected = form.roomId === room.roomId;
                 const catName = categoryById.get(room.categoryId)?.name || 'Categoría';
@@ -460,45 +419,36 @@ function ReservationForm({ onClose, notify }) {
                   <div
                     key={room.roomId}
                     onClick={() => setForm((current) => ({ ...current, roomId: room.roomId }))}
-                    style={{
-                      border: isSelected ? '2px solid var(--color-gold)' : '1px solid var(--color-border)',
-                      borderRadius: '14px',
-                      padding: '14px',
-                      background: isSelected ? 'linear-gradient(135deg, rgba(197, 157, 95, 0.1), #ffffff)' : '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSelected ? '0 6px 20px rgba(197, 157, 95, 0.2)' : '0 2px 6px rgba(0,0,0,0.02)',
-                      position: 'relative',
-                    }}
+                    className={`reservation-room-card ${isSelected ? 'is-selected' : ''}`}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '16px' }}>{catStyle.icon}</span>
-                        <strong style={{ fontSize: '15px', fontWeight: '800', color: 'var(--color-navy-deep)' }}>Hab. {room.number}</strong>
+                    <div className="reservation-room-header">
+                      <div className="reservation-room-heading">
+                        <span className="reservation-room-icon">{catStyle.icon}</span>
+                        <strong className="reservation-room-number">Hab. {room.number}</strong>
                       </div>
                       {isSelected ? (
-                        <span style={{ background: 'var(--color-gold)', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', fontWeight: '800' }}>
+                        <span className="reservation-room-selected-badge">
                           ✓ ELEGIDA
                         </span>
                       ) : (
-                        <span style={{ fontSize: '10.5px', color: 'var(--color-muted)', fontWeight: '600' }}>
+                        <span className="reservation-room-floor">
                           Piso {room.floor}
                         </span>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '11px', background: catStyle.badgeBg, color: catStyle.badgeColor, padding: '2px 6px', borderRadius: '6px', fontWeight: '700' }}>
+                    <div className="reservation-room-meta">
+                      <span className={`reservation-room-category reservation-category-${catStyle.badgeColor.slice(1)}`}>
                         {catName}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                      <span className="reservation-room-capacity">
                         👥 Cap: {room.capacity}
                       </span>
                     </div>
 
-                    <div style={{ borderTop: '1px dashed var(--color-border)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{formatReservationMoney(room.nightlyRate)} /n</span>
-                      <strong style={{ fontSize: '13.5px', color: '#059669', fontWeight: '800' }}>Total: {formatReservationMoney(room.totalAmount)}</strong>
+                    <div className="reservation-room-price">
+                      <span>{formatReservationMoney(room.nightlyRate)} /n</span>
+                      <strong>Total: {formatReservationMoney(room.totalAmount)}</strong>
                     </div>
                   </div>
                 );
@@ -508,23 +458,23 @@ function ReservationForm({ onClose, notify }) {
         ) : null}
 
         {selectedRoom ? (
-          <div className="span-2" style={{ background: '#fff', padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px' }}>✨</span>
+          <div className="span-2 reservation-extras-panel">
+            <div className="reservation-extras-header">
+              <div className="reservation-extras-title-group">
+                <span className="reservation-extras-icon">✨</span>
                 <div>
-                  <strong style={{ fontSize: '13.5px', color: 'var(--color-navy-deep)' }}>Servicios Adicionales y Amenidades</strong>
-                  <div style={{ fontSize: '11.5px', color: 'var(--color-muted)' }}>Añada servicios opcionales a la cotización de la estadía</div>
+                  <strong className="reservation-extras-title">Servicios Adicionales y Amenidades</strong>
+                  <div className="reservation-extras-description">Añada servicios opcionales a la cotización de la estadía</div>
                 </div>
               </div>
               {selectedExtras.size > 0 ? (
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#ecfdf5', padding: '3px 8px', borderRadius: '8px' }}>
+                <span className="reservation-extras-summary">
                   +{selectedExtras.size} servicio(s) · S/ {extrasCost.toFixed(2)}
                 </span>
               ) : null}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+            <div className="reservation-extras-grid">
               {EXTRA_SERVICES.map((s) => {
                 const checked = selectedExtras.has(s.id);
                 const itemPrice = s.type === 'per_night' ? s.price * nightsCount : s.price;
@@ -532,34 +482,24 @@ function ReservationForm({ onClose, notify }) {
                   <label
                     key={s.id}
                     onClick={() => toggleExtra(s.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '10px',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: checked ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)',
-                      background: checked ? 'var(--color-gold-soft)' : '#f8fafc',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
+                    className={`reservation-extra-option ${checked ? 'is-checked' : ''}`}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => {}} 
-                      style={{ marginTop: '2px' }}
+                      className="reservation-extra-checkbox"
                     />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text)' }}>
+                    <div className="reservation-extra-copy">
+                      <div className="reservation-extra-name-row">
+                        <span className="reservation-extra-name">
                           {s.icon} {s.name}
                         </span>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-muted)', margin: '2px 0 4px' }}>
+                      <div className="reservation-extra-description">
                         {s.desc}
                       </div>
-                      <div style={{ fontSize: '12px', fontWeight: '800', color: checked ? '#059669' : 'var(--color-navy)' }}>
+                      <div className={`reservation-extra-price ${checked ? 'is-checked' : ''}`}>
                         +S/ {itemPrice.toFixed(2)} {s.type === 'per_night' ? `(S/ ${s.price}/noche)` : '(fijo)'}
                       </div>
                     </div>
@@ -571,47 +511,47 @@ function ReservationForm({ onClose, notify }) {
         ) : null}
 
         {selectedRoom ? (
-          <div className="span-2" style={{ background: 'linear-gradient(135deg, var(--color-navy), var(--color-navy-deep))', color: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 10px 30px rgba(15,23,42,0.18)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '24px' }}>{getCategoryStyle(categoryById.get(selectedRoom.categoryId)?.name).icon}</span>
+          <div className="span-2 reservation-quote-panel">
+            <div className="reservation-quote-header">
+              <div className="reservation-quote-title-group">
+                <span className="reservation-quote-icon">{getCategoryStyle(categoryById.get(selectedRoom.categoryId)?.name).icon}</span>
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Cotización Confirmada</div>
-                  <strong style={{ fontSize: '16px', color: '#fff' }}>Habitación {selectedRoom.number} · {categoryById.get(selectedRoom.categoryId)?.name} (Piso {selectedRoom.floor})</strong>
+                  <div className="reservation-quote-eyebrow">Cotización Confirmada</div>
+                  <strong className="reservation-quote-room">Habitación {selectedRoom.number} · {categoryById.get(selectedRoom.categoryId)?.name} (Piso {selectedRoom.floor})</strong>
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>Total Liquidación</div>
-                <strong style={{ fontSize: '22px', color: '#34d399', fontWeight: '900' }}>S/ {grandTotal.toFixed(2)}</strong>
+              <div className="reservation-quote-total">
+                <div className="reservation-quote-total-label">Total Liquidación</div>
+                <strong>S/ {grandTotal.toFixed(2)}</strong>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', fontSize: '12px', marginBottom: selectedExtras.size > 0 ? '12px' : 0 }}>
+            <div className={`reservation-quote-details ${selectedExtras.size > 0 ? 'has-extras' : ''}`}>
               <div>
-                <span style={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontSize: '10.5px' }}>Huésped Asignado</span>
-                <strong style={{ color: '#fff' }}>{selectedGuest ? selectedGuest.name : 'Pendiente'}</strong>
+                <span className="reservation-quote-detail-label">Huésped Asignado</span>
+                <strong>{selectedGuest ? selectedGuest.name : 'Pendiente'}</strong>
               </div>
               <div>
-                <span style={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontSize: '10.5px' }}>Duración Calculada</span>
-                <strong style={{ color: '#fff' }}>{stayMetrics ? `${stayMetrics.nights} noches (${stayMetrics.hours}h)` : '—'}</strong>
+                <span className="reservation-quote-detail-label">Duración Calculada</span>
+                <strong>{stayMetrics ? `${stayMetrics.nights} noches (${stayMetrics.hours}h)` : '—'}</strong>
               </div>
               <div>
-                <span style={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontSize: '10.5px' }}>Tarifa Habitación</span>
-                <strong style={{ color: '#fff' }}>{formatReservationMoney(selectedRoom.totalAmount)}</strong>
+                <span className="reservation-quote-detail-label">Tarifa Habitación</span>
+                <strong>{formatReservationMoney(selectedRoom.totalAmount)}</strong>
               </div>
               <div>
-                <span style={{ color: 'rgba(255,255,255,0.6)', display: 'block', fontSize: '10.5px' }}>Servicios Extras</span>
-                <strong style={{ color: selectedExtras.size > 0 ? '#34d399' : '#fff' }}>+S/ {extrasCost.toFixed(2)}</strong>
+                <span className="reservation-quote-detail-label">Servicios Extras</span>
+                <strong className={selectedExtras.size > 0 ? 'has-extras' : ''}>+S/ {extrasCost.toFixed(2)}</strong>
               </div>
             </div>
 
             {selectedExtras.size > 0 ? (
-              <div style={{ borderTop: '1px dashed rgba(255,255,255,0.15)', paddingTop: '8px', fontSize: '11.5px', color: 'rgba(255,255,255,0.85)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ color: 'var(--color-gold)', fontWeight: '700' }}>Incluye adicionales:</span>
+              <div className="reservation-quote-extras">
+                <span className="reservation-quote-extras-label">Incluye adicionales:</span>
                 {Array.from(selectedExtras).map((id) => {
                   const s = EXTRA_SERVICES.find((item) => item.id === id);
                   return (
-                    <span key={id} style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                    <span key={id} className="reservation-quote-extra-tag">
                       {s?.icon} {s?.name}
                     </span>
                   );
@@ -638,21 +578,13 @@ function ReservationForm({ onClose, notify }) {
           <div className="alert-banner alert-banner-danger span-2" role="alert">{formError}</div>
         ) : null}
 
-        <div className="form-actions span-2" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose} style={{ padding: '10px 20px', borderRadius: '12px' }}>
+        <div className="form-actions span-2 reservation-form-actions">
+          <button type="button" className="btn btn-outline reservation-cancel-button" disabled={busy} onClick={onClose}>
             Cancelar
           </button>
 
           <button
-            className="btn btn-primary"
-            style={{
-              padding: '12px 28px',
-              fontSize: '14px',
-              fontWeight: '700',
-              borderRadius: '12px',
-              background: !selectedRoom || !form.primaryGuestId ? undefined : 'linear-gradient(135deg, var(--color-navy), var(--color-navy-deep))',
-              boxShadow: selectedRoom && form.primaryGuestId ? '0 4px 14px rgba(15,23,42,0.3)' : undefined,
-            }}
+            className={`btn btn-primary reservation-submit-button ${selectedRoom && form.primaryGuestId ? 'is-ready' : ''}`}
             disabled={busy || retryBlocked || !selectedRoom || !form.primaryGuestId}
           >
             {busy ? 'Confirmando reserva…' : selectedRoom ? `Registrar Reserva · S/ ${grandTotal.toFixed(2)}` : 'Seleccione una habitación para continuar'}

@@ -60,70 +60,48 @@ export function ParkingExitModal({
       <form onSubmit={handleSubmit} className="form-grid">
         {/* Resumen Operativo del Vehículo */}
         <div
-          className="span-2 card"
-          style={{
-            padding: '16px 20px',
-            borderRadius: '12px',
-            backgroundColor: 'var(--color-surface-subtle, #f8fafc)',
-            border: '1px solid var(--color-border, #e2e8f0)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
+          className="span-2 card parking-exit-summary"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="parking-exit-header">
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-muted, #64748b)', textTransform: 'uppercase' }}>
+              <span className="parking-exit-kicker">
                 Vehículo & Espacio
               </span>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text, #0f172a)' }}>
-                {vehicle.plate} · <span style={{ fontWeight: 600 }}>{vehicle.brandModel || vehicle.type}</span>
+              <div className="parking-exit-vehicle-title">
+                {vehicle.plate} · <span className="parking-exit-model">{vehicle.brandModel || vehicle.type}</span>
               </div>
             </div>
             <span
-              style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                padding: '4px 10px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-border, #e2e8f0)',
-                color: 'var(--color-text, #0f172a)',
-              }}
+              className="parking-exit-space"
             >
               Espacio {vehicle.space}
             </span>
           </div>
 
           <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '10px',
-              paddingTop: '10px',
-              borderTop: '1px dashed var(--color-border, #e2e8f0)',
-            }}
+            className="parking-exit-metrics"
           >
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-muted, #64748b)' }}>Ingreso</div>
-              <strong style={{ fontSize: '12px' }}>{formatDateTime(vehicle.entryAt)}</strong>
+              <div className="parking-exit-label">Ingreso</div>
+              <strong className="parking-exit-value">{formatDateTime(vehicle.entryAt)}</strong>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-muted, #64748b)' }}>Permanencia</div>
-              <strong style={{ fontSize: '12px', color: '#0284c7' }}>⏱️ {duration}</strong>
+              <div className="parking-exit-label">Permanencia</div>
+              <strong className="parking-exit-value parking-exit-duration">⏱️ {duration}</strong>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-muted, #64748b)' }}>Tarifa / Folio</div>
-              <strong style={{ fontSize: '12px', color: '#16a34a' }}>{formatMoney(vehicle.fee)}</strong>
+              <div className="parking-exit-label">Tarifa / Folio</div>
+              <strong className="parking-exit-value parking-exit-fee">{formatMoney(vehicle.fee)}</strong>
             </div>
           </div>
           {vehicle.driverName || vehicle.driverPhone ? (
-            <div style={{ fontSize: '12px', color: 'var(--color-muted, #64748b)', borderTop: '1px solid #f1f5f9', paddingTop: '6px' }}>
-              👤 Conductor: <strong style={{ color: 'var(--color-text, #0f172a)' }}>{vehicle.driverName || 'Huésped'}</strong>
+            <div className="parking-exit-driver">
+              👤 Conductor: <strong>{vehicle.driverName || 'Huésped'}</strong>
               {vehicle.driverPhone ? ` · 📞 ${vehicle.driverPhone}` : ''}
             </div>
           ) : null}
           {vehicle.keysLeft ? (
-            <div style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: '#fef3c7', color: '#b45309', fontSize: '12px', fontWeight: 600 }}>
+            <div className="parking-exit-keys-warning">
               🔑 Llaves en custodia: Entregar las llaves físicas al conductor antes de la salida.
             </div>
           ) : null}
@@ -142,15 +120,15 @@ export function ParkingExitModal({
         </label>
 
         {/* Checkbox de Inspección */}
-        <div className="span-2" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' }}>
+        <div className="span-2 parking-exit-inspection">
           <input
             type="checkbox"
             id="inspection-check"
             checked={inspectionOk}
             onChange={(e) => setInspectionOk(e.target.checked)}
-            style={{ width: '16px', height: '16px' }}
+            className="parking-exit-inspection-checkbox"
           />
-          <label htmlFor="inspection-check" style={{ fontSize: '13px', cursor: 'pointer', margin: 0 }}>
+          <label htmlFor="inspection-check" className="parking-exit-inspection-label">
             Revisión física conforme / Llaves entregadas al huésped
           </label>
         </div>

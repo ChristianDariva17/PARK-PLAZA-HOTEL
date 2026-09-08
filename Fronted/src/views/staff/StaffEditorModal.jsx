@@ -95,11 +95,11 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
       wide
     >
       {fetching ? (
-        <div className="card route-loading" role="status" style={{ padding: '40px', textAlign: 'center' }}>
+        <div className="card route-loading staff-editor-loading-state" role="status">
           Cargando datos del colaborador…
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="form-grid" style={{ gap: '18px' }}>
+        <form onSubmit={handleSubmit} className="form-grid staff-editor-form">
           {/* Live Preview Card */}
           <div className="staff-preview-card span-2">
             <div className="staff-preview-left">
@@ -153,7 +153,7 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
           </div>
 
           <label>
-            <span>Nombres <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
+            <span>Nombres <strong className="required-marker">*</strong></span>
             <div className="field-icon-wrap">
               <User size={16} />
               <input
@@ -169,7 +169,7 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
           </label>
 
           <label>
-            <span>Apellidos <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
+            <span>Apellidos <strong className="required-marker">*</strong></span>
             <div className="field-icon-wrap">
               <User size={16} />
               <input
@@ -184,7 +184,7 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
           </label>
 
           <label className="span-2">
-            <span>Documento de Identidad (DNI / Pasaporte / CE) <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
+            <span>Documento de Identidad (DNI / Pasaporte / CE) <strong className="required-marker">*</strong></span>
             <div className="field-icon-wrap">
               <CreditCard size={16} />
               <input
@@ -196,7 +196,7 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
                 disabled={loading}
               />
             </div>
-            <small style={{ color: 'var(--color-muted)', fontSize: '11px', marginTop: '2px' }}>
+            <small className="staff-editor-helper-text">
               Este documento se utiliza para el control de asistencia y verificación de identidad.
             </small>
           </label>
@@ -280,7 +280,7 @@ export function StaffEditorModal({ staffId, onClose, onSaved }) {
           </label>
 
           {/* Form Actions */}
-          <div className="form-actions span-2" style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <div className="form-actions span-2 staff-editor-form-actions">
             <button
               type="button"
               className="btn btn-outline"

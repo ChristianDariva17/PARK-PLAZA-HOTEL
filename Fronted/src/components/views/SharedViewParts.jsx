@@ -1,3 +1,4 @@
+import { Children } from 'react';
 import { AlertTriangle, CheckCircle2, Circle, Clock3, Search, XCircle } from 'lucide-react';
 import { usePermissions } from '../../auth/authContext';
 import { permissionForAction, permissionForPrimaryAction } from '../../auth/permissions';
@@ -49,6 +50,7 @@ export function DetailGrid({ items, compact = false }) {
 }
 
 export function DataTable({ caption, columns, children, emptyTitle, emptyDescription }) {
-  if (!children) return <section className="card"><EmptyState title={emptyTitle} description={emptyDescription} /></section>;
-  return <section className="card table-container"><table className="custom-table"><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{children}</tbody></table></section>;
+  const rows = Children.toArray(children);
+  if (!rows.length) return <section className="card"><EmptyState title={emptyTitle} description={emptyDescription} /></section>;
+  return <section className="card table-container"><table className="custom-table"><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{rows}</tbody></table></section>;
 }

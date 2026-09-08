@@ -7,6 +7,7 @@ import { StaffQrScannerModal } from './StaffQrScannerModal.jsx';
 import { DataTable, EmptyState, MetricStrip, PageHeader, SectionHeader, StatusBadge } from '../../components/views/SharedViewParts.jsx';
 import { PermissionButton } from '../../components/auth/PermissionButton.jsx';
 import { staffClient } from '../../staff/staffClient.js';
+import { P1Select } from '../../components/ui/P1Atoms.jsx';
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
 const createIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
@@ -70,30 +71,18 @@ export function StaffAttendanceView() {
       <PageHeader metadata="Control operativo · registro auditable" title="Asistencia y turnos" description="Marcaciones biométricas y manuales vinculadas al personal de esta propiedad." />
 
       {/* Barra de Acciones Principales QR & GPS */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '12px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 20px',
-        backgroundColor: '#ffffff',
-        borderRadius: '14px',
-        border: '1px solid rgba(15, 23, 42, 0.08)',
-        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
-        marginBottom: '20px'
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <strong style={{ fontSize: '1rem', color: '#0f172a' }}>Auto-registro con Geocerca & QR Rotativo</strong>
-          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+      <div className="attendance-auto-register-banner">
+        <div className="attendance-auto-register-copy">
+          <strong>Auto-registro con Geocerca & QR Rotativo</strong>
+          <span>
             Los colaboradores pueden escanear el QR desde su celular validando su presencia física en el hotel.
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={() => setScannerOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <div className="attendance-auto-register-actions">
+          <button className="btn btn-primary attendance-icon-button" onClick={() => setScannerOpen(true)}>
             <Smartphone size={16} /> Marcar mi asistencia (QR + GPS)
           </button>
-          <button className="btn btn-outline" onClick={() => setKioskOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <button className="btn btn-outline attendance-icon-button" onClick={() => setKioskOpen(true)}>
             <QrCode size={16} /> Pantalla de Kiosco QR
           </button>
         </div>
@@ -111,8 +100,8 @@ export function StaffAttendanceView() {
           <section className="card attendance-action-card">
             <SectionHeader eyebrow="Paso 1 · Identificación" title="Seleccioná el personal" description="Elegí a la persona y el tipo de movimiento antes de iniciar la validación." />
             <div className="attendance-fields">
-              <label>Empleado<select value={selectedStaff} onChange={(event) => { setSelectedStaff(event.target.value); setManualMessage(null); }}><option value="">Seleccionar empleado...</option>{activeStaff.map((member) => <option key={member.id} value={member.id}>{getStaffName(member)} · {member.role || 'Sin cargo'}</option>)}</select></label>
-              <label>Movimiento<select value={movement} onChange={(event) => setMovement(event.target.value)}><option value="Ingreso">Ingreso</option><option value="Salida">Salida</option></select></label>
+              <P1Select label="Empleado" value={selectedStaff} onChange={(event) => { setSelectedStaff(event.target.value); setManualMessage(null); }}><option value="">Seleccionar empleado...</option>{activeStaff.map((member) => <option key={member.id} value={member.id}>{getStaffName(member)} · {member.role || 'Sin cargo'}</option>)}</P1Select>
+              <P1Select label="Movimiento" value={movement} onChange={(event) => setMovement(event.target.value)}><option value="Ingreso">Ingreso</option><option value="Salida">Salida</option></P1Select>
             </div>
             <div className={`attendance-selected ${selectedStaff ? '' : 'attendance-selected-empty'}`}>
               {selectedStaff ? <><span className="attendance-avatar"><Users size={19} /></span><div><strong>{getStaffName(staffById.get(selectedStaff))}</strong><small>{staffById.get(selectedStaff)?.role || 'Personal operativo'} · Listo para registrar</small></div><StatusBadge>Activo</StatusBadge></> : <><span className="attendance-avatar muted"><Users size={19} /></span><div><strong>Ningún empleado seleccionado</strong><small>La selección es necesaria para continuar.</small></div></>}
@@ -139,7 +128,7 @@ export function StaffAttendanceView() {
         <section className="card attendance-history-card">
           <SectionHeader eyebrow="Trazabilidad" title="Últimos registros" description="Los eventos provienen de `/api/attendance/events`." action={<button className="icon-button" title="Actualizar registros" onClick={reload}><RefreshCw size={16} /></button>} />
           {recentAttendance.length ? <DataTable caption="Últimas marcaciones de asistencia" columns={['Personal', 'Fecha y hora', 'Movimiento', 'Método', 'Estado']}>
-            {recentAttendance.map((event) => <tr key={event.id}><td><strong>{getStaffName(staffById.get(event.staffId))}</strong><small>{event.staffId.slice(0, 8)}...</small></td><td>{formatDateTime(event.occurredAt)}</td><td><span className={`attendance-movement ${event.movement === 'Ingreso' ? 'entry' : 'exit'}`}>{event.movement === 'Ingreso' ? <LogIn size={14} /> : <LogOut size={14} />}{event.movement}</span></td><td>{event.method === 'QR_GPS' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600, color: '#0369a1' }}><MapPin size={13} style={{ color: '#0284c7' }} /> QR + GPS {event.metadata?.distanceMeters != null ? <small style={{ color: '#64748b', fontWeight: 'normal' }}>({event.metadata.distanceMeters}m)</small> : null}</span> : event.method}</td><td><StatusBadge>{event.status}</StatusBadge></td></tr>)}
+            {recentAttendance.map((event) => <tr key={event.id}><td><strong>{getStaffName(staffById.get(event.staffId))}</strong><small>{event.staffId.slice(0, 8)}...</small></td><td>{formatDateTime(event.occurredAt)}</td><td><span className={`attendance-movement ${event.movement === 'Ingreso' ? 'entry' : 'exit'}`}>{event.movement === 'Ingreso' ? <LogIn size={14} /> : <LogOut size={14} />}{event.movement}</span></td><td>{event.method === 'QR_GPS' ? <span className="attendance-qr-method"><MapPin className="attendance-qr-icon" size={13} /> QR + GPS {event.metadata?.distanceMeters != null ? <small className="attendance-qr-distance">({event.metadata.distanceMeters}m)</small> : null}</span> : event.method}</td><td><StatusBadge>{event.status}</StatusBadge></td></tr>)}
           </DataTable> : <EmptyState title="Sin marcaciones recientes" description="Las nuevas asistencias aparecerán aquí después de ser confirmadas por el backend." />}
         </section>
       </div>

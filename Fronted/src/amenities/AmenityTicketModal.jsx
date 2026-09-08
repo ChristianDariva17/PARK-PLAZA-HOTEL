@@ -39,93 +39,67 @@ export function AmenityTicketModal({ open, onClose, reservation, onCheckInSucces
       title="Ticket & Pase QR de Acceso"
       description="Pase de control de acceso para zonas recreativas del Hotel Park Plaza."
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="amenity-modal-stack">
         {/* Card visual del Ticket estilo Luxury */}
-        <div style={{
-          padding: '24px',
-          borderRadius: '16px',
-          background: '#ffffff',
-          border: '1px solid var(--color-border, #e2e8f0)',
-          boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.08)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
+        <div className={`amenity-ticket-card ${isMirador ? 'is-mirador' : 'is-piscina'}`}>
           {/* Header de la Zona */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '14px', borderBottom: '1px dashed var(--color-border, #e2e8f0)', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className={`kpi-icon-circle ${isMirador ? 'tone-purple' : 'tone-blue'}`} style={{ width: '38px', height: '38px', borderRadius: '10px' }}>
+          <div className="amenity-ticket-header">
+            <div className="amenity-ticket-heading">
+              <div className={`kpi-icon-circle ${isMirador ? 'tone-purple' : 'tone-blue'} amenity-ticket-icon`}>
                 {isMirador ? <Mountain size={20} /> : <Waves size={20} />}
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-muted, #64748b)', textTransform: 'uppercase' }}>
+                <div className="amenity-ticket-eyebrow">
                   Pase de Acceso
                 </div>
-                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--color-navy, #0f172a)', fontFamily: 'var(--font-serif)' }}>
+                <h4 className="amenity-ticket-title">
                   {reservation.amenityType}
                 </h4>
               </div>
             </div>
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '999px',
-              fontSize: '11.5px',
-              fontWeight: '700',
-              background: isCheckedIn ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-              color: isCheckedIn ? '#059669' : '#d97706',
-              border: `1px solid ${isCheckedIn ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`
-            }}>
+            <span className={`amenity-ticket-status ${isCheckedIn ? 'is-checked-in' : 'is-confirmed'}`}>
               {isCheckedIn ? 'Ingreso Validado' : 'Pase Confirmado'}
             </span>
           </div>
 
           {/* QR Code Simulado / Renderizado */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            background: 'var(--color-surface-soft, #f8fafc)',
-            borderRadius: '12px',
-            border: '1px solid var(--color-border, #e2e8f0)',
-            marginBottom: '18px'
-          }}>
-            <QrCode size={130} style={{ color: 'var(--color-navy, #0f172a)' }} />
-            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '13px', fontWeight: '700', marginTop: '10px', letterSpacing: '0.1em', color: 'var(--color-navy, #0f172a)' }}>
+          <div className="amenity-ticket-qr">
+            <QrCode size={130} className="amenity-ticket-qr-icon" />
+            <span className="amenity-ticket-code">
               #{reservation.id.slice(0, 8).toUpperCase()}
             </span>
           </div>
 
           {/* Desglose de Datos */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--color-border-soft, #f1f5f9)' }}>
-              <span style={{ color: 'var(--color-muted, #64748b)' }}>Titular</span>
-              <strong style={{ color: 'var(--color-navy, #0f172a)' }}>{reservation.customerName || 'Visitante General'}</strong>
+          <div className="amenity-ticket-details">
+            <div className="amenity-ticket-detail-row">
+              <span className="amenity-ticket-muted">Titular</span>
+              <strong className="amenity-ticket-value">{reservation.customerName || 'Visitante General'}</strong>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--color-border-soft, #f1f5f9)' }}>
-              <span style={{ color: 'var(--color-muted, #64748b)' }}>DNI / Documento</span>
-              <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: 'var(--color-navy, #0f172a)' }}>
+            <div className="amenity-ticket-detail-row">
+              <span className="amenity-ticket-muted">DNI / Documento</span>
+              <span className="amenity-ticket-value amenity-ticket-mono">
                 {reservation.documentNumber || 'No registrado'}
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--color-border-soft, #f1f5f9)' }}>
-              <span style={{ color: 'var(--color-muted, #64748b)' }}>Horario / Turno</span>
-              <span style={{ fontWeight: '600', color: 'var(--color-navy, #0f172a)' }}>
+            <div className="amenity-ticket-detail-row">
+              <span className="amenity-ticket-muted">Horario / Turno</span>
+              <span className="amenity-ticket-value">
                 {new Date(reservation.startTime).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })} —{' '}
                 {new Date(reservation.endTime).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--color-border-soft, #f1f5f9)' }}>
-              <span style={{ color: 'var(--color-muted, #64748b)' }}>Acompañantes (Pax)</span>
-              <strong style={{ color: 'var(--color-navy, #0f172a)' }}>{reservation.pax} {reservation.pax === 1 ? 'persona' : 'personas'}</strong>
+            <div className="amenity-ticket-detail-row">
+              <span className="amenity-ticket-muted">Acompañantes (Pax)</span>
+              <strong className="amenity-ticket-value">{reservation.pax} {reservation.pax === 1 ? 'persona' : 'personas'}</strong>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px' }}>
-              <span style={{ color: 'var(--color-muted, #64748b)' }}>Estado de Cuenta</span>
-              <strong style={{ color: isPaid ? '#059669' : '#d97706' }}>
+            <div className="amenity-ticket-detail-row amenity-ticket-account">
+              <span className="amenity-ticket-muted">Estado de Cuenta</span>
+              <strong className={`amenity-ticket-value ${isPaid ? 'is-paid' : 'is-open'}`}>
                 {isPaid ? 'Total Pagado' : `Cuenta Abierta (${formatMoney(reservation.totalAmount || reservation.price)})`}
               </strong>
             </div>
@@ -133,21 +107,20 @@ export function AmenityTicketModal({ open, onClose, reservation, onCheckInSucces
         </div>
 
         {/* Acciones del Modal */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--color-border, #e2e8f0)' }}>
-          <button type="button" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={handlePrint}>
+        <div className="amenity-form-actions amenity-ticket-actions">
+          <button type="button" className="btn btn-outline amenity-inline-button" onClick={handlePrint}>
             <Printer size={16} />
             <span>Imprimir Ticket</span>
           </button>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="amenity-action-group">
             <button type="button" className="btn btn-outline" onClick={onClose}>
               Cerrar
             </button>
             {!isCheckedIn ? (
               <button
                 type="button"
-                className="btn btn-primary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#059669', borderColor: '#059669' }}
+                className="btn btn-primary amenity-inline-button amenity-checkin-button"
                 onClick={handleCheckIn}
                 disabled={checkingIn}
               >

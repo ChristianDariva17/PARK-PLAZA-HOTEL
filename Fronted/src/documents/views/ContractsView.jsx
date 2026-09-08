@@ -33,8 +33,8 @@ export function ContractsView({ notify }) {
         { label: 'Borradores / Pendientes', value: data.items.filter(i => ['Borrador', 'Pendiente', 'DRAFT', 'PENDING_SIGNATURE'].includes(i.status) && !i.metadata?.signatures?.guestSignature).length },
       ]} />
       
-      <div className="filter-bar" style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-        <label className="search-label" style={{ flex: 1 }}>
+      <div className="filter-bar contracts-filter-bar">
+        <label className="search-label contracts-search-label">
           <Search size={16} />
           <input
             aria-label="Buscar documentos"
@@ -45,7 +45,7 @@ export function ContractsView({ notify }) {
             onKeyDown={(e) => e.key === 'Enter' && handleFilter()}
           />
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <label className="contracts-status-filter">
           <span>Estado:</span>
           <select
             value={statusFilter}
@@ -75,11 +75,11 @@ export function ContractsView({ notify }) {
         emptyTitle="Sin contratos registrados"
       >
         {loading ? (
-          <tr><td colSpan="8" style={{ textAlign: 'center', padding: 24 }}>Cargando documentos...</td></tr>
+          <tr><td colSpan="8" className="contracts-loading-cell">Cargando documentos...</td></tr>
         ) : data.items.length === 0 ? (
           <tr>
-            <td colSpan="8" style={{ textAlign: 'center', padding: 32, color: '#94A3B8' }}>
-              <FileText size={32} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.5 }} />
+            <td colSpan="8" className="contracts-empty-cell">
+              <FileText size={32} className="contracts-empty-icon" />
               No se encontraron documentos de estadía registrados aún.
             </td>
           </tr>
@@ -92,13 +92,13 @@ export function ContractsView({ notify }) {
           return (
             <tr key={item.id}>
               <td>
-                <div style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace' }}>
+                <div className="contracts-reference">
                   {item.reference || `DOC-${item.id.substring(0, 8).toUpperCase()}`}
                 </div>
               </td>
               <td><strong>{guestName}</strong></td>
               <td>{roomNumber}</td>
-              <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{item.reservationId || 'Directa'}</td>
+              <td className="contracts-reservation-id">{item.reservationId || 'Directa'}</td>
               <td>{new Date(item.generatedAt || item.createdAt).toLocaleDateString('es-PE')}</td>
               <td>
                 <StatusBadge status={item.status === 'Vigente' ? 'confirmed' : 'pending'}>
@@ -107,19 +107,18 @@ export function ContractsView({ notify }) {
               </td>
               <td>
                 {hasSignature ? (
-                  <span style={{ color: '#16A34A', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 11 }}>
+                  <span className="contracts-signature-captured">
                     <CheckCircle2 size={13} /> Capturada
                   </span>
                 ) : (
-                  <span style={{ color: '#94A3B8', fontSize: 11 }}>Sin firma</span>
+                  <span className="contracts-signature-missing">Sin firma</span>
                 )}
               </td>
               <td>
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => setSelectedId(item.id)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                   onClick={() => setSelectedId(item.id)}
+                  className="btn btn-sm btn-outline contracts-document-button"
                 >
                   <FileText size={13} /> Ver Documento
                 </button>
@@ -129,9 +128,9 @@ export function ContractsView({ notify }) {
         })}
       </DataTable>
 
-      <div className="pagination" style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+      <div className="pagination contracts-pagination">
          <button className="btn btn-outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
-         <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: 13 }}>Página {page}</span>
+          <span className="contracts-page-label">Página {page}</span>
          <button className="btn btn-outline" disabled={data.items.length < 50} onClick={() => setPage(p => p + 1)}>Siguiente</button>
       </div>
 
@@ -142,7 +141,7 @@ export function ContractsView({ notify }) {
         title={selected?.reference || `Documento ${selected?.id?.substring(0, 8) || ''}`}
       >
         {selected ? (
-          <div className="detail-stack" style={{ gap: 20 }}>
+           <div className="detail-stack contracts-detail-stack">
             <StayConditionsDocument
               reservation={selected.metadata?.stay || { id: selected.reservationId, ...selected.metadata?.reservation }}
               guest={selected.metadata?.guest}

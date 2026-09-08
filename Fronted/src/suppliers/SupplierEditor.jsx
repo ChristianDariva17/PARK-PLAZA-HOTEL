@@ -191,31 +191,31 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
       description={supplierId ? 'Actualice la información fiscal, canales de compra y catálogo de insumos abastecidos.' : 'Complete la ficha técnica y comercial del proveedor para vincularlo a las órdenes de compra e inventario.'}
     >
       {fetching ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280', fontSize: 14 }}>
+        <div className="supplier-element-variant-i-extended">
           Cargando datos del proveedor...
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxHeight: '80vh', overflowY: 'auto', paddingRight: 6 }}>
+        <form onSubmit={handleSubmit} className="supplier-stack-action">
           
           {error && (
-            <div style={{ padding: '12px 16px', background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+            <div className="supplier-row-header">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
 
           {/* SECTION 1: Identidad Fiscal */}
-          <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="supplier-card-variant-o">
+            <div className="supplier-row-variant-z">
               <Building2 size={18} color="#D97706" />
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <h4 className="supplier-element-variant-j-extended">
                 1. Datos Fiscales & Razón Social
               </h4>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 14, marginBottom: 12 }}>
+            <div className="supplier-grid-accent">
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
-                  Razón Social (Nombre Legal) <span style={{ color: '#DC2626' }}>*</span>
+                <label className="supplier-element-variant-k-extended">
+                  Razón Social (Nombre Legal) <span className="supplier-element-content">*</span>
                 </label>
                 <input
                   type="text"
@@ -224,13 +224,13 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   onChange={handleChange}
                   placeholder="Ej: Distribuidora Gastronómica del Sur S.A.C."
                   required
-                  style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13.5, boxSizing: 'border-box', outline: 'none' }}
+                  className="supplier-element-variant-l-extended"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
-                  RUC / Identificador Fiscal (11 dígitos) <span style={{ color: '#DC2626' }}>*</span>
+                <label className="supplier-element-variant-k-extended">
+                  RUC / Identificador Fiscal (11 dígitos) <span className="supplier-element-content">*</span>
                 </label>
                 <input
                   type="text"
@@ -240,13 +240,13 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   onChange={(e) => setFormData(p => ({ ...p, taxId: e.target.value.replace(/[^0-9]/g, '') }))}
                   placeholder="Ej: 20601928374"
                   required
-                  style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 14, fontFamily: 'monospace', fontWeight: 700, boxSizing: 'border-box', outline: 'none' }}
+                  className="supplier-element-variant-m-extended"
                 />
               </div>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+              <label className="supplier-element-variant-k-extended">
                 Nombre Comercial (Marca / Nombre de Fantasía)
               </label>
               <input
@@ -255,23 +255,23 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                 value={formData.tradeName}
                 onChange={handleChange}
                 placeholder="Ej: Gastrosur Gourmet & Carnes"
-                style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13.5, boxSizing: 'border-box', outline: 'none' }}
+                className="supplier-element-variant-l-extended"
               />
             </div>
           </div>
 
           {/* SECTION 2: Contacto Comercial & Canales */}
-          <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="supplier-card-variant-o">
+            <div className="supplier-row-variant-z">
               <User size={18} color="#D97706" />
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <h4 className="supplier-element-variant-j-extended">
                 2. Contacto Comercial & Canales de Compra
               </h4>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div className="supplier-grid-status">
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+                <label className="supplier-element-variant-k-extended">
                   Nombre del Asesor / Ejecutivo
                 </label>
                 <input
@@ -280,12 +280,12 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   value={formData.contactName}
                   onChange={handleChange}
                   placeholder="Ej: Carlos Mendoza"
-                  style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+                  className="supplier-element-variant-n-extended"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+                <label className="supplier-element-variant-k-extended">
                   Teléfono / WhatsApp
                 </label>
                 <input
@@ -294,12 +294,12 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="Ej: +51 987 654 321"
-                  style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+                  className="supplier-element-variant-n-extended"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+                <label className="supplier-element-variant-k-extended">
                   Email para Órdenes de Compra
                 </label>
                 <input
@@ -308,27 +308,27 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Ej: pedidos@gastrosur.pe"
-                  style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+                  className="supplier-element-variant-n-extended"
                 />
               </div>
             </div>
           </div>
 
           {/* SECTION 3: Tiempos de Entrega & Preferencia */}
-          <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
+          <div className="supplier-card-variant-o">
+            <div className="supplier-row-variant-z">
               <Clock size={18} color="#D97706" />
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <h4 className="supplier-element-variant-j-extended">
                 3. Operaciones & Condiciones de Entrega
               </h4>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 16, alignItems: 'center' }}>
+            <div className="supplier-grid-action">
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+                <label className="supplier-element-variant-k-extended">
                   Plazo Promedio de Entrega (Días)
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="supplier-element-variant-o-extended">
                   <input
                     type="number"
                     name="averageDeliveryDays"
@@ -336,26 +336,16 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                     onChange={handleChange}
                     min="0"
                     max="90"
-                    style={{ width: 100, height: 40, borderRadius: 8, border: '1px solid #CBD5E1', padding: '0 12px', fontSize: 14, fontWeight: 700, outline: 'none' }}
+                    className="supplier-element-variant-p-extended"
                   />
-                  <span style={{ fontSize: 12.5, color: '#6B7280' }}>días hábiles</span>
+                  <span className="supplier-element-variant-q-extended">días hábiles</span>
                 </div>
               </div>
 
               {/* Preferred VIP Supplier Toggle Card */}
               <div 
                 onClick={() => setFormData(p => ({ ...p, isPreferred: !p.isPreferred }))}
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  border: `1.5px solid ${formData.isPreferred ? '#F59E0B' : '#E5E7EB'}`,
-                  background: formData.isPreferred ? '#FFFBEB' : '#F9FAFB',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  transition: 'all 0.15s'
-                }}
+                className={`supplier-row ${formData.isPreferred ? 'is-preferred' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -364,14 +354,14 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                   checked={formData.isPreferred}
                   onChange={handleChange}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#D97706' }}
+                  className="supplier-control"
                 />
                 <div>
-                  <strong style={{ fontSize: 13, color: formData.isPreferred ? '#92400E' : '#374151', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <strong className={`supplier-row-secondary ${formData.isPreferred ? 'is-preferred' : ''}`}>
                     <Star size={15} fill={formData.isPreferred ? '#D97706' : 'none'} color="#D97706" />
                     Proveedor Preferido / Calificado VIP
                   </strong>
-                  <span style={{ fontSize: 11.5, color: '#6B7280', display: 'block', marginTop: 2 }}>
+                  <span className="supplier-element-variant-r-extended">
                     Tendrá prioridad automática al emitir cotizaciones y órdenes de compra.
                   </span>
                 </div>
@@ -380,18 +370,18 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
           </div>
 
           {/* SECTION 4: Categorías de Suministros */}
-          <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="supplier-card-variant-o">
+            <div className="supplier-element-variant-s-extended">
+              <div className="supplier-element-variant-o-extended">
                 <Tag size={18} color="#D97706" />
-                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <h4 className="supplier-element-variant-j-extended">
                   4. Categorías de Suministros que Provee
                 </h4>
               </div>
-              <span style={{ fontSize: 11.5, color: '#6B7280' }}>Seleccione una o varias</span>
+              <span className="supplier-element-variant-t-extended">Seleccione una o varias</span>
             </div>
 
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="supplier-element-variant-u-extended">
               {CATEGORIES.map((cat) => {
                 const selected = formData.categories.includes(cat.id);
                 const Icon = cat.icon;
@@ -400,21 +390,7 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                     key={cat.id}
                     type="button"
                     onClick={() => handleCategoryToggle(cat.id)}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: 20,
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      border: `1.5px solid ${selected ? '#D97706' : '#E5E7EB'}`,
-                      background: selected ? 'rgba(212, 175, 55, 0.1)' : '#FFFFFF',
-                      color: selected ? '#92400E' : '#4B5563',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      transition: 'all 0.15s ease',
-                      boxShadow: selected ? '0 1px 3px rgba(212, 175, 55, 0.2)' : '0 1px 2px rgba(0,0,0,0.02)'
-                    }}
+                    className={`supplier-card ${selected ? 'is-selected' : ''}`}
                   >
                     <Icon size={14} color={selected ? '#D97706' : '#6B7280'} />
                     {cat.label}
@@ -426,49 +402,39 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
           </div>
 
           {/* SECTION 5: Insumos de Inventario Abastecidos (Conexión Inventario) */}
-          <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #F3F4F6', paddingBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="supplier-card-variant-o">
+            <div className="supplier-element-variant-s-extended">
+              <div className="supplier-element-variant-o-extended">
                 <PackageCheck size={18} color="#D97706" />
-                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <h4 className="supplier-element-variant-j-extended">
                   5. Insumos del Hotel que Abastece ({selectedItemIds.length} seleccionados)
                 </h4>
               </div>
-              <span style={{ fontSize: 11.5, color: '#059669', fontWeight: 700, background: '#D1FAE5', padding: '2px 8px', borderRadius: 6 }}>
+              <span className="supplier-card-variant-p">
                 Conectado a Cocina y Bar 5★
               </span>
             </div>
 
-            <p style={{ fontSize: 12.5, color: '#6B7280', margin: '0 0 12px' }}>
+            <p className="supplier-element-variant-v-extended">
               Vincule los insumos y materias primas que este proveedor suministra para actualizar costos y órdenes automáticamente.
             </p>
 
             {/* Insumos Search Bar */}
-            <div style={{ position: 'relative', marginBottom: 12 }}>
-              <Search size={15} color="#9CA3AF" style={{ position: 'absolute', left: 12, top: 12 }} />
+            <div className="supplier-element-header">
+              <Search size={15} color="#9CA3AF" className="supplier-overlay-secondary" />
               <input
                 type="text"
                 placeholder="Buscar insumos (Ej: Lomo fino, Salmón, Pisco, Café, Leche...)"
                 value={inventorySearch}
                 onChange={(e) => setInventorySearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: 38,
-                  paddingLeft: 36,
-                  paddingRight: 12,
-                  borderRadius: 8,
-                  border: '1px solid #CBD5E1',
-                  fontSize: 13,
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
+                className="supplier-text-variant-variant-a"
               />
             </div>
 
             {/* Insumos Grid */}
-            <div style={{ maxHeight: 180, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, padding: 4 }}>
+            <div className="supplier-grid-field">
               {filteredInventory.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9CA3AF', padding: '16px 0', fontSize: 12.5 }}>
+                <div className="supplier-text-variant-variant-b">
                   No se encontraron insumos coincidentes en el inventario.
                 </div>
               ) : (
@@ -478,24 +444,13 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                     <div
                       key={item.id}
                       onClick={() => toggleInventoryItem(item.id)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: `1.5px solid ${isChecked ? '#D97706' : '#E2E8F0'}`,
-                        background: isChecked ? 'rgba(212, 175, 55, 0.08)' : '#F8FAFC',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        transition: 'all 0.12s'
-                      }}
+                      className={`supplier-row-compact ${isChecked ? 'is-checked' : ''}`}
                     >
-                      <div style={{ overflow: 'hidden' }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1E293B', display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      <div className="supplier-element-footer">
+                        <span className="supplier-text-variant-variant-c">
                           {item.name}
                         </span>
-                        <span style={{ fontSize: 11, color: '#64748B' }}>
+                        <span className="supplier-element-variant-u">
                           Unid: <strong>{item.unit}</strong> · Stock: {Number(item.stock || 0).toFixed(1)}
                         </span>
                       </div>
@@ -503,7 +458,7 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => {}}
-                        style={{ cursor: 'pointer', accentColor: '#D97706' }}
+                        className="supplier-element-variant-k"
                       />
                     </div>
                   );
@@ -513,23 +468,14 @@ export function SupplierEditor({ open, supplierId, onSaved, onClose }) {
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E2E8F0', paddingTop: 16, marginTop: 4 }}>
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading} style={{ padding: '10px 20px', fontSize: 13.5, fontWeight: 700 }}>
+          <div className="supplier-element-variant-w-extended">
+            <button type="button" className="btn btn-outline supplier-text-variant-variant-d" onClick={onClose} disabled={loading}>
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary supplier-text-variant-variant-e"
               disabled={loading}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 26px',
-                fontSize: 14,
-                fontWeight: 800,
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-              }}
             >
               <Save size={16} /> {loading ? 'Guardando Proveedor...' : supplierId ? 'Actualizar Ficha Proveedor' : 'Crear y Guardar Proveedor'}
             </button>

@@ -51,56 +51,42 @@ export function ParkingVisualMap({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="parking-map">
       {/* Barra superior con KPIs de Capacidad y Barra de Ocupación */}
       <div
-        className="card"
-        style={{
-          padding: '18px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          background: 'var(--color-surface, #ffffff)',
-          border: '1px solid var(--color-border, #e2e8f0)',
-          borderRadius: '16px',
-        }}
+        className="card parking-map-summary"
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="parking-map-summary-header">
           <div>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span className="parking-map-kicker">
               Estado del Estacionamiento
             </span>
-            <h3 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: 700, color: 'var(--color-text, #0f172a)' }}>
+            <h3 className="parking-map-summary-title">
               {occupiedCount} de {totalSpaces} espacios ocupados ({occupancyPercent}%)
             </h3>
           </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+          <div className="parking-map-legend">
+            <span className="parking-map-legend-item">
+              <span className="parking-map-dot parking-map-dot-available" />
               {availableCount} Disponibles
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
+            <span className="parking-map-legend-item">
+              <span className="parking-map-dot parking-map-dot-occupied" />
               {occupiedCount} Ocupados
             </span>
           </div>
         </div>
 
         {/* Barra de progreso visual */}
-        <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--color-border, #e2e8f0)', borderRadius: '4px', overflow: 'hidden' }}>
+        <div className="parking-map-progress">
           <div
-            style={{
-              width: `${occupancyPercent}%`,
-              height: '100%',
-              backgroundColor: occupancyPercent >= 90 ? '#ef4444' : occupancyPercent >= 70 ? '#f59e0b' : '#10b981',
-              transition: 'width 0.4s ease',
-              borderRadius: '4px',
-            }}
+            className={`parking-map-progress-bar ${occupancyPercent >= 90 ? 'is-danger' : occupancyPercent >= 70 ? 'is-warning' : 'is-healthy'}`}
+            data-occupancy={Math.round(occupancyPercent / 10) * 10}
           />
         </div>
 
         {/* Selector de filtros de tipo */}
-        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+        <div className="parking-map-filters">
           {['Todos', 'Auto', 'Moto'].map((type) => (
             <button
               key={type}
@@ -116,11 +102,7 @@ export function ParkingVisualMap({
 
       {/* Grid de Espacios Visuales */}
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '16px',
-        }}
+        className="parking-map-grid"
       >
         {filteredSpaces.map((space) => {
           const vehicle = vehicleBySpace.get(space.code);
@@ -130,122 +112,79 @@ export function ParkingVisualMap({
           return (
             <div
               key={space.id}
-              style={{
-                borderRadius: '14px',
-                border: isOccupied ? '2px solid rgba(239, 68, 68, 0.4)' : '1px dashed #10b981',
-                backgroundColor: isOccupied ? 'rgba(254, 242, 242, 0.6)' : 'rgba(240, 253, 244, 0.5)',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '160px',
-                transition: 'all 0.2s ease',
-                boxShadow: isOccupied ? '0 2px 8px rgba(239, 68, 68, 0.08)' : 'none',
-              }}
+              className={`parking-space-card ${isOccupied ? 'is-occupied' : 'is-available'} ${isMoto ? 'is-moto' : 'is-auto'}`}
             >
               {/* Encabezado del slot */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="parking-space-header">
+                <div className="parking-space-heading">
                   <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: isOccupied ? '#fee2e2' : '#dcfce7',
-                      color: isOccupied ? '#dc2626' : '#16a34a',
-                    }}
+                    className="parking-space-icon"
                   >
                     {isMoto ? <Bike size={18} /> : <Car size={18} />}
                   </div>
                   <div>
-                    <strong style={{ fontSize: '15px', color: 'var(--color-text, #0f172a)' }}>{space.code}</strong>
-                    <div style={{ fontSize: '11px', color: 'var(--color-muted, #64748b)' }}>{space.type}</div>
+                    <strong className="parking-space-code">{space.code}</strong>
+                    <div className="parking-space-type">{space.type}</div>
                   </div>
                 </div>
                 <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '20px',
-                    backgroundColor: isOccupied ? '#fee2e2' : '#dcfce7',
-                    color: isOccupied ? '#b91c1c' : '#15803d',
-                  }}
+                  className="parking-space-status"
                 >
                   {isOccupied ? 'OCUPADO' : 'LIBRE'}
                 </span>
               </div>
 
               {/* Cuerpo: detalles si está ocupado, o prompt para ingresar si está libre */}
-              <div style={{ marginTop: '12px', flex: 1 }}>
+              <div className="parking-space-body">
                 {isOccupied ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text, #0f172a)', letterSpacing: '0.05em' }}>
+                  <div className="parking-space-vehicle">
+                    <div className="parking-space-plate">
                       {vehicle.plate}
-                      {vehicle.color ? <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-muted, #64748b)', marginLeft: '6px' }}>({vehicle.color})</span> : null}
+                      {vehicle.color ? <span className="parking-space-color">({vehicle.color})</span> : null}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-muted, #64748b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div className="parking-space-model">
                       {vehicle.brandModel || vehicle.type}
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <div className="parking-space-tags">
                       {vehicle.roomId ? (
                         <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            backgroundColor: 'var(--color-surface-hover, #f1f5f9)',
-                            padding: '2px 6px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--color-border, #e2e8f0)',
-                          }}
+                          className="parking-space-room"
                         >
                           Hab. {vehicle.roomId}
                         </span>
                       ) : (
                         <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: '6px',
-                            backgroundColor: '#fef3c7',
-                            color: '#92400e',
-                          }}
+                          className="parking-space-origin"
                         >
                           {vehicle.originType === 'restaurant' ? '🍴 Restaurante' : vehicle.originType === 'event' ? '🎉 Evento' : '🚗 Visita'} · {vehicle.driverName || 'Externo'}
                         </span>
                       )}
                       {vehicle.keysLeft ? (
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#d97706' }}>🔑 Llaves</span>
+                        <span className="parking-space-keys">🔑 Llaves</span>
                       ) : null}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', height: '100%', color: '#15803d', fontSize: '12px', fontWeight: 500 }}>
+                  <div className="parking-space-empty">
                     Espacio disponible para asignación
                   </div>
                 )}
               </div>
 
               {/* Acciones */}
-              <div style={{ marginTop: '14px', display: 'flex', gap: '6px' }}>
+              <div className="parking-space-actions">
                 {isOccupied ? (
                   <>
                     <button
                       type="button"
-                      className="btn btn-sm btn-outline"
-                      style={{ flex: 1, fontSize: '11px', padding: '4px 8px' }}
+                      className="btn btn-sm btn-outline parking-space-action"
                       onClick={() => onVehicleClick?.(vehicle)}
                     >
                       Detalles
                     </button>
                     <button
                       type="button"
-                      className="btn btn-sm btn-primary"
-                      style={{ flex: 1, fontSize: '11px', padding: '4px 8px' }}
+                      className="btn btn-sm btn-primary parking-space-action"
                       onClick={() => onVehicleExit?.(vehicle)}
                     >
                       Salida
@@ -254,8 +193,7 @@ export function ParkingVisualMap({
                 ) : (
                   <button
                     type="button"
-                    className="btn btn-sm btn-outline"
-                    style={{ width: '100%', fontSize: '12px', borderColor: '#10b981', color: '#16a34a' }}
+                    className="btn btn-sm btn-outline parking-space-assign"
                     onClick={() => onSelectAvailableSpace?.(space.code, space.type)}
                   >
                     + Asignar ingreso

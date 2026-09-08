@@ -21,6 +21,7 @@ import { StaffEditorModal } from './StaffEditorModal.jsx';
 import { StaffScheduleModal } from './StaffScheduleModal.jsx';
 import { Dialog } from '../../components/ui/Overlay.jsx';
 import { DataTable, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../../components/views/SharedViewParts.jsx';
+import { P1Textarea } from '../../components/ui/P1Atoms.jsx';
 
 export function StaffDirectoryView() {
   const { data, status, reload } = useStaffResource();
@@ -132,7 +133,7 @@ export function StaffDirectoryView() {
   if (status === 'loading') {
     return (
       <div className="view-container" aria-busy="true">
-        <div className="card route-loading" role="status" style={{ padding: '60px', textAlign: 'center' }}>
+        <div className="card route-loading staff-directory-loading-state" role="status">
           Cargando directorio de personal…
         </div>
       </div>
@@ -142,12 +143,12 @@ export function StaffDirectoryView() {
   if (status === 'failed') {
     return (
       <div className="view-container">
-        <section className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+        <section className="card staff-directory-error-state">
           <div className="empty-state">
-            <AlertCircle size={48} style={{ color: 'var(--color-danger, #ef4444)', marginBottom: '16px' }} />
+            <AlertCircle className="staff-directory-error-icon" size={48} />
             <h3>No pudimos cargar el directorio de personal</h3>
             <p>El servicio no está disponible por el momento. Podés reintentar la consulta.</p>
-            <button onClick={reload} className="btn btn-primary" style={{ marginTop: '16px' }}>
+            <button onClick={reload} className="btn btn-primary staff-directory-retry-button">
               <RefreshCw size={16} /> Reintentar
             </button>
           </div>
@@ -262,47 +263,47 @@ export function StaffDirectoryView() {
             return (
               <tr key={member.id}>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="staff-directory-person-cell">
                     <div className="staff-directory-avatar">
                       {initials}
                     </div>
                     <div>
-                      <strong style={{ display: 'block', fontSize: '13.5px', color: 'var(--color-navy-deep)' }}>
+                      <strong className="staff-directory-name">
                         {member.firstName} {member.lastName}
                       </strong>
-                      <small style={{ color: 'var(--color-muted)', fontSize: '11px' }}>
+                      <small className="staff-directory-id">
                         ID: {member.id.slice(0, 8)}…
                       </small>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                  <span className="staff-directory-document">
                     {member.documentNormalized || '—'}
                   </span>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <strong style={{ fontSize: '13px', color: 'var(--color-text)' }}>
+                  <div className="staff-directory-role-cell">
+                    <strong className="staff-directory-role">
                       {member.position || 'Sin cargo definido'}
                     </strong>
-                    <small style={{ color: 'var(--color-muted)', fontSize: '11.5px' }}>
+                    <small className="staff-directory-department">
                       {member.department || 'Sin departamento'}
                     </small>
                   </div>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                  <div className="staff-directory-contact-cell">
                     {member.phone && <span>📞 {member.phone}</span>}
-                    {member.email && <span style={{ color: 'var(--color-muted)' }}>✉️ {member.email}</span>}
-                    {!member.phone && !member.email && <span style={{ color: 'var(--color-muted)' }}>—</span>}
+                    {member.email && <span className="staff-directory-muted">✉️ {member.email}</span>}
+                    {!member.phone && !member.email && <span className="staff-directory-muted">—</span>}
                   </div>
                 </td>
                 <td>
                   <StatusBadge>{active ? 'Activo' : 'Archivado'}</StatusBadge>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <div className="staff-directory-row-actions">
                     <button
                       onClick={() => handleEdit(member.id)}
                       className="btn btn-sm btn-outline"
@@ -382,19 +383,18 @@ export function StaffDirectoryView() {
               </div>
             )}
 
-            <label className="span-2">
-              <span>Motivo del cambio <strong style={{ color: 'var(--color-danger)' }}>*</strong></span>
-              <textarea
-                required
-                value={actionDialog.reason}
-                onChange={(e) => setActionDialog((prev) => ({ ...prev, reason: e.target.value }))}
-                placeholder={actionDialog.type === 'archive' ? 'Ej. Fin de contrato laboral, renuncia voluntaria…' : 'Ej. Reincorporación a la temporada…'}
-                disabled={actionDialog.loading}
-                style={{ minHeight: '80px' }}
-              />
-            </label>
+            <P1Textarea
+              label={<span>Motivo del cambio <strong className="staff-directory-required">*</strong></span>}
+              required
+              value={actionDialog.reason}
+              onChange={(e) => setActionDialog((prev) => ({ ...prev, reason: e.target.value }))}
+              placeholder={actionDialog.type === 'archive' ? 'Ej. Fin de contrato laboral, renuncia voluntaria…' : 'Ej. Reincorporación a la temporada…'}
+              disabled={actionDialog.loading}
+              controlClassName="staff-directory-reason"
+              className="span-2"
+            />
 
-            <div className="form-actions span-2" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div className="form-actions span-2 staff-directory-dialog-actions">
               <button
                 type="button"
                 className="btn btn-outline"

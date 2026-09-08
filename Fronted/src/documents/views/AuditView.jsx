@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDocuments } from '../useDocuments.js';
 import { PageHeader, MetricStrip, DataTable, StatusBadge, DetailGrid, SectionHeader } from '../../components/views/SharedViewParts.jsx';
 import { Drawer } from '../../components/ui/Overlay.jsx';
+import { FilterBar } from '../../components/ui/FilterBar.jsx';
 
 export function AuditView({ notify }) {
   const [eventTypeFilter, setEventTypeFilter] = useState('');
@@ -20,7 +21,7 @@ export function AuditView({ notify }) {
       <PageHeader metadata="Trazabilidad y Seguridad" title="Eventos de Auditoría" description="Consulta de registro inmutable de transiciones y eventos críticos de documentos" />
       <MetricStrip items={[{ label: 'Eventos Registrados', value: data.total }]} />
       
-      <div className="filter-bar">
+      <FilterBar label="Filtros de auditoría">
         <label>
           Tipo de Evento
           <select value={eventTypeFilter} onChange={(e) => { setEventTypeFilter(e.target.value); setFilters(f => ({ ...f, eventType: e.target.value })); setPage(1); }}>
@@ -51,7 +52,7 @@ export function AuditView({ notify }) {
           Hasta
           <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setFilters(f => ({ ...f, to: e.target.value ? `${e.target.value}T23:59:59.999Z` : '' })); setPage(1); }} />
         </label>
-      </div>
+      </FilterBar>
       
       {error && <div className="alert-banner alert-banner-error">{error}</div>}
       
@@ -72,7 +73,7 @@ export function AuditView({ notify }) {
           </tr>
         ))}
       </DataTable>
-      <div className="pagination" style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+      <div className="pagination audit-pagination">
          <button className="btn btn-outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
          <span>Página {page}</span>
           <button className="btn btn-outline" disabled={!data.hasNextPage} onClick={() => setPage(p => p + 1)}>Siguiente</button>
@@ -89,7 +90,7 @@ export function AuditView({ notify }) {
                    { label: 'Usuario', value: selected.actor?.email || 'Sistema' },
                    { label: 'Rol', value: selected.actor?.role || 'N/A' },
                 ]} />
-                <div style={{ marginTop: '16px', background: 'var(--color-neutral-900)', padding: '16px', borderRadius: '4px', overflowX: 'auto', color: 'var(--color-neutral-300)', fontFamily: 'monospace', fontSize: '13px' }}>
+                 <div className="audit-payload">
                    <pre>{JSON.stringify(selected.metadata || {}, null, 2)}</pre>
                 </div>
              </section>
