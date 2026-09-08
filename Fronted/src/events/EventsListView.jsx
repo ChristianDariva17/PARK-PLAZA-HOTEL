@@ -5,8 +5,6 @@ import {
   Building2, 
   Users, 
   Clock, 
-  Sparkles, 
-  Filter, 
   CheckCircle2, 
   PlayCircle, 
   Flag, 
@@ -14,16 +12,12 @@ import {
   Archive, 
   Printer, 
   DollarSign, 
-  TrendingUp, 
   Calendar,
-  Layers,
   UtensilsCrossed,
-  ArrowRight,
-  ShieldCheck,
   RefreshCw
 } from 'lucide-react';
 import { useEventsResource } from './useEventsResource';
-import { P1Button, P1Badge } from '../components/ui/P1Atoms';
+import { P1Badge } from '../components/ui/P1Atoms';
 import { formatMoney } from '../domain/hotelModel.js';
 import { EventBeoModal } from './EventBeoModal';
 
@@ -46,18 +40,6 @@ const STATUS_CONFIG = {
   completed: { label: 'Finalizado', variant: 'success', icon: Flag },
   cancelled: { label: 'Cancelado', variant: 'danger', icon: XCircle },
   archived: { label: 'Archivado', variant: 'neutral', icon: Archive },
-};
-
-const formatDateTime = (value, timezone) => {
-  try { 
-    return new Intl.DateTimeFormat('es-PE', { 
-      dateStyle: 'medium', 
-      timeStyle: 'short', 
-      timeZone: timezone || 'America/Lima' 
-    }).format(new Date(value)); 
-  } catch { 
-    return value; 
-  }
 };
 
 export function EventsListView({ onSelectEvent, onCreateEvent, onManagePolicies }) {

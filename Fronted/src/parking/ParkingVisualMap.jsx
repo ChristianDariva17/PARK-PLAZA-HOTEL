@@ -1,25 +1,10 @@
 import React, { useState } from 'react';
-import { Car, Bike, CheckCircle2, Clock, DoorClosed, AlertTriangle, ArrowRight } from 'lucide-react';
-import { formatDateTime } from '../domain/hotelModel.js';
+import { Car, Bike } from 'lucide-react';
 
-export const DEFAULT_PARKING_SPACES = [
-  { id: 'E-01', code: 'E-01', type: 'Auto', label: 'Cochera 01' },
-  { id: 'E-02', code: 'E-02', type: 'Auto', label: 'Cochera 02' },
-  { id: 'E-03', code: 'E-03', type: 'Auto', label: 'Cochera 03' },
-  { id: 'E-04', code: 'E-04', type: 'Auto', label: 'Cochera 04' },
-  { id: 'E-05', code: 'E-05', type: 'Auto', label: 'Cochera 05' },
-  { id: 'E-06', code: 'E-06', type: 'Auto', label: 'Cochera 06' },
-  { id: 'E-07', code: 'E-07', type: 'Auto', label: 'Cochera 07' },
-  { id: 'E-08', code: 'E-08', type: 'Auto', label: 'Cochera 08' },
-  { id: 'E-09', code: 'E-09', type: 'Auto', label: 'Cochera 09' },
-  { id: 'E-10', code: 'E-10', type: 'Auto', label: 'Cochera 10' },
-  { id: 'E-11', code: 'E-11', type: 'Auto', label: 'Cochera 11' },
-  { id: 'E-12', code: 'E-12', type: 'Auto', label: 'Cochera 12' },
-  { id: 'M-01', code: 'M-01', type: 'Moto', label: 'Bahía Moto 01' },
-  { id: 'M-02', code: 'M-02', type: 'Moto', label: 'Bahía Moto 02' },
-  { id: 'M-03', code: 'M-03', type: 'Moto', label: 'Bahía Moto 03' },
-  { id: 'M-04', code: 'M-04', type: 'Moto', label: 'Bahía Moto 04' },
-];
+import { DEFAULT_PARKING_SPACES } from './parkingModel.js';
+
+// Keep the historical component-module export for existing consumers.
+export { DEFAULT_PARKING_SPACES } from './parkingModel.js';
 
 export function ParkingVisualMap({
   vehicles = [],

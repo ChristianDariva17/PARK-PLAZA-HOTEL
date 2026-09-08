@@ -3,16 +3,11 @@ import {
   Printer, 
   X, 
   Building2, 
-  Calendar, 
   Clock, 
-  Users, 
   DollarSign, 
   FileText, 
   UtensilsCrossed, 
   Tv, 
-  CheckCircle2,
-  Sparkles,
-  ShieldCheck,
   UserCheck
 } from 'lucide-react';
 import { formatMoney } from '../domain/hotelModel.js';

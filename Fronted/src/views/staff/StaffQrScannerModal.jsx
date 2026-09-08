@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useEffectEvent } from 'react';
 import { Dialog } from '../../components/ui/Overlay.jsx';
-import { Camera, MapPin, CheckCircle2, AlertCircle, RefreshCw, ShieldCheck, UserCheck, Smartphone } from 'lucide-react';
+import { MapPin, CheckCircle2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import confetti from 'canvas-confetti';
 import { staffClient } from '../../staff/staffClient.js';
@@ -15,7 +15,6 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
   const [gpsLocation, setGpsLocation] = useState(null);
   const [gpsError, setGpsError] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(true);
-  const [cameraActive, setCameraActive] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [successResult, setSuccessResult] = useState(null);
@@ -73,7 +72,6 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
 
     const startCamera = async () => {
       try {
-        setCameraActive(true);
         html5QrCode = new Html5Qrcode(scannerContainerId);
         scannerRef.current = html5QrCode;
 
@@ -85,7 +83,7 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
             aspectRatio: 1.0,
           },
           async (decodedText) => {
-            if (!isMounted || scanning) return;
+            if (!isMounted) return;
             handleQrScanned(decodedText);
           },
           () => {
@@ -95,7 +93,6 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
       } catch (err) {
         if (isMounted) {
           console.warn('Camera initiation failed:', err);
-          setCameraActive(false);
         }
       }
     };
@@ -113,7 +110,7 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
     };
   }, [open, successResult, gpsLoading, gpsError]);
 
-  const handleQrScanned = async (qrToken) => {
+  const handleQrScanned = useEffectEvent(async (qrToken) => {
     if (scanning) return;
     setScanning(true);
     setSubmitError(null);
@@ -165,7 +162,7 @@ export function StaffQrScannerModal({ open, onClose, staffList = [], onAttendanc
     } finally {
       setScanning(false);
     }
-  };
+  });
 
   const handleManualRetry = () => {
     setSuccessResult(null);

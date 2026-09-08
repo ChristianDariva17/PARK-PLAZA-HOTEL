@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  Calendar, 
   Clock, 
   Users, 
   DollarSign, 
-  MapPin, 
   UserCheck, 
-  Building2, 
   Sparkles, 
   ArrowLeft, 
   CheckCircle2, 
   AlertTriangle, 
-  Info, 
-  FileText,
   Layers,
   Repeat,
   UtensilsCrossed,
@@ -21,13 +16,10 @@ import {
   Tv,
   Mic,
   Flower2,
-  Plus,
-  Minus
 } from 'lucide-react';
-import { P1Button, P1Input, P1Select, P1Badge } from '../components/ui/P1Atoms';
+import { P1Input, P1Select, P1Badge } from '../components/ui/P1Atoms';
 import { eventsClient } from './eventsClient';
 import { useHotel } from '../state/hotelContext.js';
-import { formatMoney } from '../domain/hotelModel.js';
 
 const QUICK_TEMPLATES = [
   { label: '💍 Boda / Matrimonio', title: 'Recepción de Boda', hours: 6, kind: 'time_bound' },
@@ -58,7 +50,6 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
   const [expectedVersion, setExpectedVersion] = useState(1);
   const [guestSearch, setGuestSearch] = useState('');
   const [conflictWarning, setConflictWarning] = useState(null);
-  const [checkingConflict, setCheckingConflict] = useState(false);
 
   // Selected Services
   const [selectedServices, setSelectedServices] = useState({});

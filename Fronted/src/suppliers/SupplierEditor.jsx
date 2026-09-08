@@ -9,10 +9,7 @@ import {
   Check, 
   Tag, 
   User, 
-  Phone, 
-  Mail, 
   Clock, 
-  ShieldCheck, 
   UtensilsCrossed, 
   Wine, 
   Sparkles, 
@@ -22,7 +19,6 @@ import {
   Search,
   PackageCheck,
   AlertTriangle,
-  Info
 } from 'lucide-react';
 
 const CATEGORIES = [

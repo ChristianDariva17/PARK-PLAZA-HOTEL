@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog } from '../components/ui/Overlay.jsx';
-import { Waves, Mountain, Settings2, Save, AlertCircle, Clock, Users, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Waves, Mountain, Save, AlertCircle } from 'lucide-react';
 import { updateAmenityConfig } from './amenitiesClient.js';
 
 export function AmenityConfigModal({ open, onClose, configs = [], onSuccess, notify }) {

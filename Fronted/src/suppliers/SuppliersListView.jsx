@@ -11,7 +11,6 @@ import {
   Mail, 
   Clock, 
   Plus, 
-  Tag, 
   RefreshCw, 
   PackageCheck,
   FileText,
@@ -19,19 +18,7 @@ import {
   ArrowDownToLine,
   Send,
   CheckCircle2,
-  ListOrdered
 } from 'lucide-react';
-import { formatMoney } from '../domain/hotelModel.js';
-
-const CATEGORY_LABELS = {
-  food: 'Alimentos',
-  beverage: 'Bebidas',
-  cleaning: 'Limpieza',
-  maintenance: 'Mantenimiento',
-  amenities: 'Amenities',
-  services: 'Servicios',
-  other: 'Otros',
-};
 
 const PO_STATUS_LABELS = {
   draft: { label: 'Borrador', bg: '#F1F5F9', color: '#475569' },
@@ -41,17 +28,15 @@ const PO_STATUS_LABELS = {
 };
 
 export function SuppliersListView({ onSelectSupplier, onCreateSupplier }) {
-  const { suppliers, loading, error, filters, updateFilters, total, refresh } = useSuppliersResource();
+  const { suppliers, loading, error, filters, updateFilters, refresh } = useSuppliersResource();
   const [searchTerm, setSearchTerm] = useState(filters.q || '');
   const [activeTab, setActiveTab] = useState('suppliers'); // 'suppliers' | 'orders' | 'critical'
 
   // Reorder Suggestions State
   const [reorderData, setReorderData] = useState({ count: 0, criticalItems: [] });
-  const [loadingReorder, setLoadingReorder] = useState(false);
 
   // Purchase Orders State
   const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loadingPOs, setLoadingPOs] = useState(false);
 
   // Purchase Order Modal State
   const [showPOModal, setShowPOModal] = useState(false);
@@ -67,23 +52,19 @@ export function SuppliersListView({ onSelectSupplier, onCreateSupplier }) {
 
   const fetchReorderAndPOs = async () => {
     try {
-      setLoadingReorder(true);
       const reorder = await suppliersClient.getReorderSuggestions();
       setReorderData(reorder);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoadingReorder(false);
     }
 
     try {
-      setLoadingPOs(true);
       const pos = await suppliersClient.getPurchaseOrders();
       setPurchaseOrders(pos);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoadingPOs(false);
     }
   };
 

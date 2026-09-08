@@ -24,7 +24,7 @@ export function useCommunications() {
       const res = await fetchNotifications(account.propertyId, {}, controller?.signal);
       const data = (res || []).map(adaptNotificationResponse);
       setNotifications({ data, status: 'ready', error: null });
-    } catch (err) {
+    } catch {
       if (err.name === 'AbortError') return;
       setNotifications(prev => ({ ...prev, status: 'error', error: err.message }));
     }
@@ -35,7 +35,7 @@ export function useCommunications() {
     try {
       const res = await fetchPreferences(account.propertyId, controller?.signal);
       setPreferences({ data: adaptPreferenceResponse(res), status: 'ready', error: null });
-    } catch (err) {
+    } catch {
       if (err.name === 'AbortError') return;
       setPreferences(prev => ({ ...prev, status: 'error', error: err.message }));
     }
@@ -65,7 +65,7 @@ export function useCommunications() {
         data: prev.data.map(n => n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n)
       }));
       return true;
-    } catch (err) {
+    } catch {
       return false;
     }
   };
@@ -79,7 +79,7 @@ export function useCommunications() {
         data: prev.data.map(n => ({ ...n, read: true, readAt: new Date().toISOString() }))
       }));
       return true;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       setActionLoading(false);
@@ -95,7 +95,7 @@ export function useCommunications() {
         data: prev.data.filter(n => !n.read)
       }));
       return true;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       setActionLoading(false);

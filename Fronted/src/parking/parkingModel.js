@@ -1,5 +1,10 @@
 import { selectActiveStays } from '../domain/hotelModel.js';
 
+export const DEFAULT_PARKING_SPACES = [
+  ...Array.from({ length: 12 }, (_, index) => ({ id: `E-${String(index + 1).padStart(2, '0')}`, code: `E-${String(index + 1).padStart(2, '0')}`, type: 'Auto', label: `Cochera ${String(index + 1).padStart(2, '0')}` })),
+  ...Array.from({ length: 4 }, (_, index) => ({ id: `M-${String(index + 1).padStart(2, '0')}`, code: `M-${String(index + 1).padStart(2, '0')}`, type: 'Moto', label: `Bahía Moto ${String(index + 1).padStart(2, '0')}` })),
+];
+
 const nextRecordId = (prefix, records) => {
   const highest = (records || []).reduce((maximum, record) => {
     const match = new RegExp(`^${prefix}-(\\d+)$`).exec(record.id);

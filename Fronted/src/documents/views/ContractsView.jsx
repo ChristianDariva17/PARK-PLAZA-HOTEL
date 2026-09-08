@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useDocuments } from '../useDocuments.js';
-import { PageHeader, MetricStrip, DataTable, StatusBadge, SectionHeader } from '../../components/views/SharedViewParts.jsx';
+import { PageHeader, MetricStrip, DataTable, StatusBadge } from '../../components/views/SharedViewParts.jsx';
 import { Drawer } from '../../components/ui/Overlay.jsx';
-import { Search, FileText, CheckCircle2, AlertCircle, Printer, X } from 'lucide-react';
+import { Search, FileText, CheckCircle2 } from 'lucide-react';
 import { StayConditionsDocument } from '../StayConditionsDocument.jsx';
 
-export function ContractsView({ notify }) {
+export function ContractsView() {
   const [statusFilter, setStatusFilter] = useState('');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);

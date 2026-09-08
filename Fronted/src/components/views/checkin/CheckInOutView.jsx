@@ -4,11 +4,11 @@ import { PERMISSIONS } from '../../../auth/permissions';
 import { formatReservationInstant, reservationStatusToLabel } from '../../../reservations/reservationModel';
 import { useHotel } from '../../../state/hotelContext';
 import FolioPanel from '../../../folios/FolioPanel';
-import { canOverrideCheckout, checkoutDebtMessage } from '../../../folios/folioModel';
 import { Dialog, TabPanel, Tabs } from '../../ui/Overlay';
 import { DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
 import { SignatureCanvas } from '../../common/SignatureCanvas.jsx';
-import { StayConditionsDocument, DEFAULT_CHECKLIST, HOTEL_INFO } from '../../../documents/StayConditionsDocument.jsx';
+import { StayConditionsDocument } from '../../../documents/StayConditionsDocument.jsx';
+import { DEFAULT_CHECKLIST, HOTEL_INFO } from '../../../documents/stayConditionsModel.js';
 import { documentsClient } from '../../../documents/documentsClient.js';
 import { FileCheck, PenTool, CheckCircle2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 

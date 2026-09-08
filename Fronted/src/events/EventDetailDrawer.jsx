@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  X, 
-  Calendar, 
   Clock, 
   MapPin, 
   Users, 
-  DollarSign, 
   UserCheck, 
   ShieldCheck, 
   AlertTriangle, 
@@ -15,13 +12,10 @@ import {
   Flag, 
   Archive, 
   XCircle,
-  Building,
   UtensilsCrossed,
-  CreditCard,
-  Receipt,
   Printer
 } from 'lucide-react';
-import { P1Button, P1Badge } from '../components/ui/P1Atoms';
+import { P1Badge } from '../components/ui/P1Atoms';
 import { eventsClient } from './eventsClient';
 import { formatMoney } from '../domain/hotelModel.js';
 import { EventBeoModal } from './EventBeoModal';

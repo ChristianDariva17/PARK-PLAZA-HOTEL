@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dialog } from '../components/ui/Overlay.jsx';
-import { Printer, QrCode, ShieldCheck, Car, Clock } from 'lucide-react';
+import { Printer, QrCode } from 'lucide-react';
 import { formatMoney, formatDateTime } from '../domain/hotelModel.js';
 
 export function ParkingTicketModal({ open, onClose, vehicle, clientName = '' }) {
@@ -9,8 +9,6 @@ export function ParkingTicketModal({ open, onClose, vehicle, clientName = '' }) 
   const handlePrint = () => {
     window.print();
   };
-
-  const isInside = vehicle.status === 'Dentro';
 
   return (
     <Dialog

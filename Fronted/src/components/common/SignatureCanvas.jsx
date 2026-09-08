@@ -113,7 +113,6 @@ export const SignatureCanvas = forwardRef(function SignatureCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     const displayWidth = rect.width || width;
     const displayHeight = height;

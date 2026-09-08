@@ -50,7 +50,6 @@ import { fetchVehicles, createVehicle, updateVehicle, exitVehicle, archiveVehicl
 import { adaptVehicleResponse, buildVehicleCreateDto, buildVehicleUpdateDto } from '../parking/parkingModel.js';
 
 import { HotelCommandsContext, HotelSearchStateContext, HotelShellStateContext, HotelStateContext } from './hotelContext.js';
-export { HotelCommandsContext, HotelSearchStateContext, HotelShellStateContext, HotelStateContext, useHotel, useHotelCommands, useHotelSearchState, useHotelShellState } from './hotelContext.js';
 import { hotelReducer, validateHotelAction } from './hotelReducer.js';
 import { loadOperationalRecords, runConfirmedOperationalRequest } from './operationalRequestPolicy.js';
 
@@ -118,7 +117,6 @@ export function HotelProvider({ children }) {
   const managedMenuGenRef = useRef(0);
   const managedMenuControllerRef = useRef(null);
   const menuImportControllerRef = useRef(null);
-  const inventoryMutationRef = useRef(null); // tracks active mutation per item id
   const parkingRequestGenerationRef = useRef(0);
   const parkingRequestControllerRef = useRef(null);
   const petRequestGenerationRef = useRef(0);
@@ -225,7 +223,7 @@ export function HotelProvider({ children }) {
     menuImportControllerRef.current = null;
     // Don't emit cancel actions here since we block navigation while importing, 
     // but useful if unmounted
-  }, [commitInternal]);
+  }, []);
 
   const runGuestLoad = useCallback(async (generation, controller) => {
     commitInternal({ type: 'GUESTS_LOAD_STARTED' });
@@ -415,8 +413,6 @@ export function HotelProvider({ children }) {
   const canReadIncidents = permissions.includes(PERMISSIONS.incidentsRead);
   const canReadMaintenance = permissions.includes(PERMISSIONS.maintenanceRead);
   const canReadCash = permissions.includes(PERMISSIONS.cashRead);
-  const canReadOrders = permissions.includes(PERMISSIONS.ordersRead);
-  const canReadInventory = permissions.includes(PERMISSIONS.inventoryRead);
   const canReadParking = permissions.includes(PERMISSIONS.parkingRead);
   const canReadPets = permissions.includes(PERMISSIONS.petsRead);
 
@@ -622,7 +618,7 @@ export function HotelProvider({ children }) {
   }, [cancelResourceLoad, runResourceLoad]);
 
   useEffect(() => {
-    const identityKey = authStatus === 'authenticated' ? `${account?.id || account?.email || ''}:${account?.propertyId || ''}` : '';
+    const identityKey = accountIdentity;
     commitInternal({ type: 'RESTAURANT_RESOURCES_RESET', identityKey });
     
     if (authStatus !== 'authenticated' || !identityKey) return undefined;
@@ -641,9 +637,10 @@ export function HotelProvider({ children }) {
       }
     });
 
+    const resources = resourceRefs.current;
     return () => {
       Object.keys(RESTAURANT_RESOURCE_DEFINITIONS).forEach((key) => {
-        resourceRefs.current[key]?.controller?.abort();
+        resources[key]?.controller?.abort();
       });
     };
   }, [accountIdentity, authStatus, permissions, cancelResourceLoad, commitInternal, runResourceLoad]);
@@ -1335,7 +1332,7 @@ export function HotelProvider({ children }) {
       }
     }
     return result;
-  }, [can, reloadResource]);
+  }, [can]);
 
   // ─── Restaurant Commands ──────────────────────────────────────────────────
   const createOrderCommand = useCallback(async (body, idempotencyKey) => {

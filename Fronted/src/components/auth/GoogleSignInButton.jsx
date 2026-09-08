@@ -25,9 +25,10 @@ export default function GoogleSignInButton({ disabled, onCredential, onError }) 
     try {
       await onCredential(response.credential);
     } catch (error) {
-      onError(error);
+      handleError(error);
     }
   });
+  const handleError = useEffectEvent(onError);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -44,7 +45,7 @@ export default function GoogleSignInButton({ disabled, onCredential, onError }) 
     }).catch((error) => {
       if (active) {
         setState('error');
-        onError(error);
+        handleError(error);
       }
     });
     return () => { active = false; };

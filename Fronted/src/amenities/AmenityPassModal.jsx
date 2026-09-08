@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Dialog } from '../components/ui/Overlay.jsx';
-import { Waves, Mountain, User, Sparkles, AlertCircle, Check, CreditCard, DollarSign, Wallet } from 'lucide-react';
+import { Waves, Mountain, User, Sparkles, AlertCircle } from 'lucide-react';
 import { createManualAmenityPass } from './amenitiesClient.js';
 import { formatMoney } from '../domain/hotelModel.js';
 

@@ -1,20 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useCommunications } from './useCommunications';
 import { DEPARTMENT_CONFIG, PRIORITY_CONFIG } from './communicationsModel';
-import { 
-  Bell, 
-  CheckCheck, 
-  Trash2, 
-  RefreshCw, 
-  Search, 
-  Filter, 
-  ArrowRight, 
-  CheckCircle2, 
-  Sparkles,
-  Inbox,
-  Clock,
-  AlertCircle
-} from 'lucide-react';
+import { CheckCheck, Trash2, RefreshCw, Search, ArrowRight, Sparkles, Inbox, Clock } from 'lucide-react';
+
+const EMPTY_NOTIFICATIONS = [];
 
 export function NotificationsView({ navigate, notify }) {
   const { 
@@ -31,7 +20,7 @@ export function NotificationsView({ navigate, notify }) {
   const [selectedStatus, setSelectedStatus] = useState('all'); // 'all' | 'unread' | 'read'
   const [searchTerm, setSearchTerm] = useState('');
 
-  const items = notifications.data || [];
+  const items = notifications.data ?? EMPTY_NOTIFICATIONS;
 
   // Filter items based on tab, status and search
   const filteredItems = useMemo(() => {

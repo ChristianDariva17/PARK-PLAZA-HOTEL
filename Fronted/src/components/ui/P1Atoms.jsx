@@ -45,8 +45,11 @@ export function P1Select({ label, className = '', controlClassName = '', style: 
 export function P1Textarea({ label, className = '', controlClassName = '', style: _style, helperText, error, required, ...props }) {
   const generatedId = useId();
   const textareaId = props.id || generatedId;
+  const helperId = helperText ? `${textareaId}-helper` : null;
+  const errorId = error ? `${textareaId}-error` : null;
+  const describedBy = [props['aria-describedby'], helperId, errorId].filter(Boolean).join(' ') || undefined;
   return <FormField label={label} required={required} helperText={helperText} error={error} className={className}>
-    <textarea {...props} id={textareaId} required={required} className={`form-control ${controlClassName}`.trim()} />
+    <textarea {...props} id={textareaId} required={required} className={`form-control ${controlClassName}`.trim()} aria-invalid={error ? 'true' : undefined} aria-describedby={describedBy} />
   </FormField>;
 }
 

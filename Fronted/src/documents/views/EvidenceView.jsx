@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useDocuments } from '../useDocuments.js';
 import { useHotel } from '../../state/hotelContext.js';
 import { PageHeader, MetricStrip, StatusBadge, EmptyState } from '../../components/views/SharedViewParts.jsx';
@@ -9,7 +9,6 @@ import {
   List,
   Eye,
   ExternalLink,
-  Download,
   Calendar,
   Sparkles,
   Wrench,
@@ -19,7 +18,6 @@ import {
   Layers,
   BedDouble,
   User,
-  ShieldCheck,
   RefreshCw
 } from 'lucide-react';
 
@@ -71,7 +69,7 @@ export function EvidenceView() {
   };
 
   // Helper to enrich evidence item with state data (room, user, reason, etc.)
-  const resolveEvidenceDetails = (item) => {
+  const resolveEvidenceDetails = useCallback((item) => {
     const rawSource = String(item.sourceType || item.originType || '').toUpperCase();
     const sourceKey = rawSource.includes('CLEAN') ? 'CLEANING'
       : rawSource.includes('MAINT') ? 'MAINTENANCE'
@@ -138,12 +136,12 @@ export function EvidenceView() {
       fileSize,
       fileMime
     };
-  };
+  }, [state]);
 
   // Enriched items
   const enrichedItems = useMemo(() => {
     return (data.items || []).map(resolveEvidenceDetails);
-  }, [data.items, state]);
+  }, [data.items, resolveEvidenceDetails]);
 
   // Client-side quick search filter
   const filteredItems = useMemo(() => {

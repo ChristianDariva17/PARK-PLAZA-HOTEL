@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { Banknote, Coins, Calculator, RotateCcw, Plus, Minus } from 'lucide-react';
 import { formatMoney } from '../domain/hotelModel.js';
 
-export const PEN_BILLS = [
+const PEN_BILLS = [
   { value: 200, label: 'S/ 200', badge: 'Santa Rosa / Tilsa', bg: 'rgba(126, 34, 206, 0.08)', border: '#c084fc', text: '#6b21a8' },
   { value: 100, label: 'S/ 100', badge: 'Jorge Chávez / Paulet', bg: 'rgba(29, 78, 216, 0.08)', border: '#93c5fd', text: '#1e40af' },
   { value: 50, label: 'S/ 50', badge: 'Valdelomar / Rostworowski', bg: 'rgba(180, 83, 9, 0.08)', border: '#fcd34d', text: '#92400e' },
   { value: 20, label: 'S/ 20', badge: 'Porras / Arguedas', bg: 'rgba(4, 120, 87, 0.08)', border: '#86efac', text: '#065f46' },
   { value: 10, label: 'S/ 10', badge: 'Quiñones / Chabuca', bg: 'rgba(2, 132, 199, 0.08)', border: '#7dd3fc', text: '#0369a1' },
 ];
-export const PEN_COINS = [
+const PEN_COINS = [
   { value: 5.0, label: 'S/ 5.00', bg: 'rgba(234, 179, 8, 0.08)', border: '#fde047' },
   { value: 2.0, label: 'S/ 2.00', bg: 'rgba(203, 213, 225, 0.25)', border: '#cbd5e1' },
   { value: 1.0, label: 'S/ 1.00', bg: 'rgba(203, 213, 225, 0.25)', border: '#cbd5e1' },

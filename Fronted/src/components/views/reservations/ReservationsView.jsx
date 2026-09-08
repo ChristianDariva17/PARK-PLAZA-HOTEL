@@ -1,10 +1,10 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
-import { CalendarSearch, CheckCircle, Eye, Plus, Search, Sparkles, UserPlus } from 'lucide-react';
+import { CalendarSearch, Eye, Search, UserPlus } from 'lucide-react';
 import { usePermissions } from '../../../auth/authContext';
 import { PERMISSIONS } from '../../../auth/permissions';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
 import { buildGuestCreateDto } from '../../../guests/guestModel';
-import { formatReservationInstant, formatReservationMoney, RESERVATION_STATUS_LABELS, reservationOperationalStatusToLabel, reservationStatusToLabel } from '../../../reservations/reservationModel';
+import { formatReservationInstant, formatReservationMoney, RESERVATION_STATUS_LABELS, reservationStatusToLabel } from '../../../reservations/reservationModel';
 import { useHotel, useHotelCommands } from '../../../state/hotelContext';
 import { Pagination, SortableHeader } from '../../ui/CollectionTable';
 import { Dialog, Drawer } from '../../ui/Overlay';

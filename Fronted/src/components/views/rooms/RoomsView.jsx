@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Bed, Calendar, Check, CheckCircle2, Clock, Edit, Eye, History, Info, Key, Layers, LayoutGrid, List, Lock, RefreshCw, Search, ShieldCheck, Sparkles, Unlock } from 'lucide-react';
+import { Bed, Calendar, Check, Clock, Edit, Eye, Key, Layers, LayoutGrid, List, Lock, RefreshCw, Search, ShieldCheck, Sparkles, Unlock } from 'lucide-react';
 import { usePermissions } from '../../../auth/authContext';
 import { PERMISSIONS } from '../../../auth/permissions';
 import { ROOM_STATUSES } from '../../../domain/hotelModel';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
 import { useHotel, useHotelCommands } from '../../../state/hotelContext';
-import { Pagination, RowActions, SortableHeader } from '../../ui/CollectionTable';
+import { Pagination, SortableHeader } from '../../ui/CollectionTable';
 import { Dialog, Drawer } from '../../ui/Overlay';
 import { EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
 import { getCategoryAudit, getRoomAmenities, updateCategoryAmenities } from '../../../rooms/roomsClient';
@@ -182,7 +182,6 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
   const [saving, setSaving] = useState(false);
 
   // Amenities
-  const [masterAmenities, setMasterAmenities] = useState([]);
   const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [loadingAmenities, setLoadingAmenities] = useState(false);
 
@@ -197,7 +196,6 @@ function CategoryForm({ category, onClose, notify, initialTab = 'details', onAme
       getRoomAmenities()
         .then((res) => {
           if (!active) return;
-          setMasterAmenities(res.master || []);
           setSelectedAmenities(res.categoryAmenities?.[category.id] || []);
         })
         .catch(() => {})

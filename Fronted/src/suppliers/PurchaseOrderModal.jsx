@@ -3,22 +3,11 @@ import { Dialog } from '../components/ui/Overlay';
 import { suppliersClient } from './suppliersClient';
 import { getInventory } from '../restaurant/restaurantClient';
 import { 
-  FileText, 
-  Plus, 
   Trash2, 
   Printer, 
   Send, 
-  CheckCircle2, 
-  Building2, 
-  Calendar, 
-  DollarSign, 
-  User, 
-  Clock, 
-  Sparkles,
-  AlertTriangle,
-  X
+  AlertTriangle
 } from 'lucide-react';
-import { formatMoney } from '../domain/hotelModel.js';
 
 export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClose, onCreated }) {
   const [suppliers, setSuppliers] = useState([]);
@@ -81,11 +70,7 @@ export function PurchaseOrderModal({ open, supplierId, initialItems = [], onClos
         })
         .catch(console.error);
     }
-  }, [selectedSupplierId]);
-
-  const selectedSupplier = useMemo(() => {
-    return suppliers.find(s => s.id === selectedSupplierId);
-  }, [suppliers, selectedSupplierId]);
+  }, [selectedSupplierId, initialItems.length, items.length]);
 
   const addItem = (invItem) => {
     if (!invItem) return;

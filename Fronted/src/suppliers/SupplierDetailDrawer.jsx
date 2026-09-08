@@ -3,7 +3,6 @@ import { Drawer } from '../components/ui/Overlay';
 import { StatusBadge } from '../components/views/SharedViewParts';
 import { suppliersClient } from './suppliersClient';
 import { 
-  Building2, 
   Edit2, 
   Archive, 
   RotateCcw, 
@@ -14,13 +13,8 @@ import {
   Copy, 
   Check, 
   User, 
-  PackageCheck, 
-  PlusCircle, 
   CheckCircle2, 
-  AlertTriangle,
   ArrowDownToLine,
-  Layers,
-  FileText
 } from 'lucide-react';
 import { formatMoney } from '../domain/hotelModel.js';
 

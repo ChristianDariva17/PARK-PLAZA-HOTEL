@@ -1,22 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, MapPin, Sparkles, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, MapPin } from 'lucide-react';
 import { useEventsResource } from './useEventsResource';
 import { eventsClient } from './eventsClient';
-import { P1Button, P1Badge } from '../components/ui/P1Atoms';
+import { P1Button } from '../components/ui/P1Atoms';
 
 const pad = (value) => String(value).padStart(2, '0');
 const keyFor = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-const statusLabels = { 
-  confirmed: 'Confirmado', 
-  tentative: 'Tentativo', 
-  preparing: 'Preparación',
-  in_progress: 'En Curso',
-  cancelled: 'Cancelado', 
-  completed: 'Completado', 
-  archived: 'Archivado', 
-  draft: 'Borrador' 
-};
-
 export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
   const { events, loading, error } = useEventsResource();
   const [spaces, setSpaces] = useState([]);

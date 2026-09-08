@@ -6,7 +6,6 @@ import {
   Eye,
   Edit,
   Power,
-  UtensilsCrossed,
   Clock,
   ChefHat,
   X,
@@ -14,15 +13,8 @@ import {
   AlertCircle,
   LayoutGrid,
   List,
-  Package,
   Sparkles,
-  TrendingUp,
-  DollarSign,
-  AlertTriangle,
   Layers,
-  Tag,
-  CheckCircle2,
-  Info,
 } from 'lucide-react';
 import { formatMoney } from '../domain/hotelModel.js';
 import { useHotel } from '../state/hotelContext.js';
@@ -32,6 +24,9 @@ import { Dialog } from '../components/ui/Overlay.jsx';
 import { PageHeader, MetricStrip, StatusBadge, EmptyState } from '../components/views/SharedViewParts.jsx';
 
 // ─── Categories & Icon Helper ──────────────────────────────────────────────────
+const EMPTY_ITEMS = [];
+const EMPTY_INVENTORY = [];
+
 const COMMON_CATEGORIES = [
   'Todas',
   'Los Clásicos del Bar',
@@ -49,7 +44,7 @@ const COMMON_CATEGORIES = [
   'Otro',
 ];
 
-export const isBarCategory = (category = '') => {
+const isBarCategory = (category = '') => {
   const cat = (category || '').toLowerCase();
   return (
     cat.includes('bar') ||
@@ -68,7 +63,7 @@ export const isBarCategory = (category = '') => {
   );
 };
 
-export const isDessertCategory = (category = '') => {
+const isDessertCategory = (category = '') => {
   const cat = (category || '').toLowerCase();
   return (
     cat.includes('postre') ||
@@ -80,7 +75,7 @@ export const isDessertCategory = (category = '') => {
   );
 };
 
-export const CULINARY_TAG_PRESETS = [
+const CULINARY_TAG_PRESETS = [
   { id: 'especialidad', label: '⭐ Especialidad 5★' },
   { id: 'chef', label: '👨‍🍳 Recomendado del Chef' },
   { id: 'autor', label: '🍸 Cóctel de Autor' },
@@ -89,7 +84,7 @@ export const CULINARY_TAG_PRESETS = [
   { id: 'picante', label: '🌶️ Toque Picante' },
 ];
 
-export function convertIngredientToInventoryUnit(quantity, fromUnit, toUnit) {
+function convertIngredientToInventoryUnit(quantity, fromUnit, toUnit) {
   const from = (fromUnit || '').toLowerCase().trim();
   const to = (toUnit || '').toLowerCase().trim();
   if (from === to) return quantity;
@@ -102,7 +97,7 @@ export function convertIngredientToInventoryUnit(quantity, fromUnit, toUnit) {
   return quantity;
 }
 
-export const getCategoryIcon = (category = '') => {
+const getCategoryIcon = (category = '') => {
   const cat = (category || '').toLowerCase();
   if (cat.includes('bar') || cat.includes('coctel') || cat.includes('pisco') || cat.includes('autor')) return '🍸';
   if (cat.includes('cerveza')) return '🍺';
@@ -119,7 +114,7 @@ export const getCategoryIcon = (category = '') => {
   return '🍽️';
 };
 
-export const UNIT_OPTIONS = [
+const UNIT_OPTIONS = [
   { value: 'oz', label: 'oz (Onzas líquidas - Bar)', icon: '🍸' },
   { value: 'ml', label: 'ml (Mililitros)', icon: '🧪' },
   { value: 'L', label: 'L (Litros)', icon: '🧃' },
@@ -266,8 +261,6 @@ function MenuItemDetailModal({ item, onClose, onEdit, onToggleStatus, inventory 
                     const stock = inv ? Number(inv.stock) - Number(inv.reserved || 0) : null;
                     const isLowStock = stock !== null && stock < (Number(ing.quantity) * 5);
                     const isOutOfStock = stock !== null && stock <= 0;
-                    const isOz = (ing.unit || '').toLowerCase() === 'oz';
-
                     return (
                       <tr key={idx}>
                         <td>
@@ -1045,8 +1038,8 @@ export function MenuManagementView({ notify }) {
     }
   }, [hasAccess, menuManagementCommands]);
 
-  const items = state.managedMenu || [];
-  const inventory = state.inventory || [];
+  const items = state.managedMenu ?? EMPTY_ITEMS;
+  const inventory = state.inventory ?? EMPTY_INVENTORY;
   const inventoryMap = useMemo(() => new Map(inventory.map((i) => [i.id, i])), [inventory]);
   const isLoading = state.menuManagementRequest?.status === 'loading';
 

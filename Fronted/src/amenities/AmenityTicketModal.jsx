@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Dialog } from '../components/ui/Overlay.jsx';
-import { QrCode, Printer, CheckCircle2, User, Clock, Waves, Mountain, ShieldCheck } from 'lucide-react';
+import { QrCode, Printer, CheckCircle2, Waves, Mountain } from 'lucide-react';
 import { checkInAmenityPass } from './amenitiesClient.js';
 import { formatMoney } from '../domain/hotelModel.js';
 

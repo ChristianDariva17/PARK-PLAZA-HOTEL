@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Search, Wrench, AlertTriangle, Plus, Lock, Unlock, Hammer, History, TrendingUp, TrendingDown, Clock, Sparkles, DollarSign, Package, Check, RefreshCw, X, ArrowUpRight, ArrowDownRight, SlidersHorizontal, Eye, EyeOff, Edit, RotateCcw, Building2, Layers, Tag, Receipt, ShieldAlert, Filter } from 'lucide-react';
+import { Search, AlertTriangle, Plus, Lock, Unlock, History, TrendingUp, TrendingDown, Clock, Sparkles, DollarSign, Package, Check, RefreshCw, ArrowUpRight, ArrowDownRight, SlidersHorizontal, Eye, Edit, RotateCcw, Building2, Receipt, ShieldAlert, Filter } from 'lucide-react';
 import {
   formatMoney,
   getOrderRequirements,
@@ -13,7 +13,6 @@ import {
   validateReservation,
 } from '../../domain/hotelModel';
 import { useHotel } from '../../state/hotelContext';
-import { CASH_PAYMENT_METHODS } from '../../cash/cashModel';
 import { CashDenominationsCalculator } from '../../cash/CashDenominationsCalculator.jsx';
 import { CashZReportModal } from '../../cash/CashZReportModal.jsx';
 import { CashMovementEnhancedForm } from '../../cash/CashMovementEnhancedForm.jsx';
@@ -21,7 +20,7 @@ import { PermissionButton } from '../auth/PermissionButton';
 import { useActionPermission } from '../auth/useActionPermission';
 import { Dialog, Drawer, Tabs, TabPanel } from '../ui/Overlay';
 import { FilterBar } from '../ui/FilterBar';
-import { DataTable, DetailGrid, EmptyState, MetricStrip, PageHeader, SectionHeader, StatusBadge } from './SharedViewParts';
+import { DataTable, DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from './SharedViewParts';
 import { useRestaurantResource } from '../../restaurant/useRestaurantResource';
 import { mapMaintenancePriorityToApi, mapMaintenanceStatusToApi, readMaintenancePhoto } from '../../maintenance/maintenanceModel';
 
@@ -119,13 +118,6 @@ function StatusStepper({ currentStatus, steps }) {
         const isCompleted = idx < currentIndex;
         const isActive = idx === currentIndex;
 
-        let color = 'var(--color-muted)';
-        if (isCompleted) {
-          color = 'var(--color-success)';
-        } else if (isActive) {
-          color = 'var(--color-primary)';
-        }
-
         return (
           <div key={step} className={`status-step ${isCompleted ? 'step-completed' : isActive ? 'step-active' : 'step-pending'}`}>
             <div className={`status-step-dot ${isCompleted ? 'step-dot-completed' : isActive ? 'step-dot-active' : 'step-dot-pending'}`} />
@@ -142,30 +134,15 @@ function StatusStepper({ currentStatus, steps }) {
 
 function PriorityTag({ priority }) {
   const norm = String(priority || '').toLowerCase().trim();
-  let bg = '#f1f5f9';
-  let color = '#475569';
-  let border = '#cbd5e1';
   let icon = '⚡';
 
   if (norm === 'urgente' || norm === 'urgent') {
-    bg = 'rgba(239, 68, 68, 0.12)';
-    color = '#dc2626';
-    border = 'rgba(239, 68, 68, 0.3)';
     icon = '🚨';
   } else if (norm === 'alta' || norm === 'high') {
-    bg = 'rgba(245, 158, 11, 0.12)';
-    color = '#d97706';
-    border = 'rgba(245, 158, 11, 0.3)';
     icon = '⚠️';
   } else if (norm === 'media' || norm === 'medium') {
-    bg = 'rgba(14, 165, 233, 0.12)';
-    color = '#0284c7';
-    border = 'rgba(14, 165, 233, 0.3)';
     icon = '⏱️';
   } else if (norm === 'baja' || norm === 'low') {
-    bg = 'rgba(100, 116, 139, 0.12)';
-    color = '#64748b';
-    border = 'rgba(100, 116, 139, 0.25)';
     icon = '📋';
   }
 
@@ -690,7 +667,7 @@ export function OperationalMaintenanceView({ notify }) {
 }
 
 function OrderEditor({ order, sourceFilter, onClose, notify }) {
-  const { state, execute } = useHotel();
+  const { state, restaurantCommands } = useHotel();
   const allowed = useActionPermission(order ? 'ORDER_UPDATE' : 'ORDER_CREATE');
   const activeStays = state.stays.filter((item) => item.status === 'Activa');
   const [form, setForm] = useState(order ? { source: order.source, stayId: order.stayId || '', recipeId: order.items[0]?.recipeId || state.recipes[0]?.id, quantity: order.items[0]?.quantity || 1, paymentMethod: order.paymentMethod, comment: order.comment, estimatedMinutes: order.estimatedMinutes } : { source: sourceFilter || 'Habitación', stayId: activeStays[0]?.id || '', recipeId: state.recipes[0]?.id || '', quantity: 1, paymentMethod: 'Cargar a la habitación', comment: '', estimatedMinutes: 25 });
@@ -743,7 +720,7 @@ function OrderEditor({ order, sourceFilter, onClose, notify }) {
 }
 
 export function OperationalOrdersView({ notify, sourceFilter = null, title = 'Pedidos QR', description = 'Creación, edición, preparación, entrega, pago y cancelación auditable.' }) {
-  const { state, execute, restaurantCommands } = useHotel();
+  const { state, restaurantCommands } = useHotel();
   const ordersResource = useRestaurantResource(state, restaurantCommands, 'orders');
   const inventoryResource = useRestaurantResource(state, restaurantCommands, 'inventory');
   const menuResource = useRestaurantResource(state, restaurantCommands, 'menu');
@@ -853,7 +830,7 @@ export function OperationalOrdersView({ notify, sourceFilter = null, title = 'Pe
 }
 
 // ─── Luxury Hotel Inventory Helpers ──────────────────────────────────────────
-export const getInventoryCategory = (name = '', unit = '') => {
+const getInventoryCategory = (name = '', unit = '') => {
   const n = (name || '').toLowerCase();
   const u = (unit || '').toLowerCase();
   if (u === 'oz' || n.includes('pisco') || n.includes('licor') || n.includes('ron') || n.includes('gin') || n.includes('vodka') || n.includes('vino') || n.includes('whisky') || n.includes('cerveza') || n.includes('jarabe') || n.includes('amargo') || n.includes('curaçao') || n.includes('trago')) {
@@ -877,7 +854,7 @@ export const getInventoryCategory = (name = '', unit = '') => {
   return { id: 'suministros', label: 'Insumos Generales', icon: '📦' };
 };
 
-export const getCleanSku = (item) => {
+const getCleanSku = (item) => {
   if (!item?.id) return 'INS-0000';
   const cleanId = String(item.id).replace(/-/g, '').slice(-4).toUpperCase();
   return `INS-${cleanId}`;
@@ -1469,8 +1446,6 @@ export function OperationalInventoryView({ notify }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos'); // 'todos' | 'optimo' | 'bajo_minimo' | 'agotados' | 'archivados'
   const [sortBy, setSortBy] = useState('name'); // 'name' | 'stock_asc' | 'stock_desc' | 'value_desc'
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
-
   const [editor, setEditor] = useState(undefined);
   const [adjustId, setAdjustId] = useState(null);
   const [archiveItem, setArchiveItem] = useState(null);

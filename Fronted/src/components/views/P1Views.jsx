@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   formatMoney,
   PAYMENT_METHODS,
@@ -14,10 +14,6 @@ import { BiometricPanel } from "../biometrics/BiometricPanel.jsx";
 import { Dialog, Drawer } from "../ui/Overlay.jsx";
 import {
   Search,
-  CreditCard,
-  Receipt,
-  UserCheck,
-  CheckCircle,
 } from "lucide-react";
 import {
   DataTable,
@@ -30,7 +26,6 @@ import {
 } from "./SharedViewParts.jsx";
 import { MenuManagementView } from "../../restaurant/MenuManagementView.jsx";
 
-import { useCommunications } from "../../communications/useCommunications.js";
 import { NotificationsView } from "../../communications/NotificationsView.jsx";
 import { useAmenityReservations } from "../../amenities/useAmenityReservations.js";
 import {
@@ -45,7 +40,7 @@ import { AmenityConfigModal } from "../../amenities/AmenityConfigModal.jsx";
 import { AmenityTicketModal } from "../../amenities/AmenityTicketModal.jsx";
 import { useWebSocket } from "../../hooks/useWebSocket.js";
 import { useStaffResource } from "../../hooks/useStaffResource.js";
-import { QrCode, Settings2, Plus, Waves, Mountain, Users, Flame, Printer } from "lucide-react";
+import { QrCode, Settings2, Plus, Waves, Mountain, Printer } from "lucide-react";
 import { ParkingVisualMap, DEFAULT_PARKING_SPACES } from "../../parking/ParkingVisualMap.jsx";
 import { ParkingExitModal } from "../../parking/ParkingExitModal.jsx";
 import { ParkingTicketModal } from "../../parking/ParkingTicketModal.jsx";
@@ -2026,15 +2021,7 @@ export function P1CleaningView({ notify }) {
                       icon: "✨",
                     },
                     { statusKey: "Aprobada", label: "4. Aprobada", icon: "✅" },
-                  ].map((step, idx) => {
-                    const isCurrent = selected.status === step.statusKey;
-                    const isDone =
-                      [
-                        "Pendiente",
-                        "En proceso",
-                        "Completada",
-                        "Aprobada",
-                      ].indexOf(selected.status) > idx;
+                  ].map((step) => {
                     return (
                       <div
                         key={step.statusKey}
@@ -4370,7 +4357,6 @@ function AmenitySettlementDialog({ reservation, onClose, notify, reload }) {
                   className="operations-stack55"
                 >
                   {paymentOptions.map((opt) => {
-                    const isSelected = paymentMethod === opt.id;
                     return (
                       <button
                         key={opt.id}

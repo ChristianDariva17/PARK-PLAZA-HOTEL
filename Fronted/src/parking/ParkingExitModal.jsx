@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Dialog } from '../components/ui/Overlay.jsx';
 import { formatMoney, formatDateTime } from '../domain/hotelModel.js';
-import { Car, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function calculateDuration(entryAt) {
   if (!entryAt) return 'No registrado';

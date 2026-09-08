@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, Fingerprint, LogIn, LogOut, RefreshCw, ShieldCheck, Users, QrCode, Smartphone, MapPin } from 'lucide-react';
+import { CheckCircle2, Fingerprint, LogIn, LogOut, RefreshCw, ShieldCheck, Users, QrCode, Smartphone, MapPin } from 'lucide-react';
 import { useStaffResource } from '../../hooks/useStaffResource.js';
 import { BiometricAttendanceAdapter } from '../../components/biometrics/BiometricAttendanceAdapter.jsx';
 import { AttendanceKioskModal } from './AttendanceKioskModal.jsx';

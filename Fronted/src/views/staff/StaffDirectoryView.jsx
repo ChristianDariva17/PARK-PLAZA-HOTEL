@@ -10,8 +10,6 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  UserCheck,
-  UserRound,
   Users,
   X,
 } from 'lucide-react';

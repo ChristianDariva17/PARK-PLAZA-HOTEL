@@ -1,27 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
-  Building2, 
-  Shield, 
   Save, 
   CheckCircle2, 
   AlertTriangle, 
-  Layers,
-  Music,
-  UtensilsCrossed,
   ShieldCheck,
-  Volume2,
-  Cigarette,
   Plus,
   Trash2,
-  Tag,
-  DollarSign,
-  Coffee,
-  Tv,
-  Check,
   X
 } from 'lucide-react';
-import { P1Button, P1Input, P1Select } from '../components/ui/P1Atoms';
+import { P1Input, P1Select } from '../components/ui/P1Atoms';
 import { eventsClient } from './eventsClient';
 
 const numericFields = [

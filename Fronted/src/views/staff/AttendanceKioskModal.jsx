@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog } from '../../components/ui/Overlay.jsx';
-import { QrCode, Clock, ShieldCheck, RefreshCw, Maximize2, Minimize2, MapPin, Sparkles } from 'lucide-react';
+import { Clock, ShieldCheck, RefreshCw, Maximize2, Minimize2, Sparkles } from 'lucide-react';
 import QRCode from 'qrcode';
 import { staffClient } from '../../staff/staffClient.js';
 
@@ -43,12 +43,12 @@ export function AttendanceKioskModal({ open, onClose }) {
 
   // Countdown timer for next rotation
   useEffect(() => {
-    if (!open || timeLeft <= 0) return;
+    if (!open) return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 1 ? prev - 1 : 20));
     }, 1000);
     return () => clearInterval(timer);
-  }, [open, tokenData]);
+  }, [open]);
 
   // Render QR on canvas
   useEffect(() => {

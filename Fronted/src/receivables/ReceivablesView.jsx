@@ -7,7 +7,7 @@ import { getFolio } from '../folios/folioClient';
 import { DataTable, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../components/views/SharedViewParts';
 import { Drawer } from '../components/ui/Overlay';
 import FolioPanel from '../folios/FolioPanel';
-import { DollarSign, CreditCard, Building2, UserCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { CreditCard, Building2, RefreshCw } from 'lucide-react';
 
 const money = (value) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(Number(value));
 const methods = ['Efectivo', 'Tarjeta', 'Transferencia', 'Yape', 'Plin'];

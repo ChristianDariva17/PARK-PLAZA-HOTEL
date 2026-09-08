@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getRoles, getPermissions, createRole, updateRole, deleteRole } from '../../../auth/rolesClient';
+import { getRoles, createRole, updateRole, deleteRole } from '../../../auth/rolesClient';
 import { getAccounts } from '../../../auth/accountsClient';
 import { 
-  Shield, Plus, Edit2, Trash2, Check, Search, Users, 
-  Lock, CheckSquare, Square, RefreshCw, Layers, Grid, Table as TableIcon
+  Shield, Plus, Edit2, Trash2, Search,
+  Lock, CheckSquare, Square, RefreshCw, Grid, Table as TableIcon
 } from 'lucide-react';
 import { Dialog } from '../../ui/Overlay';
-import { MetricStrip, PageHeader, SectionHeader, StatusBadge, EmptyState } from '../SharedViewParts';
+import { MetricStrip, PageHeader } from '../SharedViewParts';
 
-export const PERMISSION_MODULES = [
+const PERMISSION_MODULES = [
   {
     id: 'reception',
     name: 'Recepción y Habitaciones',

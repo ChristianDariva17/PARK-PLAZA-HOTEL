@@ -36,7 +36,7 @@ export function StaffScheduleModal({ staffId, onClose, onSaved }) {
       })
       .catch((err) => setError(err.message || 'Error al cargar los esquemas de horarios'))
       .finally(() => setFetching(false));
-  }, []);
+  }, [formData.workScheduleId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

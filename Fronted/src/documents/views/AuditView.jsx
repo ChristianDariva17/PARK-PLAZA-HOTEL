@@ -4,7 +4,7 @@ import { PageHeader, MetricStrip, DataTable, StatusBadge, DetailGrid, SectionHea
 import { Drawer } from '../../components/ui/Overlay.jsx';
 import { FilterBar } from '../../components/ui/FilterBar.jsx';
 
-export function AuditView({ notify }) {
+export function AuditView() {
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [subjectTypeFilter, setSubjectTypeFilter] = useState('');
   const [search, setSearch] = useState('');

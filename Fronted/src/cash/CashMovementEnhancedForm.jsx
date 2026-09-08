@@ -5,13 +5,13 @@ import { CASH_PAYMENT_METHODS } from './cashModel';
 import { formatMoney } from '../domain/hotelModel';
 import { ShieldAlert, FileText, AlertTriangle, ArrowDownRight, ArrowUpRight, Tag } from 'lucide-react';
 
-export const EXPENSE_CATEGORIES = [
+const EXPENSE_CATEGORIES = [
   { id: 'caja_chica', label: 'Caja Chica - Compras de Emergencia', icon: '🛒', desc: 'Insumos de aseo, alimentos menores, ferretería o cafetería urgente.' }, { id: 'proveedores', label: 'Pago a Proveedores Menores', icon: '📦', desc: 'Agua de bidón, diarios, mensajería, flores o lavandería express.' }, { id: 'reembolso', label: 'Devolución / Reembolso a Huésped', icon: '↩️', desc: 'Devolución de depósito en garantía o anulación de cobro en recepción.' }, { id: 'movilidad', label: 'Movilidad y Transporte', icon: '🚕', desc: 'Taxi nocturno de personal, recojo de compras o traslados de emergencia.' }, { id: 'cash_drop', label: 'Pase a Bóveda / Caja Fuerte (Cash Drop)', icon: '🛡️', desc: 'Remesa de retiro por exceso de efectivo en gaveta.' }, { id: 'mantenimiento', label: 'Mantenimiento Urgente', icon: '🔧', desc: 'Reparaciones menores inmediatas de cerrajería, plomería o electricidad.' }, { id: 'otros_egreso', label: 'Otros Egresos Justificados', icon: '📝', desc: 'Cualquier otro egreso autorizado por supervisor de turno.' },
 ];
-export const INCOME_CATEGORIES = [
+const INCOME_CATEGORIES = [
   { id: 'cobro_extra', label: 'Cobro Extraordinario en Efectivo', icon: '💵', desc: 'Servicios de lavandería, late check-out o tours cobrados en recepción.' }, { id: 'reposicion', label: 'Aporte / Reposición de Fondo Fijo', icon: '💰', desc: 'Inyección de sencillo o reposición de fondo por supervisor.' }, { id: 'cambio_divisa', label: 'Cambio de Divisas / Sencillo', icon: '💱', desc: 'Intercambio de denominaciones para gaveta de recepción.' }, { id: 'otros_ingreso', label: 'Otros Ingresos Justificados', icon: '✨', desc: 'Cualquier otro ingreso operativo autorizado.' },
 ];
-export const VOUCHER_TYPES = ['Boleta de Venta', 'Factura', 'Recibo de Caja Chica', 'Vale de Egreso / Remesa', 'Sin Comprobante'];
+const VOUCHER_TYPES = ['Boleta de Venta', 'Factura', 'Recibo de Caja Chica', 'Vale de Egreso / Remesa', 'Sin Comprobante'];
 
 export function CashMovementEnhancedForm({ initialPreset, onClose, notify }) {
   const { cashCommands } = useHotelCommands(); const allowed = useActionPermission('CASH_MOVEMENT');

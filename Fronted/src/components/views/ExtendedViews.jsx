@@ -1,7 +1,5 @@
 import { useDeferredValue, useState, useEffect } from "react";
-import { getRoles } from "../../auth/rolesClient";
-import { getAccounts } from "../../auth/accountsClient";
-import { getSettings, updateSettings } from "../../auth/settingsClient";
+import { getSettings } from "../../auth/settingsClient";
 import { AlertTriangle, Beer, PawPrint, Search } from "lucide-react";
 import {
   formatMoney,
@@ -38,21 +36,6 @@ const nextIncidentStatus = (status) =>
     "En proceso": "Resuelta",
     Resuelta: "Cerrada",
   })[status] || null;
-const moduleRoutes = {
-  Contratos: "contratos",
-  Reservas: "reservas",
-  "Check-in": "checkin-checkout",
-  "Check-out": "checkin-checkout",
-  Pagos: "finanzas",
-  Clientes: "clientes",
-  Limpieza: "limpieza",
-  Mantenimiento: "mantenimiento",
-  Incidencias: "incidencias",
-  Inventario: "inventario",
-  "Pedidos QR": "pedidos-qr",
-  Eventos: "eventos",
-  "Zonas recreativas": "recreacion",
-};
 
 export function ContractsView() {
   const { state } = useHotel();
