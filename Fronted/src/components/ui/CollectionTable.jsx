@@ -1,4 +1,4 @@
-import { Children, useEffect, useId, useRef, useState } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ChevronsUpDown, MoreHorizontal } from 'lucide-react';
 import { usePermissions } from '../../auth/authContext';
 import { permissionForPrimaryAction } from '../../auth/permissions';
@@ -34,6 +34,7 @@ export function RowActions({ label, children }) {
     const required = permissionForPrimaryAction(route, child.props?.children);
     return !required || can(required);
   });
+  const menuItems = authorizedChildren.map((child) => isValidElement(child) ? cloneElement(child, { role: 'menuitem', tabIndex: -1 }) : child);
   if (!authorizedChildren.length) return null;
-  return <div ref={rootRef} className="row-actions"><button ref={triggerRef} type="button" className="icon-button" aria-label={`Acciones para ${label}`} aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={18} /></button>{open ? <div id={menuId} className="row-actions-menu" role="menu" onClick={() => setOpen(false)}>{authorizedChildren}</div> : null}</div>;
+  return <div ref={rootRef} className="row-actions"><button ref={triggerRef} type="button" className="icon-button" aria-label={`Acciones para ${label}`} aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={18} aria-hidden="true" /></button>{open ? <div id={menuId} className="row-actions-menu" role="menu" onClick={() => setOpen(false)}>{menuItems}</div> : null}</div>;
 }

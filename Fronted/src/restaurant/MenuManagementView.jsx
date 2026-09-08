@@ -1062,20 +1062,26 @@ export function MenuManagementView({ notify }) {
     });
   }, [categoryStats]);
 
-  // Segment counts
-  const barCount = useMemo(() => items.filter(i => isBarCategory(i.category)).length, [items]);
-  const dessertCount = useMemo(() => items.filter(i => isDessertCategory(i.category)).length, [items]);
-  const kitchenCount = useMemo(() => items.filter(i => !isBarCategory(i.category) && !isDessertCategory(i.category)).length, [items]);
-
-  // Financial & Operational Metrics
-  const activeCount = items.filter(i => i.status !== 'archived').length;
-  const archivedCount = items.filter(i => i.status === 'archived').length;
-  const activeItems = items.filter(i => i.status !== 'archived');
-  const avgPrice = activeItems.length > 0 
-    ? Math.round((activeItems.reduce((sum, it) => sum + (Number(it.salePrice) || 0), 0) / activeItems.length) * 10) / 10 
-    : 0;
-  const withRecipeCount = items.filter(i => (i.ingredients?.length || 0) > 0).length;
+  // Derive all dashboard metrics in one pass over the catalog.
+  const menuMetrics = useMemo(() => items.reduce((metrics, item) => {
+    const isArchived = item.status === 'archived';
+    const isBar = isBarCategory(item.category);
+    const isDessert = isDessertCategory(item.category);
+    if (isBar) metrics.barCount += 1;
+    if (isDessert) metrics.dessertCount += 1;
+    if (!isBar && !isDessert) metrics.kitchenCount += 1;
+    if (isArchived) metrics.archivedCount += 1;
+    else {
+      metrics.activeCount += 1;
+      metrics.activePriceTotal += Number(item.salePrice) || 0;
+    }
+    if (item.ingredients?.length) metrics.withRecipeCount += 1;
+    return metrics;
+  }, { activeCount: 0, activePriceTotal: 0, archivedCount: 0, barCount: 0, dessertCount: 0, kitchenCount: 0, withRecipeCount: 0 }), [items]);
+  const { activeCount, activePriceTotal, archivedCount, barCount, dessertCount, kitchenCount, withRecipeCount } = menuMetrics;
+  const avgPrice = activeCount > 0 ? Math.round((activePriceTotal / activeCount) * 10) / 10 : 0;
   const recipePercent = items.length > 0 ? Math.round((withRecipeCount / items.length) * 100) : 0;
+  const normalizedSearch = search.trim().toLowerCase();
 
   // Filter & Sort Items
   const processedItems = useMemo(() => {
@@ -1093,8 +1099,8 @@ export function MenuManagementView({ notify }) {
       if (categoryFilter !== 'Todas' && item.category !== categoryFilter) return false;
 
       // 4. Search Query
-      if (search.trim()) {
-        const query = search.toLowerCase();
+      if (normalizedSearch) {
+        const query = normalizedSearch;
         const matchName = (item.name || '').toLowerCase().includes(query);
         const matchCat = (item.category || '').toLowerCase().includes(query);
         const matchDesc = (item.description || '').toLowerCase().includes(query);
@@ -1111,7 +1117,7 @@ export function MenuManagementView({ notify }) {
       if (sortBy === 'time_asc') return (a.preparationMinutes || 0) - (b.preparationMinutes || 0);
       return 0;
     });
-  }, [items, statusFilter, segmentFilter, categoryFilter, search, sortBy]);
+  }, [items, statusFilter, segmentFilter, categoryFilter, normalizedSearch, sortBy]);
 
   return (
     <div className="view-container">

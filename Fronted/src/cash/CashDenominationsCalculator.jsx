@@ -41,7 +41,7 @@ export function CashDenominationsCalculator({ onChange, onSummaryChange }) {
     const subtotal = kind === 'coins' ? Math.round(qty * item.value * 100) / 100 : qty * item.value;
     return <div key={item.value} className={`cash-denominations-item cash-denominations-${kind}-${String(item.value).replace('.', '-')} ${qty > 0 ? 'is-active' : ''}`}>
       <div className="cash-denominations-label"><strong>{item.label}</strong></div>
-      <div className="cash-denominations-controls"><button type="button" className="cash-denominations-stepper" onClick={() => increment(item.value, -1)} disabled={qty <= 0}><Minus size={12} /></button><input className="cash-denominations-input" type="number" min="0" step="1" placeholder="0" value={counts[item.value]} onChange={(e) => updateQuantity(item.value, e.target.value)} /><button type="button" className="cash-denominations-stepper" onClick={() => increment(item.value, 1)}><Plus size={12} /></button></div>
+       <div className="cash-denominations-controls"><button type="button" className="cash-denominations-stepper" aria-label={`Reducir cantidad de ${item.label}`} onClick={() => increment(item.value, -1)} disabled={qty <= 0}><Minus size={12} aria-hidden="true" /></button><input className="cash-denominations-input" type="number" min="0" step="1" aria-label={`Cantidad de ${item.label}`} placeholder="0" value={counts[item.value]} onChange={(e) => updateQuantity(item.value, e.target.value)} /><button type="button" className="cash-denominations-stepper" aria-label={`Aumentar cantidad de ${item.label}`} onClick={() => increment(item.value, 1)}><Plus size={12} aria-hidden="true" /></button></div>
       <div className="cash-denominations-subtotal">{formatMoney(subtotal)}</div>
     </div>;
   });

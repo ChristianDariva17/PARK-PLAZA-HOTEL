@@ -32,6 +32,23 @@ describe('UI infrastructure contracts', () => {
     expect(collectionTableSource).toContain('if (!total) return null');
   });
 
+  it('keeps row action menus keyboard-addressable', () => {
+    expect(collectionTableSource).toContain("role: 'menuitem'");
+    expect(collectionTableSource).toContain("tabIndex: -1");
+    expect(collectionTableSource).toContain("querySelector('[role=\"menuitem\"]')");
+  });
+
+  it('exposes accessible names for compact controls', () => {
+    const cashSource = readFileSync(new URL('../../cash/CashDenominationsCalculator.jsx', import.meta.url), 'utf8');
+    const staffSource = readFileSync(new URL('../../views/staff/StaffAttendanceView.jsx', import.meta.url), 'utf8');
+    const searchSource = readFileSync(new URL('../layout/GlobalSearch.jsx', import.meta.url), 'utf8');
+    expect(cashSource).toContain('aria-label={`Cantidad de ${item.label}`}');
+    expect(cashSource).toContain('aria-label={`Aumentar cantidad de ${item.label}`}');
+    expect(staffSource).toContain('aria-label="Actualizar registros"');
+    expect(searchSource).toContain('aria-haspopup="listbox"');
+    expect(searchSource).toContain('aria-expanded={open}');
+  });
+
   it('guards reusable actions through the permission hook', () => {
     expect(permissionButtonSource).toContain('useActionPermission(actionType, subjectType)');
     expect(permissionButtonSource).toContain('if (!allowed) return null');
