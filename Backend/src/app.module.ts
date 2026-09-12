@@ -30,6 +30,7 @@ import { AmenitiesModule } from './amenities/amenities.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { CommunicationsModule } from './communications/communications.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { RealtimeModule } from './realtime/realtime.module.js';
     AttendanceModule,
     AmenitiesModule,
     RolesModule,
+    SettingsModule,
     CommunicationsModule,
   ],
   controllers: [HealthController],

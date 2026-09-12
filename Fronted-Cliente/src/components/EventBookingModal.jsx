@@ -346,6 +346,13 @@ export default function EventBookingModal({ data, onClose }) {
                   </div>
                 )}
 
+                {policy?.baseRate !== undefined && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '10px', color: 'var(--color-muted)', fontSize: '13px' }}>
+                    <span>Tarifa base del salón:</span>
+                    <strong style={{ color: 'var(--color-gold)' }}>{money(policy.baseRate)}</strong>
+                  </div>
+                )}
+
                 {/* Botón de Cotización */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <button

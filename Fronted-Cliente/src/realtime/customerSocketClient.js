@@ -1,12 +1,17 @@
 import { io } from 'socket.io-client';
 
 let socketInstance = null;
+let socketCustomerId = null;
 
 export function getCustomerSocket() {
   return socketInstance;
 }
 
-export function connectCustomerSocket() {
+export function connectCustomerSocket(customerId) {
+  if (socketInstance && socketCustomerId && socketCustomerId !== customerId) {
+    disconnectCustomerSocket();
+  }
+
   if (!socketInstance) {
     socketInstance = io(window.location.origin, {
       path: '/api/socket.io',
@@ -16,6 +21,7 @@ export function connectCustomerSocket() {
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
     });
+    socketCustomerId = customerId;
 
     socketInstance.on('connect', () => {
       console.log('[Customer WebSocket] Conectado al portal.');
@@ -36,6 +42,7 @@ export function disconnectCustomerSocket() {
   socketInstance.removeAllListeners();
   socketInstance.disconnect();
   socketInstance = null;
+  socketCustomerId = null;
 }
 
 export function subscribeCustomerEvent(event, callback) {

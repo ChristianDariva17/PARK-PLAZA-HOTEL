@@ -71,6 +71,21 @@ describe('customer checkout settlement behavior', () => {
     expect(lines).toMatchObject([{ unitPrice: '12.50', subtotal: '25.00', quantity: 2 }]);
   });
 
+  it('uses the selected active variant price and preserves its identity', async () => {
+    const service = new RestaurantService({} as Database, {} as FolioService, realtime as any);
+    const menuItemId = dto.items[0]!.menuItemId;
+    const variantId = '550e8400-e29b-41d4-a716-446655440004';
+    const tx = { select: vi.fn()
+      .mockReturnValueOnce(query([{ id: menuItemId, name: 'Tea', status: 'active', salePrice: '12.50' }]))
+      .mockReturnValueOnce(query([{ id: variantId, menuItemId, name: 'Large', price: '18.00', propertyId: customer.propertyId, status: 'active', isPublished: true, isAvailable: true }])) };
+
+    const lines = await (service as any).buildOrderLines(tx, customer.propertyId, {
+      ...dto,
+      items: [{ menuItemId, variantId, quantity: 2 }],
+    });
+    expect(lines).toMatchObject([{ menuItemVariantId: variantId, menuItemVariantName: 'Large', unitPrice: '18.00', subtotal: '36.00' }]);
+  });
+
   it('creates an order only after the customer has an authorized active stay', async () => {
     const harness = createOrderHarness([[], [{ id: stayId }], [{ id: dto.items[0]!.menuItemId, name: 'Tea', status: 'active', isPublished: true, isAvailable: true, salePrice: '12.50' }], []]);
     const service = new RestaurantService(harness.db, {} as FolioService, realtime as any);

@@ -55,9 +55,18 @@ La confirmación de una reserva actualiza disponibilidad y registra adelanto del
 ## Calidad
 
 ```bash
+npm test
 npm run lint
 npm run build
 npm run preview
 ```
 
-No hay suite de pruebas automatizadas configurada todavía. Para una validación manual, revisar al menos las rutas anteriores en anchos de 320, 768, 1024 y escritorio amplio, además del flujo reserva → check-in → pedido → check-out → aprobación de limpieza.
+`npm test` ejecuta la suite Vitest y excluye `e2e/`. La suite Playwright requiere un backend accesible, una cuenta administrativa QA y sus credenciales mediante variables de entorno:
+
+```bash
+E2E_EMAIL=qa@example.test E2E_PASSWORD=<qa-password> npm run test:e2e
+```
+
+La suite E2E valida el login público, una sesión administrativa, el inventario de habitaciones y el catálogo de amenities, además de la carga persistida de configuración. El backend se verifica desde `Backend/` con `npm test`, `npm run build` y `npm run migrate`.
+
+Para una validación manual adicional, revisar las rutas anteriores en anchos de 320, 768, 1024 y escritorio amplio, además del flujo reserva → check-in → pedido → check-out → aprobación de limpieza.

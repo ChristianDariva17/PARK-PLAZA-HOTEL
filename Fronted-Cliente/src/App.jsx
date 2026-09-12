@@ -1180,7 +1180,7 @@ const AmenityPage = ({ data }) => {
   const isReservable = data.type === 'reservation';
   const price = dynamicConfig
     ? (customer ? Number(dynamicConfig.priceGuest || 0) : Number(dynamicConfig.priceExternal || 0))
-    : Number(data.price || 0);
+    : null;
 
   const durationMinutes = dynamicConfig?.durationMinutes || data.durationMinutes || 90;
   const maxPax = dynamicConfig?.maxPax || data.maxPax || 4;
@@ -1238,7 +1238,7 @@ const AmenityPage = ({ data }) => {
 
   return (
     <div className="web-main" style={{ position: 'relative', overflow: 'hidden' }}>
-      <AmenityView data={data} onBook={(type, service) => setModal({ open: true, type, service })} />
+              <AmenityView data={data} price={isReservable && price !== null ? formatMoney(price) : null} onBook={(type, service) => setModal({ open: true, type, service })} />
 
       {modal.open && data.id === 'eventos' && (
         <EventBookingModal data={data} onClose={close} />
@@ -1288,7 +1288,7 @@ const AmenityPage = ({ data }) => {
                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                        {error && <div style={{ color: 'var(--color-danger)', fontSize: '13px', background: 'rgba(220,53,69,0.1)', padding: '8px', borderRadius: '4px' }}>{error}</div>}
                        <section className="amenity-rules" aria-label={`Condiciones de ${data.title}`}>
-                         <div><span>Costo</span><strong>{price === 0 ? 'Gratis (Incluido)' : `${formatMoney(price)} por persona`}</strong></div>
+                          <div><span>Costo</span><strong>{price === null ? 'Cargando tarifa...' : price === 0 ? 'Gratis (Incluido)' : `${formatMoney(price)} por persona`}</strong></div>
                          <div><span>Duración</span><strong>{durationMinutes} min</strong></div>
                          <div><span>Máximo</span><strong>{maxPax} personas</strong></div>
                          <ul>
@@ -1344,7 +1344,7 @@ const AmenityPage = ({ data }) => {
                         <div>
                           <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Costo Total</div>
                           <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-gold)' }}>
-                             {formatMoney(price * pax)}
+                             {price === null ? 'Cargando...' : formatMoney(price * pax)}
                           </div>
                         </div>
                         <button className="gold-btn-solid" style={{ padding: '12px 24px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer' }} onClick={handleBook} disabled={isSubmitting}>

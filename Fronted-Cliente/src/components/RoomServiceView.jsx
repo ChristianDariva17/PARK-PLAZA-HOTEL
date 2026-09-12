@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Utensils, ShoppingCart, X, Plus, Minus, AlertTriangle, Clock, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../AuthContext';
+import { useCustomerSocket } from '../hooks/useCustomerSocket.js';
 import { getCustomerRestaurantActiveStays, getRestaurantMenu, getRestaurantOrders, createRestaurantOrder, cancelRestaurantOrder, getAmenitiesReservations } from '../api';
 import { createCheckoutSubmitter, formatRoomServiceError, loadRoomServiceData, retainSelectedStay, startRoomServicePolling } from '../roomServiceData';
 import './RoomServiceView.css';
@@ -66,6 +67,14 @@ const RoomServiceView = () => {
   const idempotencyKey = useRef(null);
   const checkoutSubmitter = useRef(createCheckoutSubmitter()).current;
 
+  const refreshOrders = useCallback(() => {
+    getRestaurantOrders().then(setOrders).catch(() => {});
+  }, []);
+
+  useCustomerSocket('order:created', refreshOrders);
+  useCustomerSocket('order:updated', refreshOrders);
+  useCustomerSocket('order:status_changed', refreshOrders);
+
   // Sync Cart to LocalStorage
   useEffect(() => {
     try {
@@ -90,7 +99,7 @@ const RoomServiceView = () => {
         setActiveStays(result.stays);
         
         const validAmenities = Array.isArray(amenitiesData)
-          ? amenitiesData.filter((a) => a.status === 'confirmed' && a.paymentStatus !== 'paid')
+          ? amenitiesData.filter((a) => ['confirmed', 'checked_in'].includes(a.status) && new Date(a.endTime) > new Date())
           : [];
         setActiveAmenities(validAmenities);
 
@@ -400,7 +409,7 @@ const RoomServiceView = () => {
                             >
                               {item.variants.map(v => (
                                 <option key={v.id} value={v.id}>
-                                  {v.name} (+{formatMoney(v.price)})
+                                  {v.name} {formatMoney(v.price)}
                                 </option>
                               ))}
                             </select>
@@ -489,7 +498,7 @@ const RoomServiceView = () => {
                       <label>Cargar pedido a:</label>
                       <select 
                         className="luxury-select full-width" 
-                        value={targetAccountType === 'stay' ? `stay:${selectedStayId}` : `amenity:${selectedAmenityId}`}
+                        value={targetAccountType === 'stay' && selectedStayId ? `stay:${selectedStayId}` : targetAccountType === 'amenity' && selectedAmenityId ? `amenity:${selectedAmenityId}` : ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val.startsWith('stay:')) {
@@ -507,7 +516,7 @@ const RoomServiceView = () => {
                         }}
                       >
                         {activeStays.length === 0 && activeAmenities.length === 0 && (
-                          <option value="">Sin estadía ni reserva activa de zona</option>
+                          <option value="">Huésped activo o visitante con reserva de zona requerido</option>
                         )}
                         {activeStays.length > 0 && (
                           <optgroup label="Estadías de Habitación">
@@ -519,7 +528,7 @@ const RoomServiceView = () => {
                           </optgroup>
                         )}
                         {activeAmenities.length > 0 && (
-                          <optgroup label="Zonas y Amenidades (Cuenta Temporal)">
+                          <optgroup label="Visitante externo / Reserva de zona">
                             {activeAmenities.map((amenity) => (
                               <option key={amenity.id} value={`amenity:${amenity.id}`}>
                                 {amenity.amenityType} · DNI {amenity.documentNumber || 'Registrado'} (Pagar al salir)

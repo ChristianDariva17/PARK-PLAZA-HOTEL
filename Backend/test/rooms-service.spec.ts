@@ -34,6 +34,24 @@ function mutationService(current: RoomRow | null = row) {
 }
 
 describe('RoomsService', () => {
+  it('lists the master amenities and property-scoped category assignments', async () => {
+    const amenities = queryResult([
+      { categoryId: 'category-id', amenityKey: 'wifi_high_speed' },
+      { categoryId: 'category-id', amenityKey: 'smart_tv_4k' },
+      { categoryId: 'other-category-id', amenityKey: 'digital_safe' },
+    ]);
+    const database = { select: vi.fn().mockReturnValue(amenities) } as unknown as Database;
+    const result = await new RoomsService(database, {} as AuditService, {} as any).listAmenities(actor.propertyId);
+
+    expect(result.master.length).toBeGreaterThan(0);
+    expect(result.categoryAmenities).toEqual({
+      'category-id': ['wifi_high_speed', 'smart_tv_4k'],
+      'other-category-id': ['digital_safe'],
+    });
+    const where = vi.mocked(amenities.where as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(new PgDialect().sqlToQuery(where).params).toEqual([actor.propertyId]);
+  });
+
   it('lists scoped rooms and categories with deterministic ordering and no property projection', async () => {
     const categories = queryResult([{ id: 'category-id', code: 'SIMPLE', name: 'Simple', capacity: 1, baseNightlyRate: '95.00', createdAt }]);
     const roomRows = queryResult([row]);

@@ -1,16 +1,17 @@
-import { Controller, Post, Body, Req, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req, Get, UseGuards, Headers } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AmenitiesService } from '../amenities/amenities.service.js';
 import { CustomerSessionGuard } from './customer-session.guard.js';
 import type { CustomerAuthenticatedRequest } from './customer.types.js';
 import { z } from 'zod';
+import { parseCustomerIdempotencyKey } from './customer.dto.js';
 
 const CreateReservationSchema = z.object({
   amenityType: z.string().min(1).max(50),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   pax: z.number().int().min(1).default(1),
-  documentNumber: z.string().min(1).max(32).optional(),
+  documentNumber: z.string().trim().min(1).max(32),
   customerName: z.string().min(1).max(200).optional(),
 });
 
@@ -36,8 +37,8 @@ export class CustomerAmenitiesController {
 
   @Post('reservations')
   @UseGuards(CustomerSessionGuard)
-  async createReservation(@Req() req: CustomerAuthenticatedRequest, @Body() body: any) {
+  async createReservation(@Req() req: CustomerAuthenticatedRequest, @Body() body: any, @Headers('idempotency-key') idempotencyKey: unknown) {
     const data = CreateReservationSchema.parse(body);
-    return this.amenitiesService.createReservation(req.customer!, data);
+    return this.amenitiesService.createReservation(req.customer!, data, parseCustomerIdempotencyKey(idempotencyKey));
   }
 }

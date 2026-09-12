@@ -11,7 +11,7 @@ describe('HTTP rate limits', () => {
   it('strictly limits credential exchanges and bridge capability issuance', () => {
     expect(limitFor(AuthController.prototype.login)).toBe(5);
     expect(limitFor(AuthController.prototype.google)).toBe(5);
-    expect(limitFor(CustomerAuthController.prototype.exchange)).toBe(5);
+    expect(limitFor(CustomerAuthController.prototype.exchange)).toBe(10);
     expect(limitFor(AttendanceController.prototype.issueBiometricCapability)).toBe(10);
     expect(ttlFor(AuthController.prototype.login)).toBe(60_000);
   });

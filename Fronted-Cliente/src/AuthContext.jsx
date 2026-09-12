@@ -1,7 +1,7 @@
 /* eslint-disable react/only-export-components, react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createUserWithEmailAndPassword, onAuthStateChanged, reload, sendEmailVerification, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
-import { ApiError, endCustomerSession, exchangeFirebaseToken, getCustomerSession } from './api';
+import { ApiError, endCustomerSession, exchangeFirebaseToken, getCustomerSession, setCustomerSessionRefresher } from './api';
 import { auth, googleProvider } from './firebase';
 import { disconnectCustomerSocket } from './realtime/customerSocketClient.js';
 
@@ -39,9 +39,17 @@ export const AuthProvider = ({ children }) => {
           setStatus('verification-required');
           return;
         }
-        const session = firebaseUser
-          ? await exchangeFirebaseToken(await firebaseUser.getIdToken())
-          : await getCustomerSession();
+        let session;
+        if (firebaseUser) {
+          try {
+            session = await getCustomerSession();
+          } catch (requestError) {
+            if (!(requestError instanceof ApiError) || requestError.status !== 401) throw requestError;
+            session = await exchangeFirebaseToken(await firebaseUser.getIdToken());
+          }
+        } else {
+          session = await getCustomerSession();
+        }
         setCurrentUser(firebaseUser);
         setCustomer(session.customer);
         synchronizedUid.current = key;
@@ -55,7 +63,9 @@ export const AuthProvider = ({ children }) => {
           setStatus('anonymous');
           return;
         }
-        setError(requestError instanceof Error ? requestError.message : 'Customer session could not be established.');
+        setError(requestError instanceof ApiError && requestError.status === 429
+          ? 'Se alcanzó temporalmente el límite de inicio de sesión. Espere un minuto y vuelva a intentar.'
+          : requestError instanceof Error ? requestError.message : 'Customer session could not be established.');
         setStatus('error');
         throw requestError;
       } finally {
@@ -107,11 +117,20 @@ export const AuthProvider = ({ children }) => {
     setStatus('anonymous');
   };
 
-  const retry = async () => {
+  const retry = useCallback(async () => {
     if (auth.currentUser) await reload(auth.currentUser);
     synchronizedUid.current = null;
     return synchronize(auth.currentUser);
-  };
+  }, [synchronize]);
+
+  useEffect(() => setCustomerSessionRefresher(async () => {
+    try {
+      await retry();
+      return true;
+    } catch {
+      return false;
+    }
+  }), [retry]);
 
   return (
     <AuthContext.Provider value={{ currentUser, customer, status, error, signup, login, loginWithGoogle, logout, retry }}>

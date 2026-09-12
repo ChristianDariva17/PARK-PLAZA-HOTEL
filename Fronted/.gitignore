@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+playwright/.auth/
+playwright-report/
+test-results/
 
 # Local ZK9500 bridge runtime and secrets
 bridge/vendor/

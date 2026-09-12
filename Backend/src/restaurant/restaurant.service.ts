@@ -686,29 +686,56 @@ export class RestaurantService {
       }
 
       const lines = await this.buildOrderLines(tx, customer.propertyId, dto);
-      const total = lines.reduce((acc, l) => acc + Number(l.subtotal), 0).toFixed(2);
+      const linesByStation = new Map<'bar' | 'coffee' | 'kitchen', typeof lines>();
+      for (const line of lines) {
+        const stationLines = linesByStation.get(line.station) || [];
+        stationLines.push(line);
+        linesByStation.set(line.station, stationLines);
+      }
 
       const sourceName = dto.amenityReservationId
         ? `Portal Visitante - ${amenityRecord?.amenityType || 'Amenidad'}`
         : 'Portal Huésped';
 
-      const [insertedOrder] = await tx.insert(orders).values({
-        propertyId: customer.propertyId,
-        stayId: dto.stayId ?? null,
-        amenityReservationId: dto.amenityReservationId ?? null,
-        source: sourceName,
-        paymentMethod: dto.amenityReservationId ? 'amenity_tab' : 'room_charge',
-        checkoutClassification: 'customer_checkout',
-        paymentMode: dto.paymentMode || (dto.amenityReservationId ? 'amenity_tab' : 'room_charge'),
-        deliveryMode: dto.deliveryMode,
-        total: String(total),
-        estimatedMinutes: 20,
-        comment: dto.note || '',
-        status: 'Pedido recibido',
-        responsible: customer.email,
-      } as any).returning();
+      const insertedOrders = [];
+      for (const [station, stationLines] of linesByStation) {
+        const stationTotal = stationLines.reduce((acc, line) => acc + Number(line.subtotal), 0).toFixed(2);
+        const [insertedOrder] = await tx.insert(orders).values({
+          propertyId: customer.propertyId,
+          stayId: dto.stayId ?? null,
+          amenityReservationId: dto.amenityReservationId ?? null,
+          source: `${sourceName} - ${station === 'bar' ? 'Bar' : station === 'coffee' ? 'Cafetería' : 'Cocina'}`,
+          paymentMethod: dto.amenityReservationId ? 'amenity_tab' : 'room_charge',
+          checkoutClassification: 'customer_checkout',
+          paymentMode: dto.paymentMode || (dto.amenityReservationId ? 'amenity_tab' : 'room_charge'),
+          deliveryMode: dto.deliveryMode,
+          total: stationTotal,
+          estimatedMinutes: 20,
+          comment: dto.note || '',
+          status: 'Pedido recibido',
+          responsible: customer.email,
+        } as any).returning();
+        if (!insertedOrder) throw new Error('Failed to create order');
 
-      if (!insertedOrder) throw new Error('Failed to create order');
+        await tx.insert(orderItems).values(
+          stationLines.map((line) => ({ ...line, propertyId: customer.propertyId, orderId: insertedOrder.id }))
+        );
+        await tx.insert(customerOrders).values({
+          orderId: insertedOrder.id,
+          customerAccountId: customer.customerAccountId,
+          propertyId: customer.propertyId,
+        });
+        insertedOrders.push({
+          ...insertedOrder,
+          stayId: dto.stayId,
+          amenityReservationId: dto.amenityReservationId,
+          checkoutClassification: 'customer_checkout',
+          paymentMode: dto.paymentMode,
+          items: stationLines,
+        });
+      }
+
+      const insertedOrder = insertedOrders[0]!;
 
       if (dto.amenityReservationId) {
         await tx.update(amenityReservations)
@@ -716,32 +743,12 @@ export class RestaurantService {
           .where(eq(amenityReservations.id, dto.amenityReservationId));
       }
 
-      await tx.insert(orderItems).values(
-        lines.map((l) => ({
-          ...l,
-          propertyId: customer.propertyId,
-          orderId: insertedOrder.id,
-        }))
-      );
-
-      await tx.insert(customerOrders).values({
-        orderId: insertedOrder.id,
-        customerAccountId: customer.customerAccountId,
-        propertyId: customer.propertyId,
-      });
-
       const responseBody = {
         version: 1,
         outcome: 'accepted',
         code: 'ORDER_CREATED',
-        order: {
-          ...insertedOrder,
-          stayId: dto.stayId,
-          amenityReservationId: dto.amenityReservationId,
-          checkoutClassification: 'customer_checkout',
-          paymentMode: dto.paymentMode,
-          items: lines,
-        },
+        order: insertedOrder,
+        orders: insertedOrders,
       };
 
       await tx.insert(customerOrderCommands).values({
@@ -755,8 +762,10 @@ export class RestaurantService {
         response: { status: 201, body: responseBody },
       });
 
-      this.realtime.emitToProperty(customer.propertyId, 'order:created', responseBody.order);
-      if (dto.stayId) this.realtime.emitToStay(dto.stayId, 'order:created', responseBody.order);
+      for (const order of insertedOrders) {
+        this.realtime.emitToProperty(customer.propertyId, 'order:created', order);
+        if (dto.stayId) this.realtime.emitToStay(dto.stayId, 'order:created', order);
+      }
 
       return responseBody;
     });
@@ -854,18 +863,33 @@ export class RestaurantService {
   private async buildOrderLines(tx: any, propertyId: string, dto: { items: Array<{ menuItemId: string; variantId?: string | null | undefined; quantity: number }> }) {
     const menuIds = dto.items.map((i) => i.menuItemId);
     const menuRows = await tx.select().from(menuItems).where(and(inArray(menuItems.id, menuIds), eq(menuItems.propertyId, propertyId)));
-    return dto.items.map((item) => {
+    const variantIds = dto.items.map((item) => item.variantId).filter((id): id is string => Boolean(id));
+    const variantRows = variantIds.length
+      ? await tx.select().from(menuItemVariants).where(and(
+        inArray(menuItemVariants.id, variantIds),
+        eq(menuItemVariants.propertyId, propertyId),
+        eq(menuItemVariants.status, 'active'),
+        eq(menuItemVariants.isPublished, true),
+        eq(menuItemVariants.isAvailable, true),
+      ))
+      : [];
+      return dto.items.map((item) => {
       const menu = menuRows.find((m: any) => m.id === item.menuItemId && m.status === 'active');
       if (!menu) throw new BadRequestException(`Menu item not found or inactive: ${item.menuItemId}`);
-      const unitPrice = String(Number(menu.salePrice).toFixed(2));
-      const subtotal = String((Number(menu.salePrice) * item.quantity).toFixed(2));
+      const variant = item.variantId ? variantRows.find((candidate: any) => candidate.id === item.variantId && candidate.menuItemId === item.menuItemId && candidate.price !== null) : null;
+      if (item.variantId && !variant) throw new BadRequestException(`Menu variant not found or unavailable: ${item.variantId}`);
+      const unitPrice = String(Number(variant?.price ?? menu.salePrice).toFixed(2));
+      const subtotal = String((Number(unitPrice) * item.quantity).toFixed(2));
       return {
         menuItemId: item.menuItemId,
         menuItemName: menu.name,
-        quantity: item.quantity,
-        unitPrice,
-        subtotal,
-      };
+        menuItemVariantId: variant?.id ?? null,
+        menuItemVariantName: variant?.name ?? null,
+          quantity: item.quantity,
+          unitPrice,
+          subtotal,
+          station: determineStation(menu.category),
+        };
     });
   }
 

@@ -4,6 +4,7 @@ import { guests } from './guests.schema.js';
 import { properties } from './hotel.schema.js';
 import { reservations } from './reservations.schema.js';
 import { orders } from './restaurant.schema.js';
+import { amenityReservations } from './amenities.schema.js';
 
 export const customerAccountStatus = pgEnum('customer_account_status', ['active', 'disabled']);
 
@@ -69,6 +70,24 @@ export const customerOrders = pgTable('customer_orders', {
   foreignKey({ name: 'customer_orders_order_property_fkey', columns: [table.orderId, table.propertyId], foreignColumns: [orders.id, orders.propertyId] }).onDelete('cascade'),
   foreignKey({ name: 'customer_orders_property_fkey', columns: [table.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
   index('customer_orders_owner_idx').on(table.customerAccountId, table.createdAt),
+]);
+
+export type CustomerAmenityReservationReceipt = { status: number; body: Record<string, unknown> };
+
+export const customerAmenityCommands = pgTable('customer_amenity_commands', {
+  id: uuid().defaultRandom().primaryKey(),
+  propertyId: uuid('property_id').notNull(),
+  customerAccountId: uuid('customer_account_id').notNull().references(() => customerAccounts.id, { onDelete: 'restrict' }),
+  amenityReservationId: uuid('amenity_reservation_id').notNull(),
+  idempotencyKey: uuid('idempotency_key').notNull(),
+  fingerprint: varchar({ length: 64 }).notNull(),
+  response: jsonb().$type<CustomerAmenityReservationReceipt>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ name: 'customer_amenity_commands_property_fkey', columns: [table.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
+  foreignKey({ name: 'customer_amenity_commands_reservation_fkey', columns: [table.amenityReservationId], foreignColumns: [amenityReservations.id] }).onDelete('cascade'),
+  unique('customer_amenity_commands_customer_key_unique').on(table.customerAccountId, table.idempotencyKey),
+  index('customer_amenity_commands_reservation_idx').on(table.amenityReservationId, table.createdAt),
 ]);
 
 export type CustomerReservationTransport = {

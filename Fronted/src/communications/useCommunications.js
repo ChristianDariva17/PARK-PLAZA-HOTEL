@@ -14,6 +14,7 @@ import { adaptNotificationResponse, adaptPreferenceResponse } from './communicat
 export function useCommunications() {
   const { account, status: authStatus } = useAuth();
   const canReadNotifications = useActionPermission('NOTIFICATION_READ');
+  const canUpdateNotifications = useActionPermission('NOTIFICATIONS_READ_ALL');
   const [notifications, setNotifications] = useState({ data: [], status: 'idle', error: null });
   const [preferences, setPreferences] = useState({ data: null, status: 'idle', error: null });
   const [actionLoading, setActionLoading] = useState(false);
@@ -24,7 +25,7 @@ export function useCommunications() {
       const res = await fetchNotifications(account.propertyId, {}, controller?.signal);
       const data = (res || []).map(adaptNotificationResponse);
       setNotifications({ data, status: 'ready', error: null });
-    } catch {
+    } catch (err) {
       if (err.name === 'AbortError') return;
       setNotifications(prev => ({ ...prev, status: 'error', error: err.message }));
     }
@@ -35,7 +36,7 @@ export function useCommunications() {
     try {
       const res = await fetchPreferences(account.propertyId, controller?.signal);
       setPreferences({ data: adaptPreferenceResponse(res), status: 'ready', error: null });
-    } catch {
+    } catch (err) {
       if (err.name === 'AbortError') return;
       setPreferences(prev => ({ ...prev, status: 'error', error: err.message }));
     }
@@ -58,6 +59,7 @@ export function useCommunications() {
   }, [account?.id, account?.propertyId, authStatus, canReadNotifications, loadNotifications]);
 
   const handleMarkRead = async (id) => {
+    if (!canUpdateNotifications) return false;
     try {
       await markNotificationRead(account.propertyId, id, true);
       setNotifications(prev => ({
@@ -71,6 +73,7 @@ export function useCommunications() {
   };
 
   const handleMarkAllRead = async () => {
+    if (!canUpdateNotifications) return false;
     try {
       setActionLoading(true);
       await markAllNotificationsRead(account.propertyId);
@@ -87,6 +90,7 @@ export function useCommunications() {
   };
 
   const handleClearRead = async () => {
+    if (!canUpdateNotifications) return false;
     try {
       setActionLoading(true);
       await clearReadNotifications(account.propertyId);
@@ -112,6 +116,7 @@ export function useCommunications() {
     handleMarkRead,
     handleMarkAllRead,
     handleClearRead,
+    canUpdateNotifications,
     refresh,
     loadPreferences,
     updatePreference: (payload) => updatePreference(account?.propertyId, payload),

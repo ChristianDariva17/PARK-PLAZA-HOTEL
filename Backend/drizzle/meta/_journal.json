@@ -119,6 +119,8 @@
       { "idx": 42, "version": "7", "when": 1788309000000, "tag": "0042_flexible_pets_visitors", "breakpoints": true },
       { "idx": 43, "version": "7", "when": 1788312600000, "tag": "0043_cleaning_tasks_stays", "breakpoints": true },
     { "idx": 44, "version": "7", "when": 1788316200000, "tag": "0044_canonical_supplier_schema", "breakpoints": true },
-    { "idx": 45, "version": "7", "when": 1788323400000, "tag": "0045_folio_read_performance", "breakpoints": true }
+     { "idx": 45, "version": "7", "when": 1788323400000, "tag": "0045_folio_read_performance", "breakpoints": true },
+       { "idx": 46, "version": "7", "when": 1788327000000, "tag": "0046_customer_amenity_commands", "breakpoints": true },
+       { "idx": 47, "version": "7", "when": 1788328800000, "tag": "0047_room_category_amenities", "breakpoints": true }
   ]
 }

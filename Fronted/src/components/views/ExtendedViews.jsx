@@ -2046,17 +2046,28 @@ export function LegacySettingsView() {
 export function SettingsView() {
   const { state } = useHotel();
   const [dbSettings, setDbSettings] = useState(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState(null);
+  const [settingsReload, setSettingsReload] = useState(0);
   useEffect(() => {
     let active = true;
+    setSettingsLoading(true);
+    setSettingsError(null);
     getSettings()
       .then((res) => {
-        if (active) setDbSettings(res);
+        if (active) {
+          setDbSettings(res);
+          setSettingsLoading(false);
+        }
       })
-      .catch(console.error);
-    return () => {
-      active = false;
-    };
-  }, []);
+      .catch((error) => {
+        if (active) {
+          setSettingsError(error.message || "No se pudo cargar la configuración.");
+          setSettingsLoading(false);
+        }
+      });
+    return () => { active = false; };
+  }, [settingsReload]);
   const groups = [
     { name: "Mensajería", ids: ["INT-MSG"] },
     { name: "Fiscal", ids: ["INT-FISCAL"] },
@@ -2099,9 +2110,17 @@ export function SettingsView() {
           </p>
         </div>
         <StatusBadge>
-          {dbSettings ? "Conectado al Backend" : "Cargando Backend..."}
+          {settingsLoading ? "Cargando Backend..." : settingsError ? "Backend no disponible" : "Conectado al Backend"}
         </StatusBadge>
       </section>
+      {settingsError && (
+        <div className="alert-banner alert-banner-danger" role="alert">
+          <span>{settingsError}</span>
+          <button className="btn btn-outline" type="button" onClick={() => setSettingsReload((value) => value + 1)}>
+            Reintentar
+          </button>
+        </div>
+      )}
       <div className="settings-groups">
         {groups.map((group) => (
           <section key={group.name} aria-labelledby={`settings-${group.name}`}>

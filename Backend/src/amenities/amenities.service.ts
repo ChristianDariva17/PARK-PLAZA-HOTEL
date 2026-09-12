@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject, Optional } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { DATABASE, type Database } from '../database/database.module.js';
 import {
   amenityReservations,
@@ -8,6 +9,7 @@ import {
   orderItems,
   cashSessions,
   cashMovements,
+  customerAmenityCommands,
 } from '../database/schema/index.js';
 import { stays, stayGuests } from '../database/schema/stays.schema.js';
 import { customerGuestIdentities } from '../database/schema/customer.schema.js';
@@ -591,7 +593,24 @@ export class AmenitiesService {
     });
   }
 
-  async createReservation(actor: AuthenticatedCustomer, data: { amenityType: string; startTime: string; pax?: number }) {
+  async createReservation(actor: AuthenticatedCustomer, data: { amenityType: string; startTime: string; endTime?: string | undefined; pax?: number | undefined; documentNumber?: string | undefined; customerName?: string | undefined }, idempotencyKey: string) {
+    const fingerprint = createHash('sha256').update(JSON.stringify({
+      customer: actor.customerAccountId,
+      property: actor.propertyId,
+      ...data,
+    })).digest('hex');
+
+    return this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const existingCommand = await tx.select().from(customerAmenityCommands).where(and(
+        eq(customerAmenityCommands.customerAccountId, actor.customerAccountId),
+        eq(customerAmenityCommands.idempotencyKey, idempotencyKey),
+      )).limit(1).for('update');
+      if (existingCommand[0]) {
+        if (existingCommand[0].fingerprint !== fingerprint) throw new ConflictException('La clave de idempotencia ya fue usada con otra reserva.');
+        return existingCommand[0].response?.body ?? existingCommand[0].response;
+      }
+
     const configs = await this.getConfigs(actor.propertyId);
     const key = data.amenityType.toLowerCase().includes('mirador') ? 'mirador' : 'piscina';
     const config = configs.find((c) => c.amenityKey === key) || DEFAULT_CONFIG_PISCINA;
@@ -630,12 +649,12 @@ export class AmenitiesService {
     const priceStr = Number(config.priceGuest || 0).toFixed(2);
     const paymentStatus = Number(priceStr) === 0 ? 'paid' : 'pending';
 
-    const [inserted] = await this.db.insert(amenityReservations).values({
+    const [inserted] = await tx.insert(amenityReservations).values({
       propertyId: actor.propertyId,
       customerAccountId: actor.customerAccountId,
       amenityType: config.name,
-      documentNumber: null,
-      customerName: actor.displayName || actor.email || null,
+      documentNumber: data.documentNumber?.trim() || null,
+      customerName: data.customerName?.trim() || actor.displayName || actor.email || null,
       startTime,
       endTime,
       pax,
@@ -644,6 +663,17 @@ export class AmenitiesService {
       status: 'confirmed',
     }).returning();
 
+    if (inserted) {
+      await tx.insert(customerAmenityCommands).values({
+        propertyId: actor.propertyId,
+        customerAccountId: actor.customerAccountId,
+        amenityReservationId: inserted.id,
+        idempotencyKey,
+        fingerprint,
+        response: { status: 201, body: inserted },
+      });
+    }
+
     if (this.realtime && inserted) {
       this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_created', inserted);
       const occupancy = await this.getOccupancy(actor.propertyId);
@@ -651,5 +681,6 @@ export class AmenitiesService {
     }
 
     return inserted;
+    });
   }
 }

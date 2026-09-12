@@ -7,7 +7,17 @@ export class ApiError extends Error {
   }
 }
 
+let refreshCustomerSession = null;
+
+export const setCustomerSessionRefresher = (refresher) => {
+  refreshCustomerSession = refresher;
+  return () => {
+    if (refreshCustomerSession === refresher) refreshCustomerSession = null;
+  };
+};
+
 export async function apiRequest(path, options = {}) {
+  const { __customerSessionRetried = false, ...requestOptions } = options;
   const method = options.method?.toUpperCase() || 'GET';
   const isMutation = ['POST', 'PUT', 'PATCH'].includes(method);
   
@@ -18,13 +28,21 @@ export async function apiRequest(path, options = {}) {
   };
 
   const response = await fetch(`/api${path}`, {
-    ...options,
+    ...requestOptions,
     credentials: 'include',
     headers,
   });
   if (response.status === 204) return null;
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    const canRefresh = response.status === 401
+      && !__customerSessionRetried
+      && path !== '/customer/auth/session'
+      && path !== '/customer/auth/logout'
+      && refreshCustomerSession;
+    if (canRefresh && await refreshCustomerSession()) {
+      return apiRequest(path, { ...requestOptions, __customerSessionRetried: true });
+    }
     const message = typeof payload?.message === 'string' ? payload.message : 'The request could not be completed.';
     throw new ApiError(message, response.status, payload);
   }

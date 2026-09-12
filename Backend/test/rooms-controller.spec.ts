@@ -8,6 +8,12 @@ const actor = { accountId: 'account-id', propertyId: 'property-id', roleKey: 're
 const request = { auth: actor, id: 'request-id', ip: '127.0.0.1', headers: { 'user-agent': 'test-agent' } };
 
 describe('RoomsController property authority', () => {
+  it('derives amenities scope exclusively from the authenticated account', async () => {
+    const service = { listAmenities: vi.fn().mockResolvedValue({ master: [], categoryAmenities: {} }) } as unknown as RoomsService;
+    await new RoomsController(service).listAmenities(actor);
+    expect(service.listAmenities).toHaveBeenCalledWith(actor.propertyId);
+  });
+
   it('derives list scope exclusively from the authenticated account', async () => {
     const service = { list: vi.fn().mockResolvedValue({ rooms: [], categories: [] }) } as unknown as RoomsService;
     await new RoomsController(service).list(actor);

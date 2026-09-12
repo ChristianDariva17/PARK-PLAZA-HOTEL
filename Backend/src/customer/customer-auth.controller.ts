@@ -16,7 +16,7 @@ export class CustomerAuthController {
   constructor(private readonly sessions: CustomerAuthService, private readonly config: ConfigService<Environment, true>) {}
 
   @Post('session')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
   async exchange(@Body() body: unknown, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     const result = await this.sessions.exchange(parseFirebaseExchangeDto(body).idToken, getRequestContext(request));

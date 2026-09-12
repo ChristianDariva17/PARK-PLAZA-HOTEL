@@ -8,3 +8,9 @@ test('every mounted customer route has an explicit contract state', () => {
     assert.equal(isCustomerContractAdmitted(route), true);
   }
 });
+
+test('does not advertise a customer home endpoint that the backend does not expose', () => {
+  assert.equal(customerContractMatrix['/'].endpoint, 'derived:public-experience');
+  assert.equal(customerContractMatrix['/'].session, 'public');
+  assert.equal(customerContractMatrix['/'].permission, 'public-catalog');
+});

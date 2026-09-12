@@ -80,12 +80,14 @@ function ContractBlockedView({ route }) {
 }
 
 import { useWebSocket, useWebSocketEvents } from './hooks/useWebSocket';
+import { useCommunications } from './communications/useCommunications.js';
 
 function HotelShell() {
   const { account, loggingOut, logout } = useAuth();
   const { can } = usePermissions();
   const shellState = useHotelShellState();
-  const { execute, roomCommands } = useHotelCommands();
+  const { roomCommands } = useHotelCommands();
+  const { notifications: communicationNotifications, handleMarkRead, handleMarkAllRead } = useCommunications();
   const authorizedRoutes = useMemo(() => new Set([...VALID_ROUTES].filter((route) => can(permissionForRoute(route)))), [can]);
   const fallbackRoute = authorizedRoutes.values().next().value || '';
   const [currentView, hashNavigate] = useHashRoute(VALID_ROUTES, fallbackRoute);
@@ -133,11 +135,6 @@ function HotelShell() {
     hashNavigate(route);
   }, [hashNavigate]);
   const consumeNavigationIntent = useCallback((id) => setNavigationIntent((current) => current?.id === id ? null : current), []);
-  const runSilent = useCallback((action) => {
-    const result = execute(action);
-    if (!result.ok) notify('Operación rechazada', result.error || result.message || 'No se pudo completar la operación.', 'error');
-    return result;
-  }, [execute, notify]);
   const routeAuthorized = authorizedRoutes.has(currentView);
   const View = VIEW_COMPONENTS[currentView] || DashboardView;
   const pendingOrders = shellState.orders.filter((order) => !['Entregado', 'Pagado', 'Cancelado'].includes(order.status)).length;
@@ -149,7 +146,7 @@ function HotelShell() {
       notify('No se pudo cerrar la sesión', 'Intentá nuevamente.', 'error');
     }
   };
-  return <div className="app-layout"><a className="skip-link" href="#main-content">Saltar al contenido</a><Sidebar currentView={currentView} navigate={navigate} pendingOrdersCount={pendingOrders} open={sidebarOpen} onClose={closeSidebar} account={account} onLogout={handleLogout} loggingOut={loggingOut} /><div className="main-content"><Topbar currentView={currentView} notifications={shellState.notifications} menuOpen={sidebarOpen} onMenu={() => setSidebarOpen(true)} onNavigate={navigate} onRead={(notificationId) => runSilent({ type: 'NOTIFICATION_READ', notificationId })} onReadAll={(notificationIds) => runSilent({ type: 'NOTIFICATIONS_READ_AUTHORIZED', notificationIds })} account={account} /><main id="main-content" tabIndex="-1">{routeAuthorized ? isAdminContractAdmitted(currentView) ? <RouteErrorBoundary key={currentView}><Suspense fallback={<div className="route-loading state-panel state-loading" role="status" aria-live="polite">Cargando módulo…</div>}><View navigate={navigate} notify={notify} navigationIntent={routeIntent} consumeNavigationIntent={consumeNavigationIntent} /></Suspense></RouteErrorBoundary> : <ContractBlockedView route={currentView} /> : <div className="route-error state-panel state-forbidden" role="alert"><h2>Acceso denegado</h2><p>No tenés permiso para abrir este módulo.</p>{fallbackRoute ? <button className="btn btn-primary" onClick={() => navigate(fallbackRoute)}>Ir a un módulo autorizado</button> : null}</div>}</main></div><Toast toasts={toasts} removeToast={(id) => setToasts((items) => items.filter(({ id: toastId }) => toastId !== id))} /></div>;
+  return <div className="app-layout"><a className="skip-link" href="#main-content">Saltar al contenido</a><Sidebar currentView={currentView} navigate={navigate} pendingOrdersCount={pendingOrders} open={sidebarOpen} onClose={closeSidebar} account={account} onLogout={handleLogout} loggingOut={loggingOut} /><div className="main-content"><Topbar currentView={currentView} notifications={communicationNotifications.data} menuOpen={sidebarOpen} onMenu={() => setSidebarOpen(true)} onNavigate={navigate} onRead={(notificationId) => { void handleMarkRead(notificationId); }} onReadAll={() => { void handleMarkAllRead(); }} account={account} /><main id="main-content" tabIndex="-1">{routeAuthorized ? isAdminContractAdmitted(currentView) ? <RouteErrorBoundary key={currentView}><Suspense fallback={<div className="route-loading state-panel state-loading" role="status" aria-live="polite">Cargando módulo…</div>}><View navigate={navigate} notify={notify} navigationIntent={routeIntent} consumeNavigationIntent={consumeNavigationIntent} /></Suspense></RouteErrorBoundary> : <ContractBlockedView route={currentView} /> : <div className="route-error state-panel state-forbidden" role="alert"><h2>Acceso denegado</h2><p>No tenés permiso para abrir este módulo.</p>{fallbackRoute ? <button className="btn btn-primary" onClick={() => navigate(fallbackRoute)}>Ir a un módulo autorizado</button> : null}</div>}</main></div><Toast toasts={toasts} removeToast={(id) => setToasts((items) => items.filter(({ id: toastId }) => toastId !== id))} /></div>;
 }
 
 export default function App() {

@@ -51,17 +51,22 @@ const inventoryAvailable = (item) => item.stock - item.reserved;
 
 export function DashboardView({ navigate }) {
   const { state } = useHotel();
+  const currentDate = today();
+  const nextWeek = future(7);
   const available = state.rooms.filter((room) => room.status === 'Disponible').length;
   const occupied = state.rooms.filter((room) => room.status === 'Ocupada').length;
   const occupancy = state.rooms.length ? Math.round((occupied / state.rooms.length) * 100) : 0;
   const openIncidents = state.incidents.filter((item) => item.status !== 'Cerrada');
   const lowStock = state.inventory.filter((item) => inventoryAvailable(item) <= item.minimum);
-  const income = state.cashMovements.filter((item) => item.type === 'Ingreso').reduce((sum, item) => sum + item.amount, 0);
+  const todayIncomeMovements = state.cashMovements.filter((item) => item.type === 'Ingreso' && formatCalendarDate(new Date(item.createdAt)) === currentDate);
+  const income = todayIncomeMovements.reduce((sum, item) => sum + item.amount, 0);
   const openBalance = state.accounts.filter((item) => item.status === 'Abierta').reduce((sum, item) => sum + selectAccountBalance(item), 0);
   const activeOrders = state.orders.filter((item) => !['Entregado', 'Pagado', 'Cancelado'].includes(item.status));
-  const arrivals = state.reservations.filter((item) => item.status === 'Confirmada').toSorted((a, b) => a.checkIn.localeCompare(b.checkIn));
+  const arrivals = state.reservations.filter((item) => item.status === 'Confirmada' && item.checkIn === currentDate).toSorted((a, b) => a.checkIn.localeCompare(b.checkIn));
+  const upcomingReservations = state.reservations.filter((item) => item.status === 'Confirmada' && item.checkIn > currentDate && item.checkIn <= nextWeek).toSorted((a, b) => a.checkIn.localeCompare(b.checkIn));
   const departures = state.stays.filter((item) => item.status === 'Activa').toSorted((a, b) => a.expectedCheckOut.localeCompare(b.expectedCheckOut));
   const poolInside = state.recreationAccess.filter((item) => item.zone === 'Piscina').reduce((sum, item) => sum + item.peopleInside, 0);
+  const activeGuests = state.stays.filter((item) => item.status === 'Activa').length;
 
   const operation = [
     { label: 'Limpieza', value: state.cleaningTasks.filter((item) => item.status !== 'Aprobada').length, detail: 'tareas activas', route: 'limpieza', icon: '🧹' },
@@ -94,6 +99,39 @@ export function DashboardView({ navigate }) {
       <Kpi label="Saldos Abiertos" value={formatMoney(openBalance)} detail={`${departures.length} estadías activas`} icon={DoorOpen} tone="warning" />
       <Kpi label="Alertas Operativas" value={openIncidents.length + lowStock.length} detail="Incidencias + stock crítico" icon={BellRing} tone="red" />
     </div>
+
+    <section className="dashboard-overview-grid" aria-label="Información importante">
+      <article className="card">
+        <SectionHeader eyebrow="Caja del día" title="Resumen financiero" description="Ingresos registrados durante la jornada actual." />
+        <div className="financial-highlight">
+          <span>Ingresos de hoy</span>
+          <strong>{formatMoney(income)}</strong>
+          <small>{todayIncomeMovements.length} movimiento(s) registrados</small>
+        </div>
+        <div className="compact-indicators">
+          <button onClick={() => navigate('finanzas')}><span className="compact-icon tone-blue">$</span><span><strong>{formatMoney(openBalance)}</strong>Saldo abierto</span></button>
+          <button onClick={() => navigate('finanzas')}><span className="compact-icon tone-warning">!</span><span><strong>{state.accounts.filter((item) => item.status === 'Abierta').length}</strong>Cuentas abiertas</span></button>
+        </div>
+      </article>
+
+      <article className="card">
+        <SectionHeader eyebrow="Capacidad actual" title="Ocupación y huéspedes" description="Estado de alojamiento y espacios compartidos." />
+        <div className="compact-indicators">
+          <button onClick={() => navigate('habitaciones')}><span className="compact-icon tone-purple">{occupancy}%</span><span><strong>{occupied}/{state.rooms.length}</strong>Habitaciones ocupadas</span></button>
+          <button onClick={() => navigate('habitaciones')}><span className="compact-icon tone-green">✓</span><span><strong>{available}</strong>Habitaciones disponibles</span></button>
+          <button onClick={() => navigate('checkin-checkout')}><span className="compact-icon tone-blue">{activeGuests}</span><span><strong>{activeGuests}</strong>Huéspedes alojados</span></button>
+          <button onClick={() => navigate('recreacion')}><span className="compact-icon tone-warning">{poolInside}</span><span><strong>{poolInside}/{state.poolCapacity}</strong>Personas en piscina</span></button>
+        </div>
+      </article>
+
+      <article className="card">
+        <SectionHeader eyebrow="Próximos 7 días" title="Llegadas próximas" description="Reservas confirmadas que requieren preparación." />
+        <div className="dashboard-alert-list">
+          {upcomingReservations.slice(0, 4).map((item) => <button key={item.id} onClick={() => navigate('reservas')}><span className="alert-icon">📅</span><span><strong>{selectClientName(state, item.clientId)}</strong><small>{displayCalendarDate(item.checkIn)} · Hab. {item.roomId}</small></span><StatusBadge>{item.status}</StatusBadge></button>)}
+          {!upcomingReservations.length ? <span className="dashboard-empty-compact">No hay llegadas confirmadas en los próximos 7 días.</span> : null}
+        </div>
+      </article>
+    </section>
 
     <section aria-labelledby="dashboard-operation-title">
       <SectionHeader id="dashboard-operation-title" eyebrow="Control Transversal 5★" title="Pulso Operativo del Hotel" description="Acceso directo a cada módulo operativo de la propiedad." />
