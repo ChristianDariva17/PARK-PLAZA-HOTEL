@@ -27,6 +27,7 @@ import type { CustomerCancelOrderDto, CustomerCreateOrderDto } from '../customer
 
 import { FolioService } from '../folios/folio.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 import type {
   AdjustInventoryDto,
@@ -673,14 +674,14 @@ export class RestaurantService {
     });
 
     return this.db.transaction(async (tx) => {
+      if (typeof tx.execute === 'function') await acquirePropertyTransactionLock(tx, customer.propertyId);
       const replay = await this.findReceipt(tx, customer, 'create', idempotencyKey, fingerprint);
       if (replay) return replay;
 
-      let amenityRecord: any = null;
       if (dto.stayId) {
         await this.assertCustomerStay(tx, customer, dto.stayId);
       } else if (dto.amenityReservationId) {
-        amenityRecord = await this.assertCustomerAmenityReservation(tx, customer, dto.amenityReservationId);
+        await this.assertCustomerAmenityReservation(tx, customer, dto.amenityReservationId);
       } else {
         throw new BadRequestException('Se requiere una estadía activa o una reserva de amenidad.');
       }
@@ -693,9 +694,7 @@ export class RestaurantService {
         linesByStation.set(line.station, stationLines);
       }
 
-      const sourceName = dto.amenityReservationId
-        ? `Portal Visitante - ${amenityRecord?.amenityType || 'Amenidad'}`
-        : 'Portal Huésped';
+      const sourceName = dto.amenityReservationId ? 'Portal Visitante' : 'Portal Huésped';
 
       const insertedOrders = [];
       for (const [station, stationLines] of linesByStation) {

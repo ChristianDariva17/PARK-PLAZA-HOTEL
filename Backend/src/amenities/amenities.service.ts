@@ -75,8 +75,8 @@ export class AmenitiesService {
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
 
-  async getConfigs(propertyId: string): Promise<AmenityRuleConfig[]> {
-    const rows = await this.db
+  async getConfigs(propertyId: string, executor: Pick<Database, 'select'> = this.db): Promise<AmenityRuleConfig[]> {
+    const rows = await executor
       .select()
       .from(amenityConfigs)
       .where(eq(amenityConfigs.propertyId, propertyId));
@@ -227,73 +227,80 @@ export class AmenitiesService {
   }
 
   async createManualPass(actor: AuthenticatedAccount, dto: CreateManualAmenityPassDto) {
-    const configs = await this.getConfigs(actor.propertyId);
-    const normalizedKey = dto.amenityType.toLowerCase().includes('mirador') ? 'mirador' : 'piscina';
-    const config = configs.find((c) => c.amenityKey === normalizedKey) || DEFAULT_CONFIG_PISCINA;
+    const inserted = await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const configs = await this.getConfigs(actor.propertyId, tx);
+      const normalizedKey = dto.amenityType.toLowerCase().includes('mirador') ? 'mirador' : 'piscina';
+      const config = configs.find((c) => c.amenityKey === normalizedKey) || DEFAULT_CONFIG_PISCINA;
 
-    const startTime = dto.startTime ? new Date(dto.startTime) : new Date();
-    const durationMs = (config.durationMinutes || 120) * 60 * 1000;
-    const endTime = new Date(startTime.getTime() + durationMs);
-
-    // Calculate price based on guest vs external
-    let finalPrice = dto.customPrice;
-    if (finalPrice === undefined || finalPrice === null) {
-      if (dto.stayId) {
-        finalPrice = config.priceGuest;
-      } else {
-        finalPrice = config.priceExternal * (dto.pax || 1);
+      const startTime = dto.startTime ? new Date(dto.startTime) : new Date();
+      const durationMs = (config.durationMinutes || 120) * 60 * 1000;
+      const endTime = new Date(startTime.getTime() + durationMs);
+      if (Number.isNaN(startTime.getTime()) || endTime <= startTime) {
+        throw new BadRequestException('El horario del pase no es válido.');
       }
-    }
 
-    const priceStr = Number(finalPrice || 0).toFixed(2);
-    const paymentStatus = dto.paymentStatus || (Number(priceStr) === 0 ? 'paid' : 'pending');
+      const existing = await tx.select({ pax: amenityReservations.pax })
+        .from(amenityReservations)
+        .where(and(
+          eq(amenityReservations.propertyId, actor.propertyId),
+          eq(amenityReservations.amenityType, config.name),
+          inArray(amenityReservations.status, ['confirmed', 'checked_in']),
+          gt(amenityReservations.endTime, startTime),
+          lte(amenityReservations.startTime, endTime),
+        ));
+      const currentTotalPax = existing.reduce((sum: number, reservation: { pax: number }) => sum + (reservation.pax || 1), 0);
+      if (currentTotalPax + (dto.pax || 1) > config.capacity) {
+        throw new ConflictException(`Aforo completo para el horario seleccionado. Capacidad disponible: ${Math.max(0, config.capacity - currentTotalPax)} personas.`);
+      }
 
-    const [inserted] = await this.db
-      .insert(amenityReservations)
-      .values({
-        propertyId: actor.propertyId,
-        stayId: dto.stayId || null,
-        amenityType: config.name,
-        documentNumber: dto.documentNumber || null,
-        customerName: dto.customerName.trim(),
-        startTime,
-        endTime,
-        pax: dto.pax || 1,
-        price: priceStr,
-        paymentStatus,
-        status: 'confirmed',
-        checkedInAt: new Date(),
-      })
-      .returning();
+      let finalPrice = dto.customPrice;
+      if (finalPrice === undefined || finalPrice === null) {
+        finalPrice = dto.stayId ? config.priceGuest : config.priceExternal * (dto.pax || 1);
+      }
 
-    // If paid immediately in cash and cash session is open, record movement
-    if (paymentStatus === 'paid' && dto.paymentMethod === 'Efectivo' && Number(priceStr) > 0 && inserted) {
-      const openSession = (
-        await this.db
-          .select()
-          .from(cashSessions)
-          .where(
-            and(
-              eq(cashSessions.propertyId, actor.propertyId),
-              eq(cashSessions.status, 'open'),
-            ),
-          )
-          .limit(1)
-      )[0];
+      const priceStr = Number(finalPrice || 0).toFixed(2);
+      const paymentStatus = dto.paymentStatus || (Number(priceStr) === 0 ? 'paid' : 'pending');
 
-      if (openSession) {
-        await this.db.insert(cashMovements).values({
+      const [created] = await tx.insert(amenityReservations)
+        .values({
           propertyId: actor.propertyId,
-          sessionId: openSession.id,
-          type: 'Ingreso',
-          amount: priceStr,
-          concept: `Cobro entrada Pase de Día: ${config.name} (${dto.customerName})`,
-          method: 'Efectivo',
-          responsible: actor.email,
-          referenceId: `amenity-${inserted.id}`,
-        });
+          stayId: dto.stayId || null,
+          amenityType: config.name,
+          documentNumber: dto.documentNumber || null,
+          customerName: dto.customerName.trim(),
+          startTime,
+          endTime,
+          pax: dto.pax || 1,
+          price: priceStr,
+          paymentStatus,
+          status: 'confirmed',
+          checkedInAt: new Date(),
+        })
+        .returning();
+
+      if (paymentStatus === 'paid' && dto.paymentMethod === 'Efectivo' && Number(priceStr) > 0 && created) {
+        const [openSession] = await tx.select().from(cashSessions)
+          .where(and(eq(cashSessions.propertyId, actor.propertyId), eq(cashSessions.status, 'open')))
+          .limit(1)
+          .for('update', { of: cashSessions });
+
+        if (openSession) {
+          await tx.insert(cashMovements).values({
+            propertyId: actor.propertyId,
+            sessionId: openSession.id,
+            type: 'Ingreso',
+            amount: priceStr,
+            concept: `Cobro entrada Pase de Día: ${config.name} (${dto.customerName})`,
+            method: 'Efectivo',
+            responsible: actor.email,
+            referenceId: `amenity-${created.id}`,
+          });
+        }
       }
-    }
+
+      return created;
+    });
 
     if (this.realtime && inserted) {
       this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_created', inserted);
@@ -305,28 +312,31 @@ export class AmenitiesService {
   }
 
   async checkInReservation(actor: AuthenticatedAccount, reservationId: string) {
-    const [reservation] = await this.db
-      .select()
-      .from(amenityReservations)
-      .where(
-        and(
+    const updated = await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const [reservation] = await tx.select()
+        .from(amenityReservations)
+        .where(and(
           eq(amenityReservations.id, reservationId),
           eq(amenityReservations.propertyId, actor.propertyId),
-        ),
-      );
+        ));
 
-    if (!reservation) throw new NotFoundException('Reserva no encontrada.');
+      if (!reservation) throw new NotFoundException('Reserva no encontrada.');
+      if (reservation.status === 'checked_in') throw new ConflictException('La reserva ya registró el ingreso.');
+      if (reservation.status !== 'confirmed') throw new ConflictException('La reserva no está disponible para ingreso.');
 
-    const [updated] = await this.db
-      .update(amenityReservations)
-      .set({
-        status: 'checked_in',
-        checkedInAt: new Date(),
-      })
-      .where(eq(amenityReservations.id, reservationId))
-      .returning();
+      const [checkedIn] = await tx.update(amenityReservations)
+        .set({ status: 'checked_in', checkedInAt: new Date() })
+        .where(and(
+          eq(amenityReservations.id, reservationId),
+          eq(amenityReservations.propertyId, actor.propertyId),
+          eq(amenityReservations.status, 'confirmed'),
+        ))
+        .returning();
+      return checkedIn;
+    });
 
-    if (this.realtime) {
+    if (this.realtime && updated) {
       const occupancy = await this.getOccupancy(actor.propertyId);
       this.realtime.emitToProperty(actor.propertyId, 'amenity:occupancy_changed', occupancy);
     }
@@ -600,7 +610,7 @@ export class AmenitiesService {
       ...data,
     })).digest('hex');
 
-    return this.db.transaction(async (tx: any) => {
+    const inserted = await this.db.transaction(async (tx: any) => {
       await acquirePropertyTransactionLock(tx, actor.propertyId);
       const existingCommand = await tx.select().from(customerAmenityCommands).where(and(
         eq(customerAmenityCommands.customerAccountId, actor.customerAccountId),
@@ -611,7 +621,7 @@ export class AmenitiesService {
         return existingCommand[0].response?.body ?? existingCommand[0].response;
       }
 
-    const configs = await this.getConfigs(actor.propertyId);
+    const configs = await this.getConfigs(actor.propertyId, tx);
     const key = data.amenityType.toLowerCase().includes('mirador') ? 'mirador' : 'piscina';
     const config = configs.find((c) => c.amenityKey === key) || DEFAULT_CONFIG_PISCINA;
 
@@ -630,17 +640,17 @@ export class AmenitiesService {
     }
 
     // Check capacity for time overlap
-    const existing = await this.db.select({ pax: amenityReservations.pax })
+    const existing = await tx.select({ pax: amenityReservations.pax })
       .from(amenityReservations)
       .where(and(
         eq(amenityReservations.propertyId, actor.propertyId),
         eq(amenityReservations.amenityType, config.name),
-        eq(amenityReservations.status, 'confirmed'),
-        gte(amenityReservations.endTime, startTime),
+        inArray(amenityReservations.status, ['confirmed', 'checked_in']),
+        gt(amenityReservations.endTime, startTime),
         lte(amenityReservations.startTime, endTime),
       ));
 
-    const currentTotalPax = existing.reduce((sum, r) => sum + (r.pax || 1), 0);
+    const currentTotalPax = existing.reduce((sum: number, r: { pax: number }) => sum + (r.pax || 1), 0);
     if (currentTotalPax + pax > config.capacity) {
       throw new ConflictException(`Aforo completo para el horario seleccionado. Capacidad disponible: ${Math.max(0, config.capacity - currentTotalPax)} personas.`);
     }
@@ -674,6 +684,9 @@ export class AmenitiesService {
       });
     }
 
+    return inserted;
+    });
+
     if (this.realtime && inserted) {
       this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_created', inserted);
       const occupancy = await this.getOccupancy(actor.propertyId);
@@ -681,6 +694,5 @@ export class AmenitiesService {
     }
 
     return inserted;
-    });
   }
 }

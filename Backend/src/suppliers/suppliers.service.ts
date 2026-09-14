@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { suppliers, supplierCommands, supplierBankDetails, purchaseOrders } from '../database/schema/suppliers.schema.js';
 import { inventoryItems, inventoryLedger } from '../database/schema/restaurant.schema.js';
@@ -15,52 +15,15 @@ import {
   RateSupplierDto
 } from './suppliers.dto.js';
 import { randomUUID } from 'crypto';
+import { commandReceipts } from '../database/schema/commands.schema.js';
+import { requestFingerprint } from '../database/idempotency.js';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 @Injectable()
-export class SuppliersService implements OnModuleInit {
-  private readonly logger = new Logger(SuppliersService.name);
+export class SuppliersService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
-
-  async onModuleInit() {
-    try {
-      // Ensure purchase_orders table and rating columns exist safely
-      await (this.db as any).execute(sql`
-        ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS rating integer DEFAULT 5;
-        ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS rating_notes text;
-
-        CREATE TABLE IF NOT EXISTS purchase_orders (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          property_id uuid NOT NULL REFERENCES properties(id),
-          supplier_id uuid NOT NULL REFERENCES suppliers(id),
-          order_number varchar(40) NOT NULL,
-          status varchar(30) NOT NULL DEFAULT 'draft',
-          expected_delivery_date timestamp,
-          currency varchar(3) NOT NULL DEFAULT 'PEN',
-          subtotal numeric(12, 2) NOT NULL DEFAULT 0,
-          tax numeric(12, 2) NOT NULL DEFAULT 0,
-          total numeric(12, 2) NOT NULL DEFAULT 0,
-          items jsonb NOT NULL DEFAULT '[]',
-          notes text,
-          invoice_number varchar(80),
-          rating integer,
-          rating_notes text,
-          issued_by_account_id uuid,
-          sent_at timestamp,
-          received_at timestamp,
-          created_at timestamp NOT NULL DEFAULT now(),
-          updated_at timestamp NOT NULL DEFAULT now()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier ON purchase_orders(property_id, supplier_id);
-        CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(property_id, status);
-      `);
-      this.logger.log('Suppliers and Purchase Orders schema verified successfully');
-    } catch (e) {
-      this.logger.warn('Suppliers schema check warning: ' + (e as Error).message);
-    }
-  }
 
   async listSuppliers(propertyId: string, options: { page: number; pageSize: number; query?: string; status?: string }) {
     let conditions = [eq(suppliers.propertyId, propertyId)];
@@ -147,6 +110,8 @@ export class SuppliersService implements OnModuleInit {
     if (!supplier) throw new NotFoundException('Supplier not found');
 
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      await this.assertInventoryItems(tx, propertyId, itemIds);
       await tx.update(inventoryItems)
         .set({ supplierId: null, updatedAt: new Date() })
         .where(and(eq(inventoryItems.propertyId, propertyId), eq(inventoryItems.supplierId, supplierId)));
@@ -157,7 +122,7 @@ export class SuppliersService implements OnModuleInit {
           .where(and(eq(inventoryItems.propertyId, propertyId), inArray(inventoryItems.id, itemIds)));
       }
 
-      return this.db.select()
+      return tx.select()
         .from(inventoryItems)
         .where(and(
           eq(inventoryItems.propertyId, propertyId),
@@ -219,52 +184,65 @@ export class SuppliersService implements OnModuleInit {
 
   // ─── Purchase Orders (Órdenes de Compra) ──────────────────────────────────
   async createPurchaseOrder(propertyId: string, dto: CreatePurchaseOrderDto, idempotencyKey: string, accountId: string) {
-    const [supplier] = await this.db.select().from(suppliers).where(and(eq(suppliers.id, dto.supplierId), eq(suppliers.propertyId, propertyId)));
-    if (!supplier) throw new NotFoundException('Supplier not found');
+    return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { supplierId: dto.supplierId, expectedDeliveryDate: dto.expectedDeliveryDate ?? null, currency: dto.currency, notes: dto.notes ?? null, items: dto.items };
+      const receipt = await this.findReceipt(tx, propertyId, 'suppliers.purchase-order.create', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
 
-    const countRes = await this.db.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.propertyId, propertyId));
-    const nextSeq = Number(countRes?.[0]?.count ?? 0) + 1;
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const orderNumber = `OC-${yearMonth}-${String(nextSeq).padStart(4, '0')}`;
+      const [supplier] = await tx.select().from(suppliers).where(and(eq(suppliers.id, dto.supplierId), eq(suppliers.propertyId, propertyId))).limit(1);
+      if (!supplier) throw new NotFoundException('Supplier not found');
 
-    let subtotal = 0;
-    const computedItems = dto.items.map(item => {
-      const lineTotal = Number((item.quantity * (item.unitCost || 0)).toFixed(2));
-      subtotal += lineTotal;
-      return {
-        inventoryItemId: item.inventoryItemId,
-        name: item.name,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitCost: item.unitCost,
-        totalCost: lineTotal,
-      };
+      const inventoryRows = await tx.select().from(inventoryItems).where(and(eq(inventoryItems.propertyId, propertyId), inArray(inventoryItems.id, dto.items.map((item) => item.inventoryItemId))));
+      const inventoryMap = new Map(inventoryRows.map((item) => [item.id, item]));
+      if (inventoryRows.length !== new Set(dto.items.map((item) => item.inventoryItemId)).size) {
+        throw new NotFoundException('One or more inventory items were not found in this property');
+      }
+
+      const countRes = await tx.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.propertyId, propertyId));
+      const nextSeq = Number(countRes?.[0]?.count ?? 0) + 1;
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const orderNumber = `OC-${yearMonth}-${String(nextSeq).padStart(4, '0')}`;
+
+      let subtotal = 0;
+      const computedItems = dto.items.map(item => {
+        const inventoryItem = inventoryMap.get(item.inventoryItemId)!;
+        const lineTotal = Number((item.quantity * (item.unitCost || 0)).toFixed(2));
+        subtotal += lineTotal;
+        return {
+          inventoryItemId: item.inventoryItemId,
+          name: inventoryItem.name,
+          unit: inventoryItem.unit,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          totalCost: lineTotal,
+        };
+      });
+
+      const tax = Number((subtotal * 0.18).toFixed(2));
+      const total = Number((subtotal + tax).toFixed(2));
+      const [created] = await tx.insert(purchaseOrders).values({
+        id: randomUUID(),
+        propertyId,
+        supplierId: dto.supplierId,
+        orderNumber,
+        status: 'draft',
+        expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : null,
+        currency: dto.currency || 'PEN',
+        subtotal: String(subtotal.toFixed(2)),
+        tax: String(tax.toFixed(2)),
+        total: String(total.toFixed(2)),
+        items: computedItems as any,
+        notes: dto.notes ?? null,
+        issuedByAccountId: accountId as any,
+      }).returning();
+      if (!created) throw new BadRequestException('Failed to create purchase order');
+
+      const response = { ...created, supplier: this.mapToResponse(supplier) };
+      await this.saveReceipt(tx, propertyId, 'suppliers.purchase-order.create', idempotencyKey, receiptPayload, response);
+      return response;
     });
-
-    const tax = Number((subtotal * 0.18).toFixed(2)); // IGV 18%
-    const total = Number((subtotal + tax).toFixed(2));
-
-    const [created] = await this.db.insert(purchaseOrders).values({
-      id: randomUUID(),
-      propertyId,
-      supplierId: dto.supplierId,
-      orderNumber,
-      status: 'draft',
-      expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : null,
-      currency: dto.currency || 'PEN',
-      subtotal: String(subtotal.toFixed(2)),
-      tax: String(tax.toFixed(2)),
-      total: String(total.toFixed(2)),
-      items: computedItems as any,
-      notes: dto.notes ?? null,
-      issuedByAccountId: accountId as any,
-    }).returning();
-
-    return {
-      ...created,
-      supplier: this.mapToResponse(supplier),
-    };
   }
 
   async listPurchaseOrders(propertyId: string, options: { supplierId?: string; status?: string }) {
@@ -298,20 +276,38 @@ export class SuppliersService implements OnModuleInit {
     };
   }
 
-  async sendPurchaseOrder(propertyId: string, orderId: string) {
-    const [po] = await this.db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, orderId), eq(purchaseOrders.propertyId, propertyId)));
-    if (!po) throw new NotFoundException('Purchase order not found');
+  async sendPurchaseOrder(propertyId: string, orderId: string, idempotencyKey: string, accountId: string) {
+    return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { orderId, accountId };
+      const receipt = await this.findReceipt(tx, propertyId, 'suppliers.purchase-order.send', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
 
-    const [updated] = await this.db.update(purchaseOrders)
-      .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, orderId))
-      .returning();
+      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, orderId), eq(purchaseOrders.propertyId, propertyId))).limit(1).for('update');
+      if (!po) throw new NotFoundException('Purchase order not found');
+      if (po.status === 'received' || po.status === 'cancelled') throw new ConflictException(`Purchase order cannot be sent from ${po.status}`);
+      if (po.status === 'sent') {
+        await this.saveReceipt(tx, propertyId, 'suppliers.purchase-order.send', idempotencyKey, receiptPayload, po);
+        return po;
+      }
 
-    return updated;
+      const [updated] = await tx.update(purchaseOrders)
+        .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(purchaseOrders.id, orderId), eq(purchaseOrders.propertyId, propertyId)))
+        .returning();
+      if (!updated) throw new BadRequestException('Failed to send purchase order');
+      await this.saveReceipt(tx, propertyId, 'suppliers.purchase-order.send', idempotencyKey, receiptPayload, updated);
+      return updated;
+    });
   }
 
   async receivePurchaseOrder(propertyId: string, orderId: string, dto: ReceivePurchaseOrderDto, idempotencyKey: string, accountId: string) {
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { orderId, invoiceNumber: dto.invoiceNumber ?? null, rating: dto.rating ?? null, ratingNotes: dto.ratingNotes ?? null, notes: dto.notes ?? null };
+      const receipt = await this.findReceipt(tx, propertyId, 'suppliers.purchase-order.receive', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
+
       const [po] = await tx.select().from(purchaseOrders)
         .where(and(eq(purchaseOrders.id, orderId), eq(purchaseOrders.propertyId, propertyId)))
         .for('update');
@@ -330,7 +326,10 @@ export class SuppliersService implements OnModuleInit {
           .where(and(eq(inventoryItems.id, itm.inventoryItemId), eq(inventoryItems.propertyId, propertyId)))
           .for('update');
 
-        if (inv) {
+          if (!inv) {
+            throw new NotFoundException(`Inventory item ${itm.inventoryItemId} not found in this property`);
+          }
+          if (inv) {
           const currentStock = Number(inv.stock || 0);
           const newStock = currentStock + Number(itm.quantity);
 
@@ -382,10 +381,12 @@ export class SuppliersService implements OnModuleInit {
         .where(eq(purchaseOrders.id, orderId))
         .returning();
 
-      return {
+      const response = {
         purchaseOrder: updatedPO,
         restockedItems: updatedInventoryResults,
       };
+      await this.saveReceipt(tx, propertyId, 'suppliers.purchase-order.receive', idempotencyKey, receiptPayload, response);
+      return response;
     });
   }
 
@@ -407,9 +408,10 @@ export class SuppliersService implements OnModuleInit {
 
   // ─── Core Suppliers CRUD ──────────────────────────────────────────────────
   async restockFromSupplier(propertyId: string, supplierId: string, dto: RestockFromSupplierDto, idempotencyKey: string, accountId: string) {
-    const reqFingerprint = JSON.stringify(dto);
+    const reqFingerprint = requestFingerprint(dto);
 
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
       const [existingCommand] = await tx.select().from(supplierCommands)
         .where(and(
           eq(supplierCommands.propertyId, propertyId),
@@ -418,6 +420,9 @@ export class SuppliersService implements OnModuleInit {
         )).for('update');
         
       if (existingCommand) {
+        if (existingCommand.requestFingerprint !== reqFingerprint) {
+          throw new ConflictException('Idempotency key reused with different request body');
+        }
         return JSON.parse(existingCommand.response!);
       }
 
@@ -494,11 +499,12 @@ export class SuppliersService implements OnModuleInit {
   }
 
   async createSupplier(propertyId: string, dto: CreateSupplierDto, idempotencyKey: string, accountId: string) {
-    const reqFingerprint = JSON.stringify(dto);
+    const reqFingerprint = requestFingerprint(dto);
     const taxIdNormalized = dto.taxId.replace(/[^0-9]/g, '');
     const legalNameNormalized = dto.legalName.trim().replace(/\s+/g, ' ').toUpperCase();
 
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
       const [existingCommand] = await tx.select().from(supplierCommands)
         .where(and(
           eq(supplierCommands.propertyId, propertyId),
@@ -536,6 +542,7 @@ export class SuppliersService implements OnModuleInit {
         }).returning();
 
         if (dto.inventoryItemIds && dto.inventoryItemIds.length > 0) {
+          await this.assertInventoryItems(tx, propertyId, dto.inventoryItemIds);
           await tx.update(inventoryItems)
             .set({ supplierId: id, updatedAt: new Date() })
             .where(and(eq(inventoryItems.propertyId, propertyId), inArray(inventoryItems.id, dto.inventoryItemIds)));
@@ -563,9 +570,10 @@ export class SuppliersService implements OnModuleInit {
   }
 
   async updateSupplier(propertyId: string, id: string, dto: UpdateSupplierDto, expectedVersion: number, idempotencyKey: string, accountId: string) {
-    const reqFingerprint = JSON.stringify({ ...dto, expectedVersion });
+    const reqFingerprint = requestFingerprint({ id, dto, expectedVersion });
 
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
       const [existingCommand] = await tx.select().from(supplierCommands)
         .where(and(
           eq(supplierCommands.propertyId, propertyId),
@@ -619,6 +627,7 @@ export class SuppliersService implements OnModuleInit {
             .where(and(eq(inventoryItems.propertyId, propertyId), eq(inventoryItems.supplierId, id)));
 
           if (dto.inventoryItemIds.length > 0) {
+            await this.assertInventoryItems(tx, propertyId, dto.inventoryItemIds);
             await tx.update(inventoryItems)
               .set({ supplierId: id, updatedAt: new Date() })
               .where(and(eq(inventoryItems.propertyId, propertyId), inArray(inventoryItems.id, dto.inventoryItemIds)));
@@ -645,9 +654,10 @@ export class SuppliersService implements OnModuleInit {
   }
 
   async archiveSupplier(propertyId: string, id: string, dto: ArchiveSupplierDto, idempotencyKey: string, accountId: string) {
-    const reqFingerprint = JSON.stringify(dto);
+    const reqFingerprint = requestFingerprint({ id, dto });
     
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
       const [existingCommand] = await tx.select().from(supplierCommands)
         .where(and(
           eq(supplierCommands.propertyId, propertyId),
@@ -655,7 +665,12 @@ export class SuppliersService implements OnModuleInit {
           eq(supplierCommands.idempotencyKey, idempotencyKey)
         )).for('update');
         
-      if (existingCommand) return JSON.parse(existingCommand.response!);
+      if (existingCommand) {
+        if (existingCommand.requestFingerprint !== reqFingerprint) {
+          throw new ConflictException('Idempotency key reused with different request body');
+        }
+        return JSON.parse(existingCommand.response!);
+      }
 
       const [supplier] = await tx.select().from(suppliers)
         .where(and(eq(suppliers.id, id), eq(suppliers.propertyId, propertyId)))
@@ -704,9 +719,10 @@ export class SuppliersService implements OnModuleInit {
   }
 
   async reactivateSupplier(propertyId: string, id: string, dto: ReactivateSupplierDto, idempotencyKey: string, accountId: string) {
-    const reqFingerprint = JSON.stringify(dto);
+    const reqFingerprint = requestFingerprint({ id, dto });
     
     return this.db.transaction(async (tx: Transaction) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
       const [existingCommand] = await tx.select().from(supplierCommands)
         .where(and(
           eq(supplierCommands.propertyId, propertyId),
@@ -714,7 +730,12 @@ export class SuppliersService implements OnModuleInit {
           eq(supplierCommands.idempotencyKey, idempotencyKey)
         )).for('update');
         
-      if (existingCommand) return JSON.parse(existingCommand.response!);
+      if (existingCommand) {
+        if (existingCommand.requestFingerprint !== reqFingerprint) {
+          throw new ConflictException('Idempotency key reused with different request body');
+        }
+        return JSON.parse(existingCommand.response!);
+      }
 
       const [supplier] = await tx.select().from(suppliers)
         .where(and(eq(suppliers.id, id), eq(suppliers.propertyId, propertyId)))
@@ -752,6 +773,45 @@ export class SuppliersService implements OnModuleInit {
          throw err;
       }
     });
+  }
+
+  private async findReceipt(tx: Transaction, propertyId: string, operation: string, idempotencyKey: string, payload: unknown) {
+    const fingerprint = requestFingerprint(payload);
+    const [existing] = await tx.select({
+      response: commandReceipts.response,
+      requestFingerprint: commandReceipts.requestFingerprint,
+    }).from(commandReceipts).where(and(
+      eq(commandReceipts.propertyId, propertyId),
+      eq(commandReceipts.operation, operation),
+      eq(commandReceipts.idempotencyKey, idempotencyKey),
+    )).limit(1).for('update');
+
+    if (!existing) return null;
+    if (existing.requestFingerprint !== fingerprint) throw new ConflictException('IDEMPOTENCY_KEY_REUSED');
+    return existing.response;
+  }
+
+  private async saveReceipt(tx: Transaction, propertyId: string, operation: string, idempotencyKey: string, payload: unknown, response: unknown) {
+    await tx.insert(commandReceipts).values({
+      propertyId,
+      operation,
+      idempotencyKey,
+      requestFingerprint: requestFingerprint(payload),
+      responseStatus: 200,
+      response,
+    });
+  }
+
+  private async assertInventoryItems(tx: Transaction, propertyId: string, itemIds: string[]): Promise<void> {
+    if (itemIds.length === 0) return;
+    const uniqueItemIds = [...new Set(itemIds)];
+    const rows = await tx.select({ id: inventoryItems.id }).from(inventoryItems).where(and(
+      eq(inventoryItems.propertyId, propertyId),
+      inArray(inventoryItems.id, uniqueItemIds),
+    ));
+    if (rows.length !== uniqueItemIds.length) {
+      throw new NotFoundException('One or more inventory items were not found in this property');
+    }
   }
 
   private mapToResponse(row: any) {

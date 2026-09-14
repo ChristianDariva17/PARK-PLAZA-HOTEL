@@ -95,7 +95,7 @@ export class AuthService {
       created = inserted.length > 0;
     }
     const accessRequest = request[0]!;
-    if (created) await this.audit.record({ ...context, eventType: 'auth.google.registration_requested', subjectType: 'google_access_request', subjectId: accessRequest.id, propertyId: registrationPropertyId, metadata: { email: identity.email } });
+    if (created) await this.audit.record({ ...context, eventType: 'auth.google.registration_requested', subjectType: 'google_access_request', subjectId: accessRequest.id, propertyId: registrationPropertyId, metadata: { emailHash: this.crypto.hashLoginKey(identity.email) } });
     if (accessRequest.status === 'rejected') throw new ForbiddenException('Google access request was rejected');
     if (accessRequest.status !== 'pending') throw new UnauthorizedException('Google account is not available');
     return { status: 'pending' as const, message: 'Tu solicitud fue enviada para revisión administrativa.' };

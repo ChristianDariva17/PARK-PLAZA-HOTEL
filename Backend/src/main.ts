@@ -2,6 +2,7 @@ import 'dotenv/config';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
@@ -12,6 +13,7 @@ async function bootstrap(): Promise<void> {
   const environment = validateEnv(process.env);
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ trustProxy: environment.API_TRUST_PROXY_HOPS, bodyLimit: 5 * 1024 * 1024 }));
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
   await app.register(helmet);
   await app.register(cookie);
   app.enableShutdownHooks();

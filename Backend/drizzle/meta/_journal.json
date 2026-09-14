@@ -121,6 +121,10 @@
     { "idx": 44, "version": "7", "when": 1788316200000, "tag": "0044_canonical_supplier_schema", "breakpoints": true },
      { "idx": 45, "version": "7", "when": 1788323400000, "tag": "0045_folio_read_performance", "breakpoints": true },
        { "idx": 46, "version": "7", "when": 1788327000000, "tag": "0046_customer_amenity_commands", "breakpoints": true },
-       { "idx": 47, "version": "7", "when": 1788328800000, "tag": "0047_room_category_amenities", "breakpoints": true }
+        { "idx": 47, "version": "7", "when": 1788328800000, "tag": "0047_room_category_amenities", "breakpoints": true },
+         { "idx": 48, "version": "7", "when": 1788330600000, "tag": "0048_amenity_permissions", "breakpoints": true },
+          { "idx": 49, "version": "7", "when": 1788334200000, "tag": "0049_customer_amenity_checkout_facts", "breakpoints": true },
+           { "idx": 50, "version": "7", "when": 1789401022163, "tag": "0050_phase_1_security_boundaries", "breakpoints": true },
+           { "idx": 51, "version": "7", "when": 1789402000000, "tag": "0051_phase_2_transaction_integrity", "breakpoints": true }
   ]
 }

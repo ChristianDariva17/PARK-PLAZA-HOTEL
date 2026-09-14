@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AttendanceService } from './attendance.service.js';
 import { BridgeCapabilityService } from './bridge-capability.service.js';
@@ -6,6 +6,9 @@ import { RequirePermissions } from '../auth/decorators/require-permissions.decor
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
 import { getRequestContext } from '../auth/request-context.js';
+import { DATABASE, type Database } from '../database/database.module.js';
+import { guests, staff } from '../database/schema/index.js';
+import { and, eq } from 'drizzle-orm';
 import { parseBridgeCapabilityDto, parseReportManualAttendanceDto, parseSubmitCorrectionDto, parseApproveCorrectionDto, parseReportBiometricAttendanceDto, parseReportQrAttendanceDto } from './attendance.dto.js';
 
 @Controller('attendance')
@@ -13,6 +16,7 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly bridgeCapabilities: BridgeCapabilityService,
+    @Inject(DATABASE) private readonly database: Database,
   ) {}
 
   @Get('events')
@@ -65,7 +69,7 @@ export class AttendanceController {
       if (!actor.permissions.some((permission) => ['guests.biometric', 'staff.biometric', 'staff.attendance'].includes(permission))) {
         throw new ForbiddenException('Insufficient permissions');
       }
-      return this.bridgeCapabilities.issue('health');
+      return this.bridgeCapabilities.issue('health', undefined, actor.propertyId);
     }
 
     const required = request.subjectType === 'client'
@@ -76,7 +80,13 @@ export class AttendanceController {
     if (!required.every((permission) => actor.permissions.includes(permission))) {
       throw new ForbiddenException('Insufficient permissions');
     }
-    return this.bridgeCapabilities.issue(request.operation, { type: request.subjectType, id: request.subjectId });
+    const subjectTable = request.subjectType === 'employee' ? staff : guests;
+    const [subject] = await this.database.select({ id: subjectTable.id })
+      .from(subjectTable)
+      .where(and(eq(subjectTable.id, request.subjectId), eq(subjectTable.propertyId, actor.propertyId)))
+      .limit(1);
+    if (!subject) throw new NotFoundException('Sujeto biométrico no encontrado');
+    return this.bridgeCapabilities.issue(request.operation, { type: request.subjectType, id: request.subjectId }, actor.propertyId);
   }
 
   @Post('corrections')

@@ -1,10 +1,12 @@
 import { authRequest } from '../auth/authClient.js';
 
+const idempotencyKey = () => globalThis.crypto?.randomUUID?.() || (() => { throw new Error('Secure random UUID is unavailable'); })();
+
 export const evidenceClient = {
   registerEvidence: async (data) => {
     return authRequest('/api/documents/evidences', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, idempotencyKey: data.idempotencyKey || idempotencyKey() }),
     });
   },
 

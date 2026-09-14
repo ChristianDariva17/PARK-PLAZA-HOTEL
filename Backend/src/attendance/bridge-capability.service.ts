@@ -7,6 +7,7 @@ interface BridgeCapabilityPayload {
   op: BridgeCapabilityOperation;
   st?: 'client' | 'employee';
   sid?: string;
+  pid?: string;
   exp: number;
   jti: string;
 }
@@ -23,19 +24,20 @@ export class BridgeCapabilityService {
     this.secret = secret;
   }
 
-  issue(operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }) {
+  issue(operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }, propertyId?: string) {
     const expiresAt = new Date(Date.now() + 60_000);
     const payload: BridgeCapabilityPayload = {
       op: operation,
       exp: Math.floor(expiresAt.getTime() / 1000),
       jti: randomUUID(),
       ...(subject ? { st: subject.type, sid: subject.id } : {}),
+      ...(propertyId ? { pid: propertyId } : {}),
     };
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     return { token: `${encoded}.${this.sign(encoded)}`, expiresAt: expiresAt.toISOString() };
   }
 
-  verify(token: string, operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }) {
+  verify(token: string, operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }, propertyId?: string) {
     const [encoded, signature] = token.split('.');
     if (!encoded || !signature) throw new Error('Invalid bridge capability');
     const expected = this.sign(encoded);
@@ -55,6 +57,9 @@ export class BridgeCapabilityService {
     }
     if (subject && (payload.st !== subject.type || payload.sid !== subject.id)) {
       throw new Error('Bridge capability subject mismatch');
+    }
+    if (propertyId && payload.pid !== propertyId) {
+      throw new Error('Bridge capability property mismatch');
     }
     return payload;
   }

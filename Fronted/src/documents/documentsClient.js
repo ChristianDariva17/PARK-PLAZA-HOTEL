@@ -1,10 +1,17 @@
 import { authRequest } from '../auth/authClient.js';
 
+const idempotencyKey = () => globalThis.crypto?.randomUUID?.() || (() => { throw new Error('Secure random UUID is unavailable'); })();
+
+const withIdempotencyKey = (data = {}) => ({
+  ...data,
+  idempotencyKey: data.idempotencyKey || idempotencyKey(),
+});
+
 export const documentsClient = {
   createContract: async (data) => {
     return authRequest('/api/documents/contracts', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(withIdempotencyKey(data)),
     });
   },
 
@@ -22,21 +29,21 @@ export const documentsClient = {
   transitionContract: async (id, data) => {
     return authRequest(`/api/documents/contracts/${id}/transition`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(withIdempotencyKey(data)),
     });
   },
 
   linkEvidence: async (id, data) => {
     return authRequest(`/api/documents/contracts/${id}/link-evidence`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(withIdempotencyKey(data)),
     });
   },
 
   registerEvidence: async (data) => {
     return authRequest('/api/documents/evidences', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(withIdempotencyKey(data)),
     });
   },
 

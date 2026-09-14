@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { DATABASE } from '../database/database.module.js';
 import { auditEvents, notifications } from '../database/schema/index.js';
 import type { RequestContext } from '../auth/auth.types.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { OutboxService } from './outbox.service.js';
 
 type AuditEventRow = typeof auditEvents.$inferInsert;
 
@@ -13,6 +14,10 @@ interface AuditInsert {
 
 export interface AuditExecutor {
   insert(table: any): AuditInsert;
+}
+
+interface AuditTransactionalExecutor extends AuditExecutor {
+  transaction(callback: (executor: AuditExecutor) => Promise<void>): Promise<unknown>;
 }
 
 export interface AuditEventInput extends RequestContext {
@@ -38,7 +43,7 @@ export class AuditService {
 
   constructor(
     @Inject(DATABASE) private readonly database: AuditExecutor,
-    @Optional() private readonly realtime?: RealtimeGateway,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   async listEvents(propertyId: string, limit: number, offset: number) {
@@ -46,14 +51,30 @@ export class AuditService {
   }
 
   async record(event: AuditEventInput, executor: AuditExecutor = this.database): Promise<void> {
-    await executor.insert(auditEvents).values(this.buildEvent(event));
-    await this.notify(event);
+    if (executor === this.database && typeof (this.database as { transaction?: unknown }).transaction === 'function') {
+      await (this.database as AuditTransactionalExecutor).transaction((tx) => this.recordInExecutor(event, tx));
+      return;
+    }
+    await this.recordInExecutor(event, executor);
   }
 
   async recordMany(events: readonly AuditEventInput[], executor: AuditExecutor = this.database): Promise<void> {
     if (events.length === 0) return;
+    if (executor === this.database && typeof (this.database as { transaction?: unknown }).transaction === 'function') {
+      await (this.database as AuditTransactionalExecutor).transaction((tx) => this.recordManyInExecutor(events, tx));
+      return;
+    }
+    await this.recordManyInExecutor(events, executor);
+  }
+
+  private async recordInExecutor(event: AuditEventInput, executor: AuditExecutor): Promise<void> {
+    await executor.insert(auditEvents).values(this.buildEvent(event));
+    await this.queueNotification(event, executor);
+  }
+
+  private async recordManyInExecutor(events: readonly AuditEventInput[], executor: AuditExecutor): Promise<void> {
     await executor.insert(auditEvents).values(events.map((event) => this.buildEvent(event)));
-    await Promise.all(events.map((event) => this.notify(event)));
+    for (const event of events) await this.queueNotification(event, executor);
   }
 
   private buildEvent(event: AuditEventInput): AuditEventRow {
@@ -70,7 +91,7 @@ export class AuditService {
     };
   }
 
-  private async notify(event: AuditEventInput): Promise<void> {
+  private async queueNotification(event: AuditEventInput, executor: AuditExecutor): Promise<void> {
     if (!event.propertyId || !event.actorAccountId || event.eventType.startsWith('notification.')) return;
 
     const details = this.formatNotificationDetails(event);
@@ -81,9 +102,9 @@ export class AuditService {
       originalEventType: event.eventType,
     };
 
-    try {
-      await this.database.insert(notifications).values([
+    const notificationRows = [
       {
+        id: randomUUID(),
         propertyId: event.propertyId,
         targetAccountId: event.actorAccountId,
         type: details.priority,
@@ -93,6 +114,7 @@ export class AuditService {
         metadata: sanitizedMetadata,
       },
       {
+        id: randomUUID(),
         propertyId: event.propertyId,
         targetRole: 'administrator',
         type: details.priority,
@@ -102,6 +124,7 @@ export class AuditService {
         metadata: sanitizedMetadata,
       },
       ...(this.roleFor(details.department) ? [{
+        id: randomUUID(),
         propertyId: event.propertyId,
         targetRole: this.roleFor(details.department),
         type: details.priority === 'HIGH' ? 'ALARM' : 'TASK',
@@ -110,19 +133,23 @@ export class AuditService {
         actionLink: details.route,
         metadata: sanitizedMetadata,
       }] : []),
-      ]);
+    ];
 
-      if (this.realtime && event.propertyId) {
-        this.realtime.emitToProperty(event.propertyId, 'notification:new', {
+    await executor.insert(notifications).values(notificationRows);
+    if (this.outbox) {
+      await this.outbox.enqueue(executor, {
+        propertyId: event.propertyId,
+        eventType: 'notification:new',
+        ...(event.subjectType ? { aggregateType: event.subjectType } : {}),
+        ...(event.subjectId ? { aggregateId: event.subjectId } : {}),
+        payload: {
           ...details,
-          id: `notif-${Date.now()}`,
+          id: notificationRows[0]!.id,
           createdAt: new Date().toISOString(),
           isRead: false,
           read: false,
-        });
-      }
-    } catch (error) {
-      this.logger.error(`Failed to create notification for audit event ${event.eventType}`, error);
+        },
+      });
     }
   }
 
@@ -353,13 +380,14 @@ export class AuditService {
   }
 
   private sanitize(value: Record<string, unknown>): Record<string, unknown> {
-    const sensitive = /(password|token|secret|authorization|cookie)/i;
-    return Object.fromEntries(Object.entries(value).filter(([key]) => !sensitive.test(key)).map(([key, item]) => [key, this.sanitizeValue(item, sensitive)]));
+    const credential = /(password|token|secret|authorization|cookie)/i;
+    const pii = /(email(?!hash)|phone|documentNumber|address|emergencyContact|photoUrl)/i;
+    return Object.fromEntries(Object.entries(value).filter(([key]) => !credential.test(key)).map(([key, item]) => [key, pii.test(key) ? '[REDACTED]' : this.sanitizeValue(item, credential, pii)]));
   }
 
-  private sanitizeValue(value: unknown, sensitive: RegExp): unknown {
-    if (Array.isArray(value)) return value.map((item) => this.sanitizeValue(item, sensitive));
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !sensitive.test(key)).map(([key, item]) => [key, this.sanitizeValue(item, sensitive)]));
+  private sanitizeValue(value: unknown, credential: RegExp, pii: RegExp): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.sanitizeValue(item, credential, pii));
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !credential.test(key)).map(([key, item]) => [key, pii.test(key) ? '[REDACTED]' : this.sanitizeValue(item, credential, pii)]));
     return value;
   }
 }

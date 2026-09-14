@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { foreignKey, index, jsonb, pgEnum, pgTable, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { properties } from './hotel.schema.js';
 import { accounts } from './security.schema.js';
 import { reservations } from './reservations.schema.js';
@@ -15,7 +15,13 @@ export const contracts = pgTable('contracts', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
+  unique('contracts_id_property_id_unique').on(table.id, table.propertyId),
   uniqueIndex('contracts_property_reference_unique').on(table.propertyId, table.reference),
+  foreignKey({
+    name: 'contracts_reservation_property_fkey',
+    columns: [table.reservationId, table.propertyId],
+    foreignColumns: [reservations.id, reservations.propertyId],
+  }).onDelete('set null'),
 ]);
 
 export const contractVersions = pgTable('contract_versions', {
@@ -31,6 +37,16 @@ export const contractVersions = pgTable('contract_versions', {
 }, (table) => [
   uniqueIndex('contract_versions_contract_number_unique').on(table.contractId, table.versionNumber),
   uniqueIndex('contract_versions_idempotency_unique').on(table.propertyId, table.idempotencyKey),
+  foreignKey({
+    name: 'contract_versions_contract_property_fkey',
+    columns: [table.contractId, table.propertyId],
+    foreignColumns: [contracts.id, contracts.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'contract_versions_creator_property_fkey',
+    columns: [table.creatorAccountId, table.propertyId],
+    foreignColumns: [accounts.id, accounts.propertyId],
+  }).onDelete('restrict'),
 ]);
 
 export const evidences = pgTable('evidences', {
@@ -42,7 +58,14 @@ export const evidences = pgTable('evidences', {
   metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
   creatorAccountId: uuid('creator_account_id').notNull().references(() => accounts.id, { onDelete: 'restrict' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  unique('evidences_id_property_id_unique').on(table.id, table.propertyId),
+  foreignKey({
+    name: 'evidences_creator_property_fkey',
+    columns: [table.creatorAccountId, table.propertyId],
+    foreignColumns: [accounts.id, accounts.propertyId],
+  }).onDelete('restrict'),
+]);
 
 export const contractEvidenceLinks = pgTable('contract_evidence_links', {
   id: uuid().defaultRandom().primaryKey(),
@@ -54,4 +77,19 @@ export const contractEvidenceLinks = pgTable('contract_evidence_links', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('contract_evidence_links_unique').on(table.contractId, table.evidenceId),
+  foreignKey({
+    name: 'contract_evidence_links_contract_property_fkey',
+    columns: [table.contractId, table.propertyId],
+    foreignColumns: [contracts.id, contracts.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'contract_evidence_links_evidence_property_fkey',
+    columns: [table.evidenceId, table.propertyId],
+    foreignColumns: [evidences.id, evidences.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'contract_evidence_links_linked_by_property_fkey',
+    columns: [table.linkedByAccountId, table.propertyId],
+    foreignColumns: [accounts.id, accounts.propertyId],
+  }).onDelete('restrict'),
 ]);

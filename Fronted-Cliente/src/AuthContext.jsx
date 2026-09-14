@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }) => {
   const synchronizedUid = useRef(null);
   const pendingSynchronization = useRef(null);
   const loggingOut = useRef(false);
+  const e2eAnonymousMode = import.meta.env.DEV && import.meta.env.VITE_E2E_ANONYMOUS === 'true';
 
   const synchronize = useCallback((firebaseUser) => {
     const key = firebaseUser?.uid ?? 'backend-session';
@@ -76,10 +77,16 @@ export const AuthProvider = ({ children }) => {
     return promise;
   }, []);
 
-  useEffect(() => onAuthStateChanged(auth, (firebaseUser) => {
-    if (loggingOut.current) return;
-    void synchronize(firebaseUser).catch(() => undefined);
-  }), [synchronize]);
+  useEffect(() => {
+    if (e2eAnonymousMode) {
+      void synchronize(null).catch(() => undefined);
+      return undefined;
+    }
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      if (loggingOut.current) return;
+      void synchronize(firebaseUser).catch(() => undefined);
+    });
+  }, [e2eAnonymousMode, synchronize]);
 
   const completeSignIn = async (operation) => {
     disconnectCustomerSocket();

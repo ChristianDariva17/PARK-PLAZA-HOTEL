@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req, ForbiddenException } from '@nestjs/common';
 import { DocumentsService } from './documents.service.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { AuthenticatedAccount } from '../auth/auth.types.js';
@@ -27,7 +27,7 @@ export class DocumentsController {
   }
 
   @Post('contracts')
-  @RequirePermissions('contracts.read')
+  @RequirePermissions('contracts.amend')
   async createContract(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
@@ -49,7 +49,7 @@ export class DocumentsController {
   ) {
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 50);
-    const items = await this.documentsService.listContracts(account.propertyId, page, limit, query.status);
+    const items = await this.documentsService.listContracts(account.propertyId, page, limit, query.status, query.reference);
     return {
       data: items,
       total: items.length,
@@ -68,13 +68,16 @@ export class DocumentsController {
   }
 
   @Post('contracts/:id/transition')
-  @RequirePermissions('contracts.read')
+  @RequirePermissions('contracts.amend')
   async transitionContract(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
     @Param('id') id: string,
     @Body() dto: TransitionContractDto
   ) {
+    if (dto.targetState === 'VOID' && !account.permissions.includes('contracts.void')) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
     return this.documentsService.transitionContract(
       account.propertyId,
       account.accountId,
@@ -85,7 +88,7 @@ export class DocumentsController {
   }
 
   @Post('contracts/:id/link-evidence')
-  @RequirePermissions('contracts.read')
+  @RequirePermissions('contracts.amend')
   async linkEvidence(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
@@ -102,7 +105,7 @@ export class DocumentsController {
   }
 
   @Post('evidences')
-  @RequirePermissions('evidence.read')
+  @RequirePermissions('evidence.manage')
   async registerEvidence(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,

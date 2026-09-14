@@ -31,6 +31,7 @@ import { RolesModule } from './roles/roles.module.js';
 import { CommunicationsModule } from './communications/communications.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { ExperiencesModule } from './experiences/experiences.module.js';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { SettingsModule } from './settings/settings.module.js';
     RolesModule,
     SettingsModule,
     CommunicationsModule,
+    ExperiencesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

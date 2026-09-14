@@ -5,14 +5,15 @@ import { HttpExceptionFilter } from '../src/http/http-exception.filter.js';
 function httpContext(requestId: string) {
   const send = vi.fn();
   const status = vi.fn().mockReturnValue({ send });
+  const header = vi.fn();
   const host = {
     switchToHttp: () => ({
       getRequest: () => ({ id: requestId }),
-      getResponse: () => ({ status }),
+      getResponse: () => ({ status, header }),
     }),
   } as unknown as ArgumentsHost;
 
-  return { host, send, status };
+  return { host, send, status, header };
 }
 
 describe('HttpExceptionFilter', () => {
@@ -68,10 +69,11 @@ describe('HttpExceptionFilter', () => {
 
   it('copies the Fastify request ID exactly', () => {
     const requestId = 'req-01HZX/exact:value';
-    const { host, send } = httpContext(requestId);
+    const { host, send, header } = httpContext(requestId);
 
     new HttpExceptionFilter().catch(new HttpException({ error: 'Teapot', message: 'Short and stout' }, 418), host);
 
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ requestId }));
+    expect(header).toHaveBeenCalledWith('X-Request-Id', requestId);
   });
 });

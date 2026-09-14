@@ -40,7 +40,7 @@ describe('AuditService', () => {
     expect(transaction.values).toHaveBeenCalledWith({ eventType: 'account.created', metadata: {} });
   });
 
-  it('keeps notification writes outside the audit transaction', async () => {
+  it('keeps notification writes inside the audit transaction', async () => {
     const database = createExecutor();
     const transaction = createExecutor();
     const service = new AuditService(database.executor);
@@ -48,10 +48,10 @@ describe('AuditService', () => {
     await service.record({ propertyId: 'property-id', actorAccountId: 'account-id', eventType: 'auth.login' }, transaction.executor);
 
     expect(transaction.insert).toHaveBeenCalledWith(auditEvents);
-    expect(database.insert).toHaveBeenCalledWith(notifications);
+    expect(transaction.insert).toHaveBeenCalledWith(notifications);
   });
 
-  it('does not fail the audit record when notification delivery fails', async () => {
+  it('propagates notification persistence failures for transaction rollback', async () => {
     const auditInsert = vi.fn((_table: typeof auditEvents) => ({ values: vi.fn(async () => undefined) }));
     const database: AuditExecutor = {
       insert: vi.fn((table: typeof auditEvents | typeof notifications) => {
@@ -61,7 +61,7 @@ describe('AuditService', () => {
     };
     const service = new AuditService(database);
 
-    await expect(service.record({ propertyId: 'property-id', actorAccountId: 'account-id', eventType: 'auth.login' })).resolves.toBeUndefined();
+    await expect(service.record({ propertyId: 'property-id', actorAccountId: 'account-id', eventType: 'auth.login' })).rejects.toThrow('notification unavailable');
     expect(auditInsert).toHaveBeenCalledWith(auditEvents);
   });
 
@@ -108,6 +108,8 @@ describe('AuditService', () => {
       eventType: 'metadata.checked',
       metadata: {
         Password: 'removed',
+        email: 'guest@example.com',
+        emailHash: 'stable-hash',
         profile: {
           displayName: 'Safe Name',
           AUTHORIZATION: 'removed',
@@ -124,6 +126,8 @@ describe('AuditService', () => {
     expect(database.values).toHaveBeenCalledWith({
       eventType: 'metadata.checked',
       metadata: {
+        email: '[REDACTED]',
+        emailHash: 'stable-hash',
         profile: {
           displayName: 'Safe Name',
           items: [

@@ -87,6 +87,7 @@ export const staff = pgTable('staff', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
+  unique('staff_id_property_id_unique').on(table.id, table.propertyId),
   index('staff_property_idx').on(table.propertyId),
   foreignKey({ columns: [table.accountId, table.propertyId], foreignColumns: [accounts.id, accounts.propertyId] }).onDelete('restrict'),
 ]);

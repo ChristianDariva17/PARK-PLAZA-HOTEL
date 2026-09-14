@@ -15,6 +15,7 @@ export * from './customer.schema.js';
 export * from './amenities.schema.js';
 
 export * from './communications.schema.js';
+export * from './commands.schema.js';
 export * from './documents.schema.js';
 export * from './events.schema.js';
 export * from './experiences.schema.js';

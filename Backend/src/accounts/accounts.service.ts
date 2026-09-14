@@ -65,7 +65,7 @@ export class AccountsService {
         if (input.personnelId) await this.claimPersonnel(tx, actor.propertyId, id, input.personnelId);
         await this.audit.record({
           ...this.auditBase(actor, context), eventType: 'account.created', subjectType: 'account', subjectId: id,
-          metadata: { email: input.email, roleKey: input.roleKey, personnelId: input.personnelId ?? null },
+          metadata: { emailHash: this.crypto.hashLoginKey(input.email.trim().toLowerCase()), roleKey: input.roleKey, personnelId: input.personnelId ?? null },
         }, tx);
         return id;
       });
@@ -163,7 +163,7 @@ export class AccountsService {
           status: 'approved', accountId: id, reviewedByAccountId: actor.accountId, reviewedAt: new Date(), updatedAt: new Date(),
         }).where(eq(googleAccessRequests.id, accessRequest.id));
         await this.audit.recordMany([
-          { ...this.auditBase(actor, context), eventType: 'account.google_approved', subjectType: 'account', subjectId: id, metadata: { requestId: accessRequest.id, email: accessRequest.email, roleKey: input.roleKey, personnelId: input.personnelId ?? null } },
+          { ...this.auditBase(actor, context), eventType: 'account.google_approved', subjectType: 'account', subjectId: id, metadata: { requestId: accessRequest.id, emailHash: this.crypto.hashLoginKey(accessRequest.email), roleKey: input.roleKey, personnelId: input.personnelId ?? null } },
           { ...this.auditBase(actor, context), eventType: 'auth.google.registration_approved', subjectType: 'google_access_request', subjectId: accessRequest.id, metadata: { accountId: id } },
         ], tx);
         return id;

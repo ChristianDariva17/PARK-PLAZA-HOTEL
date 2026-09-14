@@ -1,35 +1,45 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException, UnauthorizedException, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { lt } from 'drizzle-orm';
+import { DATABASE, type Database } from '../database/database.module.js';
+import { attendanceQrNonces } from '../database/schema/index.js';
 
 interface QrPayload {
   p: string; // propertyId
   t: number; // timestamp in ms
   n: string; // nonce uuid
+  e: number; // expiry timestamp in ms
+}
+
+export interface VerifiedQrToken {
+  propertyId: string;
+  nonce: string;
+  issuedAt: Date;
+  expiresAt: Date;
 }
 
 @Injectable()
-export class DynamicQrService {
+export class DynamicQrService implements OnModuleInit, OnApplicationShutdown {
   private readonly secretKey: string;
+  private cleanupTimer?: NodeJS.Timeout;
 
-  // Anti-replay cache: stores consumed nonces with timestamp to prevent duplicate punches
-  private readonly consumedNonces = new Map<string, number>();
-
-  constructor() {
+  constructor(@Inject(DATABASE) private readonly database: Database) {
     const secretKey = process.env.ATTENDANCE_QR_SECRET;
     if (!secretKey || secretKey.length < 32) {
       throw new Error('ATTENDANCE_QR_SECRET must contain at least 32 characters');
     }
     this.secretKey = secretKey;
+  }
 
-    // Purge expired nonces every 2 minutes
-    setInterval(() => {
-      const cutoff = Date.now() - 60000;
-      for (const [nonce, timestamp] of this.consumedNonces.entries()) {
-        if (timestamp < cutoff) {
-          this.consumedNonces.delete(nonce);
-        }
-      }
-    }, 120000).unref();
+  onModuleInit(): void {
+    this.cleanupTimer = setInterval(() => {
+      void this.cleanupExpiredNonces().catch(() => undefined);
+    }, 120_000);
+    this.cleanupTimer.unref();
+  }
+
+  onApplicationShutdown(): void {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
   }
 
   /**
@@ -41,6 +51,7 @@ export class DynamicQrService {
       p: propertyId,
       t: timestamp,
       n: randomUUID(),
+      e: timestamp + ttlSeconds * 1000,
     };
 
     const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -57,7 +68,7 @@ export class DynamicQrService {
   /**
    * Validates a scanned QR token against the property, signature, expiration window, and anti-replay protection.
    */
-  verifyAndConsumeToken(tokenString: string, expectedPropertyId: string): { propertyId: string; timestamp: Date } {
+  verifyToken(tokenString: string, expectedPropertyId: string): VerifiedQrToken {
     if (!tokenString || typeof tokenString !== 'string') {
       throw new BadRequestException('Token de QR inválido o vacío');
     }
@@ -89,11 +100,15 @@ export class DynamicQrService {
       throw new BadRequestException('El código QR no corresponde a esta propiedad del hotel');
     }
 
+    if (!payload.n || !payload.e || !Number.isFinite(payload.t) || !Number.isFinite(payload.e)) {
+      throw new BadRequestException('Payload de código QR inválido');
+    }
+
     const now = Date.now();
     const ageMs = now - payload.t;
 
     // Allowed validity: 25 seconds (20s cycle + 5s network grace)
-    if (ageMs > 25000) {
+    if (now > payload.e + 5000) {
       throw new BadRequestException('El código QR ha expirado. Escaneá el código actualizado en la pantalla.');
     }
 
@@ -101,18 +116,30 @@ export class DynamicQrService {
       throw new BadRequestException('La hora del código QR no concuerda con el servidor.');
     }
 
-    // Anti-replay check
-    if (this.consumedNonces.has(payload.n)) {
-      throw new BadRequestException('Este código QR ya fue utilizado. Por favor esperá el siguiente en pantalla.');
-    }
-
-    // Mark as consumed
-    this.consumedNonces.set(payload.n, now);
-
     return {
       propertyId: payload.p,
-      timestamp: new Date(payload.t),
+      nonce: payload.n,
+      issuedAt: new Date(payload.t),
+      expiresAt: new Date(payload.e),
     };
+  }
+
+  async consumeToken(transaction: Pick<Database, 'insert'>, token: VerifiedQrToken): Promise<void> {
+    const inserted = await (transaction as any).insert(attendanceQrNonces).values({
+      nonce: token.nonce,
+      propertyId: token.propertyId,
+      issuedAt: token.issuedAt,
+      expiresAt: token.expiresAt,
+      consumedAt: new Date(),
+    }).onConflictDoNothing({ target: attendanceQrNonces.nonce }).returning({ nonce: attendanceQrNonces.nonce });
+
+    if (!inserted.length) {
+      throw new BadRequestException('Este código QR ya fue utilizado. Por favor esperá el siguiente en pantalla.');
+    }
+  }
+
+  private async cleanupExpiredNonces(): Promise<void> {
+    await this.database.delete(attendanceQrNonces).where(lt(attendanceQrNonces.expiresAt, new Date()));
   }
 
   private sign(data: string): string {

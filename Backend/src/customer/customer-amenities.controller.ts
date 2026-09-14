@@ -5,6 +5,7 @@ import { CustomerSessionGuard } from './customer-session.guard.js';
 import type { CustomerAuthenticatedRequest } from './customer.types.js';
 import { z } from 'zod';
 import { parseCustomerIdempotencyKey } from './customer.dto.js';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 const CreateReservationSchema = z.object({
   amenityType: z.string().min(1).max(50),
@@ -38,7 +39,7 @@ export class CustomerAmenitiesController {
   @Post('reservations')
   @UseGuards(CustomerSessionGuard)
   async createReservation(@Req() req: CustomerAuthenticatedRequest, @Body() body: any, @Headers('idempotency-key') idempotencyKey: unknown) {
-    const data = CreateReservationSchema.parse(body);
+    const data = parseZodHttp(CreateReservationSchema, body, 'Invalid amenity reservation');
     return this.amenitiesService.createReservation(req.customer!, data, parseCustomerIdempotencyKey(idempotencyKey));
   }
 }

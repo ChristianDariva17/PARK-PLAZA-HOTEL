@@ -6,7 +6,7 @@ RUN npm ci
 FROM dependencies AS build
 COPY nest-cli.json tsconfig.json ./
 COPY src ./src
-RUN npm run build || true
+RUN npm run build
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime

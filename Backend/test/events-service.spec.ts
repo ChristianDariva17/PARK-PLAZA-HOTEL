@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { EventsService } from '../src/events/events.service.js';
 import type { AuditService } from '../src/audit/audit.service.js';
 import type { FolioService } from '../src/folios/folio.service.js';
+import { requestFingerprint } from '../src/database/idempotency.js';
 
 describe('EventsService', () => {
   let service: EventsService;
@@ -27,6 +28,24 @@ describe('EventsService', () => {
       execute: vi.fn(),
       query: {
         events: { findFirst: vi.fn(), findMany: vi.fn() },
+        eventSpaces: { findFirst: vi.fn().mockResolvedValue({
+          id: 'space-1',
+          active: true,
+          capacity: null,
+          minimumDurationMinutes: 1,
+          baseRate: '0',
+          includedMinutes: 60,
+          extraMinuteRate: '0',
+          cleaningFee: '0',
+          taxRate: '0',
+          depositPercentage: '0',
+          guaranteeAmount: '0',
+          setupMinutes: 0,
+          teardownMinutes: 0,
+          rules: {},
+          cancellationPolicy: {},
+          spaceServices: [],
+        }) },
       },
     };
 
@@ -76,21 +95,22 @@ describe('EventsService', () => {
     });
 
     it('returns the same response if idempotency key matches and fingerprint is identical', async () => {
-      // Mock existing idempotency command
-      vi.mocked(tx.limit).mockResolvedValueOnce([
-        { response: { id: 'existing-1', status: 'draft' }, fingerprint: 'create_event' }
-      ]);
-
-      const result = await service.createEvent('prop-1', 'actor-1', {
+      const request = {
         spaceId: 'space-1',
         title: 'New Event',
         timeKind: 'full_day',
-        startsAt: new Date().toISOString(),
-        endsAt: new Date(Date.now() + 86400000).toISOString(),
+        startsAt: '2026-01-01T10:00:00.000Z',
+        endsAt: '2026-01-01T12:00:00.000Z',
         timezone: 'UTC',
         attendees: 10,
         idempotencyKey: 'key-1',
-      });
+        guestId: 'guest-1',
+      };
+      vi.mocked(tx.limit).mockResolvedValueOnce([
+        { response: { id: 'existing-1', status: 'draft' }, fingerprint: requestFingerprint({ operation: 'create', payload: request }), operation: 'create' }
+      ]);
+
+      const result = await service.createEvent('prop-1', 'actor-1', request);
 
       expect(result).toEqual({ id: 'existing-1', status: 'draft' });
       expect(tx.insert).not.toHaveBeenCalled();

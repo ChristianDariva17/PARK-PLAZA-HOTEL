@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GeofenceService } from '../src/attendance/geofence.service.js';
 import { DynamicQrService } from '../src/attendance/dynamic-qr.service.js';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
@@ -48,11 +48,11 @@ describe('DynamicQrService', () => {
 
   beforeEach(() => {
     process.env.ATTENDANCE_QR_SECRET = Buffer.alloc(32, 1).toString('base64');
-    service = new DynamicQrService();
+    service = new DynamicQrService({} as any);
   });
 
-  it('does not request constructor dependencies from Nest', () => {
-    expect(Reflect.getMetadata('design:paramtypes', DynamicQrService)).toBeUndefined();
+  it('accepts a database dependency for persistent nonce consumption', () => {
+    expect(service).toBeInstanceOf(DynamicQrService);
   });
 
   it('generates a valid signed kiosk token', () => {
@@ -62,31 +62,42 @@ describe('DynamicQrService', () => {
     expect(result.refreshIntervalMs).toBe(20000);
   });
 
-  it('verifies and consumes a valid token', () => {
+  it('verifies a valid token without consuming it', () => {
     const { token } = service.generateKioskToken(propertyId, 20);
-    const consumed = service.verifyAndConsumeToken(token, propertyId);
-    expect(consumed.propertyId).toBe(propertyId);
-    expect(consumed.timestamp).toBeInstanceOf(Date);
+    const verified = service.verifyToken(token, propertyId);
+    expect(verified.propertyId).toBe(propertyId);
+    expect(verified.nonce).toBeDefined();
+    expect(verified.issuedAt).toBeInstanceOf(Date);
   });
 
-  it('prevents replay attack when reusing the same token', () => {
+  it('prevents replay attack through the persistent nonce executor', async () => {
     const { token } = service.generateKioskToken(propertyId, 20);
-    service.verifyAndConsumeToken(token, propertyId);
+    const verified = service.verifyToken(token, propertyId);
+    const returning = vi.fn()
+      .mockResolvedValueOnce([{ nonce: verified.nonce }])
+      .mockResolvedValueOnce([]);
+    const transaction = {
+      insert: vi.fn(() => ({
+        values: vi.fn().mockReturnThis(),
+        onConflictDoNothing: vi.fn().mockReturnThis(),
+        returning,
+      })),
+    };
 
-    // Second consumption must fail
-    expect(() => service.verifyAndConsumeToken(token, propertyId)).toThrow(BadRequestException);
+    await service.consumeToken(transaction as any, verified);
+    await expect(service.consumeToken(transaction as any, verified)).rejects.toThrow(BadRequestException);
   });
 
   it('rejects token for a different property', () => {
     const { token } = service.generateKioskToken(propertyId, 20);
     const otherPropertyId = '22222222-2222-4222-8222-222222222222';
-    expect(() => service.verifyAndConsumeToken(token, otherPropertyId)).toThrow(BadRequestException);
+    expect(() => service.verifyToken(token, otherPropertyId)).toThrow(BadRequestException);
   });
 
   it('rejects tampered token', () => {
     const { token } = service.generateKioskToken(propertyId, 20);
     const [payload, sig] = token.split('.');
     const tampered = `${payload}.${sig}tampered`;
-    expect(() => service.verifyAndConsumeToken(tampered, propertyId)).toThrow();
+    expect(() => service.verifyToken(tampered, propertyId)).toThrow();
   });
 });

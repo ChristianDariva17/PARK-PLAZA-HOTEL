@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Phone, CheckCircle2, X, LogIn, LogOut, Menu, Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, AlertTriangle, ChevronRight, Copy, Check, Bed, MapPin, User, Search, Calendar } from 'lucide-react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { createBooking, getAvailability, getCustomerRoomAmenities, createAmenityReservation, getAmenityConfigs } from './api';
 import { useCustomerSocket } from './hooks/useCustomerSocket.js';
-import HeroCarousel from './components/HeroCarousel';
 import RoomsAccordion from './components/RoomsAccordion';
 import AmenityView from './components/AmenityView';
 import EventBookingModal from './components/EventBookingModal';
-import Background3D from './components/Background3D';
-import RoomServiceView from './components/RoomServiceView';
 import { CUSTOMER_ROUTES, isCustomerContractAdmitted } from './contractAdmission.js';
 import './index.css';
+
+const HeroCarousel = lazy(() => import('./components/HeroCarousel'));
+const Background3D = lazy(() => import('./components/Background3D'));
+const RoomServiceView = lazy(() => import('./components/RoomServiceView'));
 
 const CLIENT_AMENITY_LABELS = {
   wifi_high_speed: '📶 WiFi 6',
@@ -586,7 +587,9 @@ const Register = () => {
 const Home = () => {
   return (
     <div className="web-main">
-      <HeroCarousel />
+      <Suspense fallback={<div className="hero-carousel-fallback" aria-hidden="true" />}>
+        <HeroCarousel />
+      </Suspense>
       <BookingBar />
     </div>
   );
@@ -1153,6 +1156,8 @@ const AmenityPage = ({ data }) => {
   const [dynamicConfig, setDynamicConfig] = useState(null);
 
   const amenityKey = (data.id || '').toLowerCase().includes('mirador') ? 'mirador' : 'piscina';
+  const firstTimeSlot = data.timeSlots?.[0] || '10:00';
+  const customerDisplayName = customer?.name;
 
   const loadConfig = useCallback(async () => {
     try {
@@ -1193,12 +1198,12 @@ const AmenityPage = ({ data }) => {
   };
 
   useEffect(() => {
-    setSelectedTime(data.timeSlots?.[0] || '10:00');
+    setSelectedTime(firstTimeSlot);
     setPax(1);
-    if (customer?.name && !customerName) {
-      setCustomerName(customer.name);
+    if (customerDisplayName && !customerName) {
+      setCustomerName(customerDisplayName);
     }
-  }, [data.id, data.timeSlots, customer]);
+  }, [data.id, firstTimeSlot, customerDisplayName, customerName]);
 
   const handleBook = async () => {
     if (!isReservable) return;
@@ -1227,7 +1232,7 @@ const AmenityPage = ({ data }) => {
         pax,
         documentNumber: documentNumber.trim(),
         customerName: customerName.trim() || customer?.name || 'Visitante',
-      });
+      }, crypto.randomUUID());
       setSuccess(true);
     } catch (err) {
       setError(err.message || 'Error al procesar la reserva.');
@@ -1390,6 +1395,7 @@ const amenityData = {
 
 function Portal() {
   const auth = useAuth();
+  const location = useLocation();
 
   if (auth.status === 'loading') return (
     <div className="portal-state-page web-main">
@@ -1434,12 +1440,15 @@ function Portal() {
     </div>
   );
 
+  const showBackground = !['/login', '/registro'].includes(location.pathname);
   return (
     <>
-      <Background3D />
+      {showBackground ? <Suspense fallback={null}><Background3D /></Suspense> : null}
       <div className="web-layout">
         <Navbar />
-        <Routes>{CUSTOMER_ROUTES.map((route) => <Route key={route} path={route} element={isCustomerContractAdmitted(route) ? <CustomerContractRoute route={route} /> : <CustomerContractBlockedView route={route} />} />)}</Routes>
+        <Suspense fallback={<div className="portal-state-page web-main"><div className="portal-state-card"><div className="portal-state-icon loading-icon"><div className="gold-spinner" /></div><h2 className="portal-state-title">Cargando experiencia</h2></div></div>}>
+          <Routes>{CUSTOMER_ROUTES.map((route) => <Route key={route} path={route} element={isCustomerContractAdmitted(route) ? <CustomerContractRoute route={route} /> : <CustomerContractBlockedView route={route} />} />)}</Routes>
+        </Suspense>
       </div>
     </>
   );

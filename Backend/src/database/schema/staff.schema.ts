@@ -23,6 +23,11 @@ export const staffProfiles = pgTable('staff_profiles', {
 }, (table) => [
   uniqueIndex('staff_profiles_document_unique').on(table.propertyId, table.documentNormalized).where(sql`${table.status} = 'Activo'`),
   index('staff_profiles_staff_idx').on(table.staffId),
+  foreignKey({
+    name: 'staff_profiles_staff_property_fkey',
+    columns: [table.staffId, table.propertyId],
+    foreignColumns: [staff.id, staff.propertyId],
+  }).onDelete('cascade'),
 ]);
 
 export const workSchedules = pgTable('work_schedules', {
@@ -56,7 +61,13 @@ export const shiftInstances = pgTable('shift_instances', {
   origin: varchar({ length: 64 }).notNull().default('Generado'), // Generado, Manual
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
+  unique('shift_instances_id_property_id_unique').on(table.id, table.propertyId),
   index('shift_instances_staff_time_idx').on(table.staffId, table.plannedStartAt),
+  foreignKey({
+    name: 'shift_instances_staff_property_fkey',
+    columns: [table.staffId, table.propertyId],
+    foreignColumns: [staff.id, staff.propertyId],
+  }).onDelete('cascade'),
 ]);
 
 export const attendanceDevices = pgTable('attendance_devices', {
@@ -71,6 +82,7 @@ export const attendanceDevices = pgTable('attendance_devices', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('attendance_devices_code_unique').on(table.propertyId, table.code),
+  unique('attendance_devices_id_property_id_unique').on(table.id, table.propertyId),
 ]);
 
 export const staffBiometricBindings = pgTable('staff_biometric_bindings', {
@@ -85,6 +97,16 @@ export const staffBiometricBindings = pgTable('staff_biometric_bindings', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
 }, (table) => [
   uniqueIndex('staff_biometric_bindings_active_unique').on(table.propertyId, table.staffId, table.deviceId).where(sql`${table.status} = 'Activo'`),
+  foreignKey({
+    name: 'staff_biometric_bindings_staff_property_fkey',
+    columns: [table.staffId, table.propertyId],
+    foreignColumns: [staff.id, staff.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'staff_biometric_bindings_device_property_fkey',
+    columns: [table.deviceId, table.propertyId],
+    foreignColumns: [attendanceDevices.id, attendanceDevices.propertyId],
+  }).onDelete('restrict'),
 ]);
 
 export const attendanceEvents = pgTable('attendance_events', {
@@ -105,6 +127,21 @@ export const attendanceEvents = pgTable('attendance_events', {
   uniqueIndex('attendance_events_idempotency_unique').on(table.propertyId, table.idempotencyKey),
   uniqueIndex('attendance_events_bridge_op_unique').on(table.bridgeOperationId).where(sql`${table.bridgeOperationId} IS NOT NULL`),
   index('attendance_events_staff_time_idx').on(table.staffId, table.occurredAt),
+  foreignKey({
+    name: 'attendance_events_staff_property_fkey',
+    columns: [table.staffId, table.propertyId],
+    foreignColumns: [staff.id, staff.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'attendance_events_shift_property_fkey',
+    columns: [table.shiftInstanceId, table.propertyId],
+    foreignColumns: [shiftInstances.id, shiftInstances.propertyId],
+  }).onDelete('set null'),
+  foreignKey({
+    name: 'attendance_events_device_property_fkey',
+    columns: [table.deviceId, table.propertyId],
+    foreignColumns: [attendanceDevices.id, attendanceDevices.propertyId],
+  }).onDelete('set null'),
 ]);
 
 export const attendanceCorrections = pgTable('attendance_corrections', {

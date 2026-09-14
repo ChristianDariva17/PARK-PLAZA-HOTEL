@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, CheckCircle2, AlertTriangle, LogIn, Calendar, Users, DollarSign, Clock, ChevronRight, ArrowLeft } from 'lucide-react';
+import { X, CheckCircle2, LogIn, Users } from 'lucide-react';
 import { createEventPreReservation, getEventSpacePolicy, getEventSpaces, quoteEvent } from '../api';
 import { useAuth } from '../AuthContext';
 
@@ -38,8 +38,8 @@ export default function EventBookingModal({ data, onClose }) {
       .then((res) => {
         const list = Array.isArray(res) ? res : res?.spaces || [];
         setSpaces(list);
-        if (list.length > 0 && !form.spaceId) {
-          setForm((f) => ({ ...f, spaceId: list[0].id }));
+        if (list.length > 0) {
+          setForm((current) => current.spaceId ? current : ({ ...current, spaceId: list[0].id }));
         }
       })
       .catch((err) => setError(err.message || 'No se pudieron cargar los ambientes de eventos.'));

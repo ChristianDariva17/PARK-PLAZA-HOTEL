@@ -63,3 +63,7 @@ docker compose up --build
 ```
 
 Never use the reset commands when the named volume contains data that must be retained. Changing `POSTGRES_PASSWORD` does not update credentials stored in an existing PostgreSQL volume.
+
+## Backup and restore
+
+Use the procedures in [`ops/README.md`](ops/README.md). Backups use `age`; keep the identity key outside the repository. Restore is restricted to an isolated database and must be validated before any recovery action.

@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, numeric, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { accounts } from './security.schema.js';
 import { properties } from './hotel.schema.js';
 import { guests } from './guests.schema.js';
@@ -35,6 +35,7 @@ export const eventSpaces = pgTable('event_spaces', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  unique('event_spaces_id_property_id_unique').on(table.id, table.propertyId),
   uniqueIndex('idx_event_spaces_property_code').on(table.propertyId, table.code),
 ]);
 
@@ -76,10 +77,31 @@ export const events = pgTable('events', {
   cancelledByAccountId: uuid('cancelled_by_account_id').references(() => accounts.id),
   cancellationReason: varchar('cancellation_reason', { length: 500 }),
 }, (table) => [
+  unique('events_id_property_id_unique').on(table.id, table.propertyId),
   index('idx_events_property_dates').on(table.propertyId, table.startsAt, table.endsAt),
   index('idx_events_property_space').on(table.propertyId, table.spaceId),
   index('idx_events_active_interval').on(table.propertyId, table.spaceId, table.startsAt, table.endsAt),
   check('chk_canonical_party', sql`quarantine_status = 'pending' OR ( (guest_id IS NOT NULL AND customer_account_id IS NULL) OR (guest_id IS NULL AND customer_account_id IS NOT NULL) )`),
+  foreignKey({
+    name: 'events_space_property_fkey',
+    columns: [table.spaceId, table.propertyId],
+    foreignColumns: [eventSpaces.id, eventSpaces.propertyId],
+  }).onDelete('restrict'),
+  foreignKey({
+    name: 'events_guest_property_fkey',
+    columns: [table.guestId, table.propertyId],
+    foreignColumns: [guests.id, guests.propertyId],
+  }).onDelete('restrict'),
+  foreignKey({
+    name: 'events_created_by_property_fkey',
+    columns: [table.createdByAccountId, table.propertyId],
+    foreignColumns: [accounts.id, accounts.propertyId],
+  }).onDelete('restrict'),
+  foreignKey({
+    name: 'events_cancelled_by_property_fkey',
+    columns: [table.cancelledByAccountId, table.propertyId],
+    foreignColumns: [accounts.id, accounts.propertyId],
+  }).onDelete('restrict'),
 ]);
 
 export const eventServices = pgTable('event_services', {
@@ -91,7 +113,13 @@ export const eventServices = pgTable('event_services', {
   unitAmount: numeric('unit_amount', { precision: 12, scale: 2 }),
   totalAmount: numeric('total_amount', { precision: 12, scale: 2 }),
   notes: varchar('notes', { length: 500 }),
-});
+}, (table) => [
+  foreignKey({
+    name: 'event_services_event_property_fkey',
+    columns: [table.eventId, table.propertyId],
+    foreignColumns: [events.id, events.propertyId],
+  }).onDelete('cascade'),
+]);
 
 export const eventSpaceServices = pgTable('event_space_services', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -103,6 +131,11 @@ export const eventSpaceServices = pgTable('event_space_services', {
   active: boolean('active').notNull().default(true),
 }, (table) => [
   uniqueIndex('idx_event_space_services_code').on(table.spaceId, table.code),
+  foreignKey({
+    name: 'event_space_services_space_property_fkey',
+    columns: [table.spaceId, table.propertyId],
+    foreignColumns: [eventSpaces.id, eventSpaces.propertyId],
+  }).onDelete('cascade'),
 ]);
 
 export const eventRecurrence = pgTable('event_recurrence', {
@@ -179,4 +212,3 @@ export const eventSpaceServicesRelations = relations(eventSpaceServices, ({ one 
   space: one(eventSpaces, { fields: [eventSpaceServices.spaceId], references: [eventSpaces.id] }),
   property: one(properties, { fields: [eventSpaceServices.propertyId], references: [properties.id] }),
 }));
-

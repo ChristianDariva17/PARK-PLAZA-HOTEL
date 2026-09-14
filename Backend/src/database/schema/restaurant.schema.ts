@@ -188,6 +188,9 @@ export const orders = pgTable('orders', {
   inventoryStage: varchar('inventory_stage', { length: 20 }).notNull().default('Sin reservar'),
   accountingStage: varchar('accounting_stage', { length: 20 }).notNull().default('Pendiente'),
   paymentMethod: varchar('payment_method', { length: 40 }).notNull().default('Efectivo'),
+  deliveryMode: varchar('delivery_mode', { length: 16 }),
+  paymentMode: varchar('payment_mode', { length: 20 }),
+  checkoutClassification: varchar('checkout_classification', { length: 20 }).notNull().default('legacy_unknown'),
   total: numeric({ precision: 14, scale: 2 }).notNull().default('0'),
   estimatedMinutes: integer('estimated_minutes').notNull().default(15),
   comment: varchar({ length: 400 }),
@@ -200,6 +203,13 @@ export const orders = pgTable('orders', {
   foreignKey({ name: 'orders_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
   foreignKey({ name: 'orders_stay_property_fkey', columns: [t.stayId, t.propertyId], foreignColumns: [stays.id, stays.propertyId] }).onDelete('restrict'),
   foreignKey({ name: 'orders_amenity_property_fkey', columns: [t.amenityReservationId], foreignColumns: [amenityReservations.id] }).onDelete('set null'),
+  check('orders_customer_checkout_facts_check', sql`(
+    (${t.checkoutClassification} = 'legacy_unknown' AND ${t.deliveryMode} IS NULL AND ${t.paymentMode} IS NULL)
+    OR (${t.checkoutClassification} = 'customer_checkout' AND (
+      (${t.deliveryMode} IN ('Room', 'Terraza', 'Recojo') AND ${t.paymentMode} = 'room_charge')
+      OR (${t.deliveryMode} IN ('Piscina', 'Mirador') AND ${t.paymentMode} = 'amenity_tab')
+    ))
+  `),
   index('orders_property_status_idx').on(t.propertyId, t.status),
   index('orders_stay_idx').on(t.stayId),
   index('orders_amenity_idx').on(t.amenityReservationId),

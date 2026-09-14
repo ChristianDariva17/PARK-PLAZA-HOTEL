@@ -1,5 +1,6 @@
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,7 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { properties } from './hotel.schema.js';
-import { customerAccounts } from './customer.schema.js';
+import { accounts } from './security.schema.js';
 
 export const suppliers = pgTable(
   'suppliers',
@@ -49,7 +50,7 @@ export const suppliers = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     archivedAt: timestamp('archived_at'),
-    archivedByAccountId: uuid('archived_by_account_id').references(() => customerAccounts.id),
+    archivedByAccountId: uuid('archived_by_account_id').references(() => accounts.id),
   },
   (table) => ({
     // Unique compound constraint required for isolation and relationships
@@ -122,6 +123,12 @@ export const purchaseOrders = pgTable(
     ),
     supplierIdx: index('idx_purchase_orders_supplier').on(table.propertyId, table.supplierId),
     statusIdx: index('idx_purchase_orders_status').on(table.propertyId, table.status),
+    orderNumberUnique: uniqueIndex('idx_purchase_orders_property_order_number').on(table.propertyId, table.orderNumber),
+    supplierPropertyForeignKey: foreignKey({
+      name: 'purchase_orders_supplier_property_fkey',
+      columns: [table.supplierId, table.propertyId],
+      foreignColumns: [suppliers.id, suppliers.propertyId],
+    }).onDelete('restrict'),
   })
 );
 

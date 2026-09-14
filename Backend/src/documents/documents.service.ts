@@ -1,9 +1,31 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { DATABASE, Database } from '../database/database.module.js';
 import { contracts, contractVersions, evidences, contractEvidenceLinks } from '../database/schema/documents.schema.js';
 import { accounts, auditEvents, roles } from '../database/schema/security.schema.js';
+import { cleaningTasks } from '../database/schema/cleaning.schema.js';
+import { incidents } from '../database/schema/incidents.schema.js';
+import { reservations } from '../database/schema/reservations.schema.js';
 import { eq, and, desc, inArray, count, gte, lte, ilike, or } from 'drizzle-orm';
-import { ListAuditEventsQueryDto } from './documents.dto.js';
+import { CONTRACT_TARGET_STATES, ListAuditEventsQueryDto } from './documents.dto.js';
+import { commandReceipts } from '../database/schema/commands.schema.js';
+import { requestFingerprint } from '../database/idempotency.js';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
+
+const contractTargetStateToStatus = {
+  DRAFT: 'Borrador',
+  PENDING_SIGNATURE: 'Pendiente',
+  SIGNED: 'Vigente',
+  ARCHIVED: 'Reemplazado',
+  VOID: 'Cancelado',
+} as const;
+
+const allowedContractTransitions: Record<string, readonly string[]> = {
+  Borrador: ['Pendiente', 'Vigente', 'Cancelado'],
+  Pendiente: ['Borrador', 'Vigente', 'Cancelado'],
+  Vigente: ['Reemplazado', 'Cancelado'],
+  Reemplazado: [],
+  Cancelado: [],
+};
 
 export interface RequestContext {
   requestId?: string | undefined;
@@ -17,21 +39,30 @@ export class DocumentsService {
 
   async createContract(propertyId: string, accountId: string, data: any, ctx: RequestContext) {
     const { reservationId, metadata, reason } = data;
-    const idempotencyKey = data.idempotencyKey || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-    const reference = data.reference || `DOC-ESTADIA-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const idempotencyKey = data.idempotencyKey;
+    if (!idempotencyKey) throw new BadRequestException('La clave de idempotencia es obligatoria');
+    const reference = data.reference || `DOC-ESTADIA-${new Date().getFullYear()}-${idempotencyKey.slice(0, 6).toUpperCase()}`;
     const initialStatus = data.status || (metadata?.signatures?.guestSignature ? 'Vigente' : 'Borrador');
 
-    // Check idempotency
-    const [existingVersion] = await this.db
-      .select()
-      .from(contractVersions)
-      .where(and(eq(contractVersions.propertyId, propertyId), eq(contractVersions.idempotencyKey, idempotencyKey)));
-
-    if (existingVersion) {
-      return this.getContract(propertyId, existingVersion.contractId);
-    }
-
     return await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receipt = await this.findReceipt(tx, propertyId, 'documents.contract.create', idempotencyKey, {
+        accountId,
+        reservationId: reservationId ?? null,
+        reference,
+        initialStatus,
+        metadata: metadata ?? {},
+        reason: reason ?? null,
+      });
+      if (receipt) return receipt;
+
+      await this.assertAccountBelongsToProperty(tx, accountId, propertyId);
+      if (reservationId) {
+        const [reservation] = await tx.select({ id: reservations.id }).from(reservations)
+          .where(and(eq(reservations.id, reservationId), eq(reservations.propertyId, propertyId))).limit(1);
+        if (!reservation) throw new NotFoundException('Reserva no encontrada');
+      }
+
       // Create contract
       const [newContract] = await tx.insert(contracts).values({
         propertyId,
@@ -64,7 +95,16 @@ export class DocumentsService {
         metadata: { reference, version: '1', status: initialStatus }
       });
 
-      return { ...newContract, versions: [newVersion], metadata: newVersion.metadata };
+      const response = { ...newContract, versions: [newVersion], metadata: newVersion.metadata };
+      await this.saveReceipt(tx, propertyId, 'documents.contract.create', idempotencyKey, {
+        accountId,
+        reservationId: reservationId ?? null,
+        reference,
+        initialStatus,
+        metadata: metadata ?? {},
+        reason: reason ?? null,
+      }, response);
+      return response;
     });
   }
 
@@ -137,21 +177,37 @@ export class DocumentsService {
   }
 
   async transitionContract(propertyId: string, accountId: string, contractId: string, data: any, ctx: RequestContext) {
-    const { status, idempotencyKey, reason } = data;
-
-    const [contract] = await this.db
-      .select()
-      .from(contracts)
-      .where(and(eq(contracts.propertyId, propertyId), eq(contracts.id, contractId)));
-
-    if (!contract) throw new NotFoundException('Contrato no encontrado');
-    
-    if (contract.status === status) return this.getContract(propertyId, contractId);
+    const { targetState, idempotencyKey, reason } = data;
+    if (!CONTRACT_TARGET_STATES.includes(targetState)) throw new BadRequestException('Estado de contrato inválido');
+    if (!idempotencyKey) throw new BadRequestException('La clave de idempotencia es obligatoria');
+    const status = contractTargetStateToStatus[targetState as keyof typeof contractTargetStateToStatus];
 
     return await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { accountId, contractId, targetState, reason: reason ?? null };
+      const receipt = await this.findReceipt(tx, propertyId, 'documents.contract.transition', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
+
+      const [contract] = await tx
+        .select()
+        .from(contracts)
+        .where(and(eq(contracts.propertyId, propertyId), eq(contracts.id, contractId)))
+        .limit(1)
+        .for('update');
+
+      if (!contract) throw new NotFoundException('Contrato no encontrado');
+      if (contract.status === status) {
+        await this.saveReceipt(tx, propertyId, 'documents.contract.transition', idempotencyKey, receiptPayload, contract);
+        return contract;
+      }
+      if (!allowedContractTransitions[contract.status]?.includes(status)) {
+        throw new ConflictException('La transición de contrato no está permitida');
+      }
+
+      await this.assertAccountBelongsToProperty(tx, accountId, propertyId);
       const [updated] = await tx.update(contracts)
         .set({ status, updatedAt: new Date() })
-        .where(eq(contracts.id, contractId))
+        .where(and(eq(contracts.id, contractId), eq(contracts.propertyId, propertyId)))
         .returning();
 
       await tx.insert(auditEvents).values({
@@ -166,6 +222,7 @@ export class DocumentsService {
         metadata: { from: contract.status, to: status, reason, idempotencyKey }
       });
 
+      await this.saveReceipt(tx, propertyId, 'documents.contract.transition', idempotencyKey, receiptPayload, updated);
       return updated;
     });
   }
@@ -179,6 +236,13 @@ export class DocumentsService {
     };
     
     return await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { accountId, sourceType, referenceId, evidenceType, description, url: url ?? null, metadata: metadata ?? {} };
+      const receipt = await this.findReceipt(tx, propertyId, 'documents.evidence.register', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
+
+      await this.assertAccountBelongsToProperty(tx, accountId, propertyId);
+      await this.assertEvidenceOriginBelongsToProperty(tx, propertyId, sourceType, referenceId);
       const [evidence] = await tx.insert(evidences).values({
         propertyId,
         originType: String(sourceType).toLowerCase(),
@@ -200,6 +264,7 @@ export class DocumentsService {
         metadata: { originType: String(sourceType).toLowerCase(), originId: referenceId, idempotencyKey }
       });
 
+      await this.saveReceipt(tx, propertyId, 'documents.evidence.register', idempotencyKey, receiptPayload, evidence);
       return evidence;
     });
   }
@@ -222,14 +287,31 @@ export class DocumentsService {
   async linkEvidence(propertyId: string, accountId: string, contractId: string, data: any, ctx: RequestContext) {
     const { evidenceId, relationType, idempotencyKey } = data;
 
-    const [existingLink] = await this.db
-      .select()
-      .from(contractEvidenceLinks)
-      .where(and(eq(contractEvidenceLinks.contractId, contractId), eq(contractEvidenceLinks.evidenceId, evidenceId)));
-
-    if (existingLink) return existingLink;
-
     return await this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, propertyId);
+      const receiptPayload = { accountId, contractId, evidenceId, relationType };
+      const receipt = await this.findReceipt(tx, propertyId, 'documents.evidence.link', idempotencyKey, receiptPayload);
+      if (receipt) return receipt;
+
+      await this.assertAccountBelongsToProperty(tx, accountId, propertyId);
+      const [contract] = await tx.select({ id: contracts.id }).from(contracts)
+        .where(and(eq(contracts.id, contractId), eq(contracts.propertyId, propertyId))).limit(1);
+      if (!contract) throw new NotFoundException('Contrato no encontrado');
+      const [evidence] = await tx.select({ id: evidences.id }).from(evidences)
+        .where(and(eq(evidences.id, evidenceId), eq(evidences.propertyId, propertyId))).limit(1);
+      if (!evidence) throw new NotFoundException('Evidencia no encontrada');
+
+      const [existingLink] = await tx
+        .select()
+        .from(contractEvidenceLinks)
+        .where(and(eq(contractEvidenceLinks.propertyId, propertyId), eq(contractEvidenceLinks.contractId, contractId), eq(contractEvidenceLinks.evidenceId, evidenceId)))
+        .limit(1);
+      if (existingLink) {
+        if (existingLink.relationType !== relationType) throw new ConflictException('La evidencia ya está vinculada con otra relación');
+        await this.saveReceipt(tx, propertyId, 'documents.evidence.link', idempotencyKey, receiptPayload, existingLink);
+        return existingLink;
+      }
+
       const [link] = await tx.insert(contractEvidenceLinks).values({
         propertyId,
         contractId,
@@ -250,7 +332,35 @@ export class DocumentsService {
         metadata: { evidenceId, relationType, idempotencyKey }
       });
 
+      await this.saveReceipt(tx, propertyId, 'documents.evidence.link', idempotencyKey, receiptPayload, link);
       return link;
+    });
+  }
+
+  private async findReceipt(tx: any, propertyId: string, operation: string, idempotencyKey: string, payload: unknown) {
+    const fingerprint = requestFingerprint(payload);
+    const [existing] = await tx.select({ response: commandReceipts.response, requestFingerprint: commandReceipts.requestFingerprint })
+      .from(commandReceipts)
+      .where(and(
+        eq(commandReceipts.propertyId, propertyId),
+        eq(commandReceipts.operation, operation),
+        eq(commandReceipts.idempotencyKey, idempotencyKey),
+      ))
+      .limit(1);
+
+    if (!existing) return null;
+    if (existing.requestFingerprint !== fingerprint) throw new ConflictException('IDEMPOTENCY_KEY_REUSED');
+    return existing.response;
+  }
+
+  private async saveReceipt(tx: any, propertyId: string, operation: string, idempotencyKey: string, payload: unknown, response: unknown) {
+    await tx.insert(commandReceipts).values({
+      propertyId,
+      operation,
+      idempotencyKey,
+      requestFingerprint: requestFingerprint(payload),
+      responseStatus: 200,
+      response,
     });
   }
 
@@ -314,5 +424,27 @@ export class DocumentsService {
         role: event.actorRole,
       } : null,
     })), total: Number(totalResult[0]?.count ?? 0) };
+  }
+
+  private async assertAccountBelongsToProperty(tx: any, accountId: string, propertyId: string) {
+    const [account] = await tx.select({ id: accounts.id }).from(accounts)
+      .where(and(eq(accounts.id, accountId), eq(accounts.propertyId, propertyId))).limit(1);
+    if (!account) throw new NotFoundException('Cuenta no encontrada');
+  }
+
+  private async assertEvidenceOriginBelongsToProperty(tx: any, propertyId: string, sourceType: string, referenceId: string) {
+    const origin = sourceType.toUpperCase();
+    const [record] = origin === 'CLEANING'
+      ? await tx.select({ id: cleaningTasks.id }).from(cleaningTasks)
+        .where(and(eq(cleaningTasks.id, referenceId), eq(cleaningTasks.propertyId, propertyId))).limit(1)
+      : origin === 'MAINTENANCE'
+        ? await tx.select({ id: incidents.id }).from(incidents)
+          .where(and(eq(incidents.id, referenceId), eq(incidents.propertyId, propertyId), eq(incidents.type, 'maintenance'))).limit(1)
+        : origin === 'INCIDENTS'
+          ? await tx.select({ id: incidents.id }).from(incidents)
+            .where(and(eq(incidents.id, referenceId), eq(incidents.propertyId, propertyId))).limit(1)
+          : await tx.select({ id: contracts.id }).from(contracts)
+            .where(and(eq(contracts.id, referenceId), eq(contracts.propertyId, propertyId))).limit(1);
+    if (!record) throw new NotFoundException('Origen de evidencia no encontrado');
   }
 }

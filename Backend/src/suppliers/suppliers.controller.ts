@@ -22,6 +22,7 @@ import {
   parseCreatePurchaseOrderDto,
   parseReceivePurchaseOrderDto,
   parseRateSupplierDto,
+  parseIdempotencyKey,
 } from './suppliers.dto.js';
 
 @Controller('suppliers')
@@ -64,16 +65,17 @@ export class SuppliersController {
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     const dto = parseCreatePurchaseOrderDto(body);
-    return this.suppliersService.createPurchaseOrder(account.propertyId, dto, idempotencyKey || crypto.randomUUID(), account.id);
+    return this.suppliersService.createPurchaseOrder(account.propertyId, dto, parseIdempotencyKey(idempotencyKey), account.id);
   }
 
   @Post('purchase-orders/:id/send')
   @RequirePermissions('suppliers.update')
   async sendPurchaseOrder(
     @CurrentAccount() account: any,
-    @Param('id') id: string
+    @Param('id') id: string,
+    @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
-    return this.suppliersService.sendPurchaseOrder(account.propertyId, id);
+    return this.suppliersService.sendPurchaseOrder(account.propertyId, id, parseIdempotencyKey(idempotencyKey), account.id);
   }
 
   @Post('purchase-orders/:id/receive')
@@ -85,7 +87,7 @@ export class SuppliersController {
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     const dto = parseReceivePurchaseOrderDto(body);
-    return this.suppliersService.receivePurchaseOrder(account.propertyId, id, dto, idempotencyKey || crypto.randomUUID(), account.id);
+    return this.suppliersService.receivePurchaseOrder(account.propertyId, id, dto, parseIdempotencyKey(idempotencyKey), account.id);
   }
 
   @Post(':id/rate')

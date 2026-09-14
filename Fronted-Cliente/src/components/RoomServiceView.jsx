@@ -4,7 +4,7 @@ import { Utensils, ShoppingCart, X, Plus, Minus, AlertTriangle, Clock, ChevronRi
 import { useAuth } from '../AuthContext';
 import { useCustomerSocket } from '../hooks/useCustomerSocket.js';
 import { getCustomerRestaurantActiveStays, getRestaurantMenu, getRestaurantOrders, createRestaurantOrder, cancelRestaurantOrder, getAmenitiesReservations } from '../api';
-import { createCheckoutSubmitter, formatRoomServiceError, loadRoomServiceData, retainSelectedStay, startRoomServicePolling } from '../roomServiceData';
+import { createCheckoutSubmitter, formatRoomServiceError, loadRoomServiceData, startRoomServicePolling } from '../roomServiceData';
 import './RoomServiceView.css';
 
 const formatMoney = (amount) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(Number(amount));

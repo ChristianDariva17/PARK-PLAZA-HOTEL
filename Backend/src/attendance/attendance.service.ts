@@ -9,6 +9,7 @@ import { DynamicQrService } from './dynamic-qr.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
 import * as schema from '../database/schema/index.js';
 import { randomUUID } from 'crypto';
+import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 @Injectable()
 export class AttendanceService {
@@ -210,6 +211,7 @@ export class AttendanceService {
           .select({ id: schema.staffBiometricBindings.id, templateReference: schema.staffBiometricBindings.templateReference })
           .from(schema.staffBiometricBindings)
           .where(and(
+            eq(schema.staffBiometricBindings.propertyId, actor.propertyId),
             eq(schema.staffBiometricBindings.staffId, data.staffId),
             eq(schema.staffBiometricBindings.deviceId, data.deviceId),
             eq(schema.staffBiometricBindings.status, 'Activo')
@@ -377,8 +379,8 @@ export class AttendanceService {
   }
 
   async reportQrAttendance(actor: AuthenticatedAccount, data: any, context: RequestContext) {
-    // 1. Verify and consume QR token
-    const tokenResult = this.dynamicQrService.verifyAndConsumeToken(data.qrToken, actor.propertyId);
+    // Verify the token before geofence checks, but consume it only in the attendance transaction.
+    const tokenResult = this.dynamicQrService.verifyToken(data.qrToken, actor.propertyId);
 
     // 2. Fetch property coordinates & geofence radius
     const [property] = await this.database
@@ -412,6 +414,7 @@ export class AttendanceService {
     }
 
     return await this.database.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
       const idempotencyKey = data.idempotencyKey;
 
       // Idempotency check
@@ -422,6 +425,12 @@ export class AttendanceService {
         .limit(1);
 
       if (existingEvent) {
+        if (data.staffId && existingEvent.staffId !== data.staffId) {
+          throw new ConflictException('IDEMPOTENCY_KEY_REUSED');
+        }
+        if (data.movement && existingEvent.movement !== data.movement) {
+          throw new ConflictException('IDEMPOTENCY_KEY_REUSED');
+        }
         return existingEvent;
       }
 
@@ -437,18 +446,15 @@ export class AttendanceService {
       }
 
       if (!targetStaffId) {
-        // Fallback: check if there is staff in property
-        const [anyStaff] = await tx
-          .select({ id: staff.id })
-          .from(staff)
-          .where(eq(staff.propertyId, actor.propertyId))
-          .limit(1);
-        targetStaffId = anyStaff?.id;
-      }
-
-      if (!targetStaffId) {
         throw new NotFoundException('No se encontró el colaborador correspondiente en esta propiedad.');
       }
+
+      const [targetStaff] = await tx
+        .select({ id: staff.id })
+        .from(staff)
+        .where(and(eq(staff.id, targetStaffId), eq(staff.propertyId, actor.propertyId)))
+        .limit(1);
+      if (!targetStaff) throw new NotFoundException('Personal no encontrado');
 
       // 4. Anti-double punch: prevent multiple events in less than 2 minutes
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
@@ -515,6 +521,8 @@ export class AttendanceService {
         }
       }
 
+      await this.dynamicQrService.consumeToken(tx, tokenResult);
+
       // 7. Insert attendance event with QR_GPS method and geofence metadata
       const [event] = await tx
         .insert(attendanceEvents)
@@ -536,7 +544,7 @@ export class AttendanceService {
               longitude: data.longitude,
               accuracy: data.accuracy ?? 10,
             },
-            qrTimestamp: tokenResult.timestamp.toISOString(),
+            qrTimestamp: tokenResult.issuedAt.toISOString(),
             ipAddress: context.ipAddress,
           },
         })

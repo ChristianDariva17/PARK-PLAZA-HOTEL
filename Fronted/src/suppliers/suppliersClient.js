@@ -54,18 +54,21 @@ export const suppliersClient = {
     });
   },
 
-  async sendPurchaseOrder(orderId) {
+  async sendPurchaseOrder(orderId, idempotencyKey = generateIdempotencyKey()) {
     return authRequest(`/api/suppliers/purchase-orders/${orderId}/send`, {
       method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
     });
   },
 
-  async receivePurchaseOrder(orderId, payload) {
+  async receivePurchaseOrder(orderId, payload, idempotencyKey = generateIdempotencyKey()) {
     return authRequest(`/api/suppliers/purchase-orders/${orderId}/receive`, {
       method: 'POST',
       body: JSON.stringify(payload),
       headers: {
-        'Idempotency-Key': generateIdempotencyKey(),
+        'Idempotency-Key': idempotencyKey,
       },
     });
   },

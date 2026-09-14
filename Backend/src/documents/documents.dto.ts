@@ -1,5 +1,8 @@
-import { IsString, IsUUID, IsOptional, IsEnum, IsObject, IsInt, Min, Max, IsISO8601 } from 'class-validator';
+import { IsString, IsUUID, IsOptional, IsObject, IsInt, Min, Max, IsISO8601, IsIn, MaxLength, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export const CONTRACT_TARGET_STATES = ['DRAFT', 'PENDING_SIGNATURE', 'SIGNED', 'ARCHIVED', 'VOID'] as const;
+export const CONTRACT_STATUSES = ['Borrador', 'Pendiente', 'Vigente', 'Reemplazado', 'Cancelado'] as const;
 
 export class CreateContractDto {
   @IsUUID()
@@ -8,14 +11,12 @@ export class CreateContractDto {
 
   @IsString()
   @IsOptional()
-  clientId?: string;
-
-  @IsString()
-  @IsOptional()
+  @MaxLength(128)
   reference?: string;
 
   @IsString()
   @IsOptional()
+  @IsIn(CONTRACT_STATUSES)
   status?: string;
 
   @IsObject()
@@ -24,42 +25,61 @@ export class CreateContractDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   reason?: string;
 
-  @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
+  @IsUUID()
+  idempotencyKey!: string;
 }
 
 export class TransitionContractDto {
   @IsString()
-  targetState!: 'DRAFT' | 'PENDING_SIGNATURE' | 'SIGNED' | 'ARCHIVED' | 'VOID';
+  @IsIn(CONTRACT_TARGET_STATES)
+  targetState!: typeof CONTRACT_TARGET_STATES[number];
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   reason?: string;
+
+  @IsUUID()
+  idempotencyKey!: string;
 }
 
 export class LinkEvidenceDto {
   @IsUUID()
   evidenceId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  relationType!: string;
+
+  @IsUUID()
+  idempotencyKey!: string;
 }
 
 export class RegisterEvidenceDto {
   @IsString()
+  @IsIn(['MAINTENANCE', 'CLEANING', 'CONTRACTS', 'INCIDENTS'])
   sourceType!: 'MAINTENANCE' | 'CLEANING' | 'CONTRACTS' | 'INCIDENTS';
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
   evidenceType!: string;
 
-  @IsString()
+  @IsUUID()
   referenceId!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   description!: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   url?: string;
 
   @IsObject()
@@ -86,6 +106,12 @@ export class ListContractsQueryDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(128)
+  reference?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(CONTRACT_STATUSES)
   status?: string;
 }
 
@@ -109,9 +135,10 @@ export class ListEvidenceQueryDto {
 
   @IsString()
   @IsOptional()
+  @IsIn(['maintenance', 'cleaning', 'contract', 'incident', 'MAINTENANCE', 'CLEANING', 'CONTRACTS', 'INCIDENTS'])
   source?: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
   referenceId?: string;
 }
@@ -132,14 +159,17 @@ export class ListAuditEventsQueryDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(128)
   eventType?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(64)
   subjectType?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(128)
   subjectId?: string;
 
   @IsUUID()
@@ -156,5 +186,6 @@ export class ListAuditEventsQueryDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   search?: string;
 }

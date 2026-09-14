@@ -84,7 +84,7 @@ async function insertReservationDependencies(client: PoolClient, fixture: Reserv
 
 describe('PostgreSQL readiness', () => {
   it('has the migrated schema and overlap constraint', async () => {
-    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean; folio_ready: boolean; cleaning_stay_ready: boolean; supplier_schema_ready: boolean }>(`select
+    const result = await pool.query<{ schema_ready: boolean; constraint_ready: boolean; guest_scope_ready: boolean; security_ready: boolean; audit_guard_ready: boolean; session_guard_ready: boolean; system_roles_ready: boolean; folio_ready: boolean; cleaning_stay_ready: boolean; supplier_schema_ready: boolean; phase2_integrity_ready: boolean }>(`select
       to_regclass('public.reservations') is not null as schema_ready,
       exists (select 1 from pg_constraint where conname = 'reservations_no_active_overlap') as constraint_ready,
       exists (select 1 from pg_constraint where conname = 'identity_documents_guest_property_fkey' and convalidated and confdeltype = 'c')
@@ -116,8 +116,19 @@ describe('PostgreSQL readiness', () => {
           and exists (select 1 from pg_constraint where conname = 'purchase_orders_supplier_id_suppliers_id_fk')
           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_property_isolation')
           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_supplier')
-          and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_status') as supplier_schema_ready`);
-    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true, cleaning_stay_ready: true, supplier_schema_ready: true });
+           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_status') as supplier_schema_ready,
+         to_regclass('public.command_receipts') is not null
+           and to_regclass('public.outbox_events') is not null
+           and to_regclass('public.attendance_qr_nonces') is not null
+           and exists (select 1 from pg_indexes where indexname = 'command_receipts_property_operation_key_unique')
+           and exists (select 1 from pg_indexes where indexname = 'outbox_events_dispatch_idx')
+           and exists (select 1 from pg_indexes where indexname = 'attendance_qr_nonces_expiry_idx')
+           and exists (select 1 from pg_indexes where indexname = 'experience_participations_property_idempotency_unique')
+           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_property_order_number')
+           and exists (select 1 from pg_constraint where conname = 'suppliers_archived_by_account_id_accounts_id_fk')
+           and exists (select 1 from pg_constraint where conname = 'events_space_property_fkey')
+           and exists (select 1 from pg_constraint where conname = 'events_guest_property_fkey') as phase2_integrity_ready`);
+    expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true, cleaning_stay_ready: true, supplier_schema_ready: true, phase2_integrity_ready: true });
   });
 });
 

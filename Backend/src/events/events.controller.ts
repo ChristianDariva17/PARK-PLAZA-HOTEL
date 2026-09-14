@@ -6,6 +6,7 @@ import { RequirePermissions } from '../auth/decorators/require-permissions.decor
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
 import { getRequestContext } from '../auth/request-context.js';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 @Controller('events')
 export class EventsController {
@@ -27,7 +28,7 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const parsedBody = resolveIdentityDto.parse(body);
+    const parsedBody = parseZodHttp(resolveIdentityDto, body);
     return this.migrationService.resolveIdentity(
       { accountId: account.accountId, propertyId: account.propertyId },
       id,
@@ -39,7 +40,7 @@ export class EventsController {
   @Get()
   @RequirePermissions('events.read')
   async listEvents(@CurrentAccount() account: AuthenticatedAccount, @Query() query: any) {
-    const parsedQuery = listEventsDto.parse(query);
+    const parsedQuery = parseZodHttp(listEventsDto, query);
     return this.eventsService.listEvents(account.propertyId, parsedQuery as any);
   }
 
@@ -56,7 +57,7 @@ export class EventsController {
     @Param('id') id: string,
     @Query() query: any,
   ) {
-    const parsed = checkAvailabilityDto.parse(query);
+    const parsed = parseZodHttp(checkAvailabilityDto, query);
     return this.eventsService.checkSpaceAvailability(
       account.propertyId,
       id,
@@ -75,19 +76,19 @@ export class EventsController {
   @Patch('spaces/:id/policy')
   @RequirePermissions('events.update')
   async updateSpacePolicy(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.updateSpacePolicy(account.propertyId, id, updateSpacePolicyDto.parse(body));
+    return this.eventsService.updateSpacePolicy(account.propertyId, id, parseZodHttp(updateSpacePolicyDto, body));
   }
 
   @Put('spaces/:id/services')
   @RequirePermissions('events.update')
   async replaceSpaceServices(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.replaceSpaceServices(account.propertyId, id, replaceSpaceServicesDto.parse(body));
+    return this.eventsService.replaceSpaceServices(account.propertyId, id, parseZodHttp(replaceSpaceServicesDto, body));
   }
 
   @Post('quote')
   @RequirePermissions('events.create')
   async quote(@CurrentAccount() account: AuthenticatedAccount, @Body() body: unknown) {
-    return this.eventsService.quote(account.propertyId, quoteEventDto.parse(body));
+    return this.eventsService.quote(account.propertyId, parseZodHttp(quoteEventDto, body));
   }
 
   @Get(':id')
@@ -99,7 +100,7 @@ export class EventsController {
   @Post()
   @RequirePermissions('events.create')
   async createEvent(@CurrentAccount() account: AuthenticatedAccount, @Body() body: any) {
-    const parsedBody = createEventDto.parse(body);
+    const parsedBody = parseZodHttp(createEventDto, body);
     return this.eventsService.createEvent(account.propertyId, account.accountId, parsedBody);
   }
 
@@ -110,7 +111,7 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const parsedBody = updateEventDto.parse(body);
+    const parsedBody = parseZodHttp(updateEventDto, body);
     return this.eventsService.updateEvent(account.propertyId, id, account.accountId, parsedBody);
   }
 
@@ -121,7 +122,7 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const parsedBody = confirmEventDto.parse(body);
+    const parsedBody = parseZodHttp(confirmEventDto, body);
     return this.eventsService.confirmEvent(account.propertyId, id, account.accountId, parsedBody);
   }
 
@@ -132,26 +133,26 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const parsedBody = cancelEventDto.parse(body);
+    const parsedBody = parseZodHttp(cancelEventDto, body);
     return this.eventsService.cancelEvent(account.propertyId, id, account.accountId, parsedBody);
   }
 
   @Post(':id/preparing')
   @RequirePermissions('events.update')
   async preparing(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'preparing', eventCommandDto.parse(body));
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'preparing', parseZodHttp(eventCommandDto, body));
   }
 
   @Post(':id/start')
   @RequirePermissions('events.update')
   async start(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'in_progress', eventCommandDto.parse(body));
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'in_progress', parseZodHttp(eventCommandDto, body));
   }
 
   @Post(':id/complete')
   @RequirePermissions('events.update')
   async complete(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'completed', eventCommandDto.parse(body));
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'completed', parseZodHttp(eventCommandDto, body));
   }
 
   @Post(':id/archive')
@@ -161,7 +162,7 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
-    const parsedBody = eventCommandDto.parse(body);
+    const parsedBody = parseZodHttp(eventCommandDto, body);
     return this.eventsService.archiveEvent(account.propertyId, id, account.accountId, parsedBody);
   }
 }

@@ -8,6 +8,7 @@ import { parseCustomerIdempotencyKey, parseCustomerReservationId } from './custo
 import { CustomerSessionGuard } from './customer-session.guard.js';
 import type { CustomerAuthenticatedRequest } from './customer.types.js';
 import type { Environment } from '../config/environment.js';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 const cancellationDto = z.object({ reason: z.string().min(1).max(500) });
 
@@ -29,7 +30,7 @@ export class CustomerEventsController {
   @Post('quote')
   @UseGuards(CustomerSessionGuard)
   quote(@Body() body: unknown, @Req() request: CustomerAuthenticatedRequest) {
-    return this.events.quote(request.customer!.propertyId, quoteEventDto.parse(body));
+    return this.events.quote(request.customer!.propertyId, parseZodHttp(quoteEventDto, body));
   }
 
   @Get()
@@ -41,13 +42,13 @@ export class CustomerEventsController {
   @Post()
   @UseGuards(CustomerSessionGuard)
   create(@Body() body: unknown, @Headers('idempotency-key') key: unknown, @Req() request: CustomerAuthenticatedRequest) {
-    return this.events.createCustomerPreReservation(request.customer!, customerCreateEventDto.parse(body), parseCustomerIdempotencyKey(key));
+    return this.events.createCustomerPreReservation(request.customer!, parseZodHttp(customerCreateEventDto, body), parseCustomerIdempotencyKey(key));
   }
 
   @Post(':id/cancel')
   @HttpCode(200)
   @UseGuards(CustomerSessionGuard)
   cancel(@Param('id') id: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown, @Req() request: CustomerAuthenticatedRequest) {
-    return this.events.cancelCustomerEvent(request.customer!, parseCustomerReservationId(id), cancellationDto.parse(body).reason, parseCustomerIdempotencyKey(key));
+    return this.events.cancelCustomerEvent(request.customer!, parseCustomerReservationId(id), parseZodHttp(cancellationDto, body).reason, parseCustomerIdempotencyKey(key));
   }
 }

@@ -14,13 +14,13 @@ export class AmenitiesController {
   constructor(private readonly amenitiesService: AmenitiesService) {}
 
   @Get('config')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.read')
   async getConfigs(@CurrentAccount() account: AuthenticatedAccount) {
     return this.amenitiesService.getConfigs(account.propertyId);
   }
 
   @Put('config')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.config')
   async updateConfig(
     @CurrentAccount() account: AuthenticatedAccount,
     @Body() body: UpdateAmenityConfigDto,
@@ -29,19 +29,19 @@ export class AmenitiesController {
   }
 
   @Get('occupancy')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.read')
   async getOccupancy(@CurrentAccount() account: AuthenticatedAccount) {
     return this.amenitiesService.getOccupancy(account.propertyId);
   }
 
   @Get('blocks')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.read')
   async listBlocks(@CurrentAccount() account: AuthenticatedAccount) {
     return this.amenitiesService.listBlocks(account.propertyId);
   }
 
   @Post('blocks')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.block')
   async createBlock(
     @CurrentAccount() account: AuthenticatedAccount,
     @Body() body: CreateAmenityBlockDto,
@@ -50,13 +50,13 @@ export class AmenitiesController {
   }
 
   @Get('reservations')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.read')
   async listReservations(@CurrentAccount() account: AuthenticatedAccount) {
     return this.amenitiesService.listPropertyReservations(account.propertyId);
   }
 
   @Post('reservations/manual')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.create', 'cash.move')
   async createManualPass(
     @CurrentAccount() account: AuthenticatedAccount,
     @Body() body: CreateManualAmenityPassDto,
@@ -65,7 +65,7 @@ export class AmenitiesController {
   }
 
   @Get('reservations/:id/tab')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.read')
   async getReservationTab(
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
@@ -74,7 +74,7 @@ export class AmenitiesController {
   }
 
   @Post('reservations/:id/checkin')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.checkin')
   async checkInReservation(
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
@@ -83,7 +83,7 @@ export class AmenitiesController {
   }
 
   @Patch('reservations/:id/identity')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.identity')
   async updateReservationIdentity(
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
@@ -93,7 +93,7 @@ export class AmenitiesController {
   }
 
   @Post('reservations/:id/settle')
-  @RequirePermissions('reservations.read')
+  @RequirePermissions('amenities.settle', 'cash.move')
   async settleReservation(
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,

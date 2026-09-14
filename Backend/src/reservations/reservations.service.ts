@@ -190,6 +190,7 @@ export class ReservationsService {
     const fingerprint = this.fingerprint({ customer: customer.customerAccountId, property: customer.propertyId, ...input });
 
     return this.database.transaction(async (tx) => {
+      await acquirePropertyTransactionLock(tx, customer.propertyId);
       const replay = await this.findCustomerReservationReceipt(tx, customer, key, fingerprint);
       if (replay) return replay;
 

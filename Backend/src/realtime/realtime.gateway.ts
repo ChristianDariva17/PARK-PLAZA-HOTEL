@@ -45,6 +45,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
             email: accounts.email,
             roleKey: roles.key,
             accountStatus: accounts.status,
+            lastSeenAt: sessions.lastSeenAt,
             expiresAt: sessions.expiresAt,
           })
           .from(sessions)
@@ -63,6 +64,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
         if (account && account.accountStatus === 'active') {
           client.data.account = account;
+          this.scheduleStaffSessionExpiry(client, account.lastSeenAt, account.expiresAt);
           const propertyRoom = `property:${account.propertyId}`;
           const roleRoom = `property:${account.propertyId}:role:${account.roleKey}`;
 
@@ -106,6 +108,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   handleDisconnect(client: Socket) {
+    const timer = client.data.staffSessionTimer as NodeJS.Timeout | undefined;
+    if (timer) clearTimeout(timer);
     this.logger.log(`[Socket Disconnected] Socket ${client.id}`);
   }
 
@@ -160,6 +164,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       ))
       .limit(1);
     return rows[0] ?? null;
+  }
+
+  private scheduleStaffSessionExpiry(client: Socket, lastSeenAt: Date, expiresAt: Date): void {
+    const idleMinutes = this.config.get('AUTH_SESSION_IDLE_MINUTES', { infer: true });
+    if (!idleMinutes || !(lastSeenAt instanceof Date) || !(expiresAt instanceof Date)) return;
+
+    const idleExpiresAt = lastSeenAt.getTime() + idleMinutes * 60_000;
+    const expiresIn = Math.max(0, Math.min(idleExpiresAt, expiresAt.getTime()) - Date.now());
+    const timer = setTimeout(() => {
+      this.logger.warn(`[Socket Expired] Staff socket ${client.id} exceeded its session lifetime`);
+      client.disconnect(true);
+    }, expiresIn);
+    timer.unref();
+    client.data.staffSessionTimer = timer;
   }
 
   private async resolveCustomerActiveStays(customerAccountId: string, propertyId: string): Promise<string[]> {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 export const SupplierCategoryEnum = z.enum([
   'food', 'beverage', 'cleaning', 'maintenance', 'amenities', 'services', 'other'
@@ -17,27 +18,27 @@ export const CreateSupplierDto = z.object({
   rating: z.number().int().min(1).max(5).optional().default(5),
   ratingNotes: z.string().max(500).optional().nullable(),
   inventoryItemIds: z.array(z.string().uuid()).optional(),
-});
+}).strict();
 export type CreateSupplierDto = z.infer<typeof CreateSupplierDto>;
 
-export const UpdateSupplierDto = CreateSupplierDto.partial();
+export const UpdateSupplierDto = CreateSupplierDto.partial().strict();
 export type UpdateSupplierDto = z.infer<typeof UpdateSupplierDto>;
 
 export const ArchiveSupplierDto = z.object({
   reason: z.string().min(3).max(500),
   expectedVersion: z.number().int().positive(),
-});
+}).strict();
 export type ArchiveSupplierDto = z.infer<typeof ArchiveSupplierDto>;
 
 export const ReactivateSupplierDto = z.object({
   reason: z.string().min(3).max(500),
   expectedVersion: z.number().int().positive(),
-});
+}).strict();
 export type ReactivateSupplierDto = z.infer<typeof ReactivateSupplierDto>;
 
 export const AssignSupplierInventoryDto = z.object({
   itemIds: z.array(z.string().uuid()),
-});
+}).strict();
 export type AssignSupplierInventoryDto = z.infer<typeof AssignSupplierInventoryDto>;
 
 export const RestockItemDto = z.object({
@@ -45,13 +46,13 @@ export const RestockItemDto = z.object({
   quantity: z.number().positive(),
   unitCost: z.number().min(0).optional(),
   lot: z.string().max(60).optional(),
-});
+}).strict();
 
 export const RestockFromSupplierDto = z.object({
   items: z.array(RestockItemDto).min(1),
   invoiceNumber: z.string().max(80).optional(),
   notes: z.string().max(500).optional(),
-});
+}).strict();
 export type RestockFromSupplierDto = z.infer<typeof RestockFromSupplierDto>;
 
 export const PurchaseOrderItemDto = z.object({
@@ -60,7 +61,7 @@ export const PurchaseOrderItemDto = z.object({
   unit: z.string().min(1),
   quantity: z.number().positive(),
   unitCost: z.number().min(0).default(0),
-});
+}).strict();
 
 export const CreatePurchaseOrderDto = z.object({
   supplierId: z.string().uuid(),
@@ -68,7 +69,7 @@ export const CreatePurchaseOrderDto = z.object({
   currency: z.string().max(3).default('PEN'),
   notes: z.string().max(500).optional().nullable(),
   items: z.array(PurchaseOrderItemDto).min(1),
-});
+}).strict();
 export type CreatePurchaseOrderDto = z.infer<typeof CreatePurchaseOrderDto>;
 
 export const ReceivePurchaseOrderDto = z.object({
@@ -76,29 +77,28 @@ export const ReceivePurchaseOrderDto = z.object({
   rating: z.number().int().min(1).max(5).optional(),
   ratingNotes: z.string().max(500).optional(),
   notes: z.string().max(500).optional(),
-});
+}).strict();
 export type ReceivePurchaseOrderDto = z.infer<typeof ReceivePurchaseOrderDto>;
 
 export const RateSupplierDto = z.object({
   rating: z.number().int().min(1).max(5),
   ratingNotes: z.string().max(500).optional().nullable(),
-});
+}).strict();
 export type RateSupplierDto = z.infer<typeof RateSupplierDto>;
 
-export const parseCreateSupplierDto = (body: unknown): CreateSupplierDto => CreateSupplierDto.parse(body);
-export const parseUpdateSupplierDto = (body: unknown): UpdateSupplierDto => UpdateSupplierDto.parse(body);
-export const parseArchiveSupplierDto = (body: unknown): ArchiveSupplierDto => ArchiveSupplierDto.parse(body);
-export const parseReactivateSupplierDto = (body: unknown): ReactivateSupplierDto => ReactivateSupplierDto.parse(body);
-export const parseAssignSupplierInventoryDto = (body: unknown): AssignSupplierInventoryDto => AssignSupplierInventoryDto.parse(body);
-export const parseRestockFromSupplierDto = (body: unknown): RestockFromSupplierDto => RestockFromSupplierDto.parse(body);
-export const parseCreatePurchaseOrderDto = (body: unknown): CreatePurchaseOrderDto => CreatePurchaseOrderDto.parse(body);
-export const parseReceivePurchaseOrderDto = (body: unknown): ReceivePurchaseOrderDto => ReceivePurchaseOrderDto.parse(body);
-export const parseRateSupplierDto = (body: unknown): RateSupplierDto => RateSupplierDto.parse(body);
+export const parseCreateSupplierDto = (body: unknown): CreateSupplierDto => parseZodHttp(CreateSupplierDto, body, 'Datos de proveedor inválidos');
+export const parseUpdateSupplierDto = (body: unknown): UpdateSupplierDto => parseZodHttp(UpdateSupplierDto, body, 'Datos de actualización de proveedor inválidos');
+export const parseArchiveSupplierDto = (body: unknown): ArchiveSupplierDto => parseZodHttp(ArchiveSupplierDto, body, 'Datos de archivo de proveedor inválidos');
+export const parseReactivateSupplierDto = (body: unknown): ReactivateSupplierDto => parseZodHttp(ReactivateSupplierDto, body, 'Datos de reactivación de proveedor inválidos');
+export const parseAssignSupplierInventoryDto = (body: unknown): AssignSupplierInventoryDto => parseZodHttp(AssignSupplierInventoryDto, body, 'Datos de asignación de inventario inválidos');
+export const parseRestockFromSupplierDto = (body: unknown): RestockFromSupplierDto => parseZodHttp(RestockFromSupplierDto, body, 'Datos de reposición inválidos');
+export const parseCreatePurchaseOrderDto = (body: unknown): CreatePurchaseOrderDto => parseZodHttp(CreatePurchaseOrderDto, body, 'Datos de orden de compra inválidos');
+export const parseReceivePurchaseOrderDto = (body: unknown): ReceivePurchaseOrderDto => parseZodHttp(ReceivePurchaseOrderDto, body, 'Datos de recepción inválidos');
+export const parseRateSupplierDto = (body: unknown): RateSupplierDto => parseZodHttp(RateSupplierDto, body, 'Datos de calificación inválidos');
+export const parseIdempotencyKey = (value: unknown): string => parseZodHttp(z.string().uuid(), value, 'Idempotency-Key header is required and must be a UUID');
 
 export const parseUuidParam = (value: unknown): string => {
-  const result = z.string().uuid().safeParse(value);
-  if (!result.success) throw new Error('Invalid UUID');
-  return result.data;
+  return parseZodHttp(z.string().uuid(), value, 'Invalid UUID');
 };
 
 export const SupplierResponseDto = z.object({

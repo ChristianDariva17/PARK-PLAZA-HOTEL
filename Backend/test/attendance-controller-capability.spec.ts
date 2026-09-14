@@ -14,17 +14,24 @@ const actor = {
 describe('AttendanceController biometric capabilities', () => {
   it('issues a subject-bound verification capability only to authorized staff', async () => {
     const issue = vi.fn().mockReturnValue({ token: 'capability', expiresAt: '2026-09-05T00:00:00.000Z' });
-    const controller = new AttendanceController({} as any, { issue } as any);
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([{ id: 'subject-id' }]) })),
+        })),
+      })),
+    };
+    const controller = new AttendanceController({} as any, { issue } as any, database as any);
 
     await expect(controller.issueBiometricCapability({
       operation: 'verify', subjectType: 'employee', subjectId: '11111111-1111-4111-8111-111111111111',
     }, { ...actor, permissions: ['staff.biometric', 'staff.attendance'] })).resolves.toEqual({ token: 'capability', expiresAt: '2026-09-05T00:00:00.000Z' });
 
-    expect(issue).toHaveBeenCalledWith('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' });
+    expect(issue).toHaveBeenCalledWith('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' }, 'property-1');
   });
 
   it('rejects a biometric operation when the session lacks its permission', async () => {
-    const controller = new AttendanceController({} as any, { issue: vi.fn() } as any);
+    const controller = new AttendanceController({} as any, { issue: vi.fn() } as any, {} as any);
 
     await expect(controller.issueBiometricCapability({
       operation: 'enroll', subjectType: 'client', subjectId: '11111111-1111-4111-8111-111111111111',

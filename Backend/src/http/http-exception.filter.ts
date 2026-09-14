@@ -32,6 +32,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
+    reply.header('X-Request-Id', request.id);
     reply.status(envelope.statusCode).send(envelope);
   }
 
