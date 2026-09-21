@@ -169,9 +169,8 @@ export class ExperiencesService {
         if (!stayGuest) throw new BadRequestException('El huésped no pertenece a la estadía');
       }
 
-      // Check capacity if applicable
+      // Capacity is scoped to an exact scheduled slot; experiences have no duration model.
       if (exp.maxCapacity && dto.scheduledAt) {
-        // Find existing participations for the exact same time (simple logic, should use range)
         const currentCountRes = await tx.select({ totalPax: sql<number>`sum(pax)` })
           .from(experienceParticipations)
           .where(

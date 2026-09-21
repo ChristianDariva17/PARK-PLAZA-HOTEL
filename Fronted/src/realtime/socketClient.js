@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { reportClientTelemetry } from '../observability/clientTelemetry.js';
 
 let socketInstance = null;
 const connectionListeners = new Set();
@@ -22,23 +23,20 @@ export function connectSocket() {
     });
 
     socketInstance.on('connect', () => {
-      console.log('[WebSocket] Conectado en vivo al servidor Park Plaza');
+      reportClientTelemetry({ kind: 'websocket', outcome: 'connected', path: '/api/socket.io' });
       connectionListeners.forEach((cb) => cb(true, 'connected'));
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.warn('[WebSocket] Desconectado:', reason);
+    socketInstance.on('disconnect', () => {
+      reportClientTelemetry({ kind: 'websocket', outcome: 'disconnected', path: '/api/socket.io' });
       connectionListeners.forEach((cb) => cb(false, 'disconnected'));
     });
 
-    socketInstance.on('connect_error', (error) => {
-      console.warn('[WebSocket] Error de conexión:', error.message);
+    socketInstance.on('connect_error', () => {
+      reportClientTelemetry({ kind: 'websocket', outcome: 'error', path: '/api/socket.io', code: 'connect_error' });
       connectionListeners.forEach((cb) => cb(false, 'error'));
     });
 
-    socketInstance.on('connection:ack', (ack) => {
-      console.log('[WebSocket] Handshake ACK:', ack);
-    });
   }
 
   if (!socketInstance.connected) socketInstance.connect();

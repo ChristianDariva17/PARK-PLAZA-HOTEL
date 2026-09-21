@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseZodHttp } from '../http/zod-parser.js';
 
 const serviceSelectionDto = z.object({
   code: z.string().min(1).max(64),
@@ -28,7 +29,6 @@ export const createEventDto = z.object({
   eventStartsAt: z.string().datetime().optional(),
   eventEndsAt: z.string().datetime().optional(),
   services: z.array(serviceSelectionDto).max(50).optional(),
-  idempotencyKey: z.string().min(1).max(255),
 }).refine(data => {
   const start = new Date(data.startsAt);
   const end = new Date(data.endsAt);
@@ -61,7 +61,6 @@ export const updateEventDto = z.object({
   eventEndsAt: z.string().datetime().optional(),
   services: z.array(serviceSelectionDto).max(50).optional(),
   expectedVersion: z.number().int().min(1),
-  idempotencyKey: z.string().min(1).max(255),
 }).refine(data => {
   if (data.startsAt && data.endsAt) {
     const start = new Date(data.startsAt);
@@ -92,7 +91,6 @@ export const listEventsDto = z.object({
 
 export const eventCommandDto = z.object({
   expectedVersion: z.number().int().min(1),
-  idempotencyKey: z.string().min(1).max(255),
 });
 
 export const confirmEventDto = eventCommandDto.extend({
@@ -132,6 +130,8 @@ export const customerCreateEventDto = z.object({
   services: z.array(serviceSelectionDto).max(50).default([]),
 }).and(bookingTimesDto);
 
+export const parseIdempotencyKey = (input: unknown) => parseZodHttp(z.string().uuid(), input, 'Invalid Idempotency-Key');
+
 export const updateSpacePolicyDto = z.object({
   capacity: z.number().int().min(1).optional(),
   openingTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
@@ -153,6 +153,8 @@ export const updateSpacePolicyDto = z.object({
 export const replaceSpaceServicesDto = z.array(z.object({
   code: z.string().min(1).max(64),
   name: z.string().min(1).max(255),
+  category: z.string().trim().min(1).max(64).default('General'),
   unitAmount: z.number().min(0),
+  perPerson: z.boolean().default(false),
   active: z.boolean().default(true),
 })).max(100);

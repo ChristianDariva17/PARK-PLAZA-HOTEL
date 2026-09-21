@@ -7,5 +7,10 @@ setup('authenticate QA account', async ({ page }) => {
   await page.getByRole('button', { name: 'Ingresar' }).click();
 
   await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
+  if (new URL(page.url()).protocol === 'http:') {
+    const cookies = await page.context().cookies();
+    await page.context().clearCookies();
+    await page.context().addCookies(cookies.map((cookie) => ({ ...cookie, secure: false })));
+  }
   await page.context().storageState({ path: 'playwright/.auth/admin.json' });
 });

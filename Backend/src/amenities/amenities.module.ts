@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { FolioModule } from '../folios/folio.module.js';
 import { AmenitiesController } from './amenities.controller.js';
 import { AmenitiesService } from './amenities.service.js';
 
 @Module({
-  imports: [DatabaseModule, FolioModule],
+  imports: [DatabaseModule, FolioModule, AuditModule],
   controllers: [AmenitiesController],
   providers: [AmenitiesService],
   exports: [AmenitiesService],

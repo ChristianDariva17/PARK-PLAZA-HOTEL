@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
-import { CheckCircle2, Fingerprint, LogIn, LogOut, RefreshCw, ShieldCheck, Users, QrCode, Smartphone, MapPin } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { CheckCircle2, LogIn, LogOut, RefreshCw, Users, QrCode, Smartphone, MapPin } from 'lucide-react';
 import { useStaffResource } from '../../hooks/useStaffResource.js';
-import { BiometricAttendanceAdapter } from '../../components/biometrics/BiometricAttendanceAdapter.jsx';
-import { AttendanceKioskModal } from './AttendanceKioskModal.jsx';
-import { StaffQrScannerModal } from './StaffQrScannerModal.jsx';
 import { DataTable, EmptyState, MetricStrip, PageHeader, SectionHeader, StatusBadge } from '../../components/views/SharedViewParts.jsx';
 import { PermissionButton } from '../../components/auth/PermissionButton.jsx';
 import { staffClient } from '../../staff/staffClient.js';
 import { P1Select } from '../../components/ui/P1Atoms.jsx';
+
+const loadNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
+const LazyAttendanceKioskModal = loadNamed(() => import('./AttendanceKioskModal.jsx'), 'AttendanceKioskModal');
+const LazyStaffQrScannerModal = loadNamed(() => import('./StaffQrScannerModal.jsx'), 'StaffQrScannerModal');
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
 const createIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
@@ -68,7 +69,7 @@ export function StaffAttendanceView() {
 
   return (
     <div className="view-container attendance-view">
-      <PageHeader metadata="Control operativo · registro auditable" title="Asistencia y turnos" description="Marcaciones biométricas y manuales vinculadas al personal de esta propiedad." />
+      <PageHeader metadata="Control operativo · registro auditable" title="Asistencia y turnos" description="Marcaciones manuales y QR vinculadas al personal de esta propiedad." />
 
       {/* Barra de Acciones Principales QR & GPS */}
       <div className="attendance-auto-register-banner">
@@ -118,11 +119,6 @@ export function StaffAttendanceView() {
             {manualMessage ? <div className={`attendance-feedback ${manualMessage.type}`} role="status">{manualMessage.text}</div> : null}
           </section>
 
-          <section className="card attendance-method-card">
-            <div className="attendance-method-heading"><span className="attendance-method-icon biometric"><Fingerprint size={21} /></span><div><span className="section-kicker">Método alternativo</span><h3>Validación biométrica</h3></div><span className="method-label"><ShieldCheck size={14} /> Auditado</span></div>
-            <p className="attendance-method-copy">Usá el lector enrolado cuando esté disponible. El backend valida dispositivo, huella, propiedad y vinculación del empleado.</p>
-            {selectedStaff ? <BiometricAttendanceAdapter staffId={selectedStaff} movement={movement} onComplete={async () => { setManualMessage({ type: 'success', text: `${movement} biométrico registrado correctamente.` }); await reload(); }} /> : <div className="attendance-empty-prompt"><Fingerprint size={22} /><span>Seleccioná un empleado para habilitar el lector biométrico.</span></div>}
-          </section>
         </div>
 
         <section className="card attendance-history-card">
@@ -133,13 +129,8 @@ export function StaffAttendanceView() {
         </section>
       </div>
 
-      <AttendanceKioskModal open={kioskOpen} onClose={() => setKioskOpen(false)} />
-      <StaffQrScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        staffList={activeStaff}
-        onAttendanceSuccess={reload}
-      />
+      {kioskOpen ? <Suspense fallback={<div className="route-loading state-panel" role="status">Cargando kiosco QR...</div>}><LazyAttendanceKioskModal open onClose={() => setKioskOpen(false)} /></Suspense> : null}
+      {scannerOpen ? <Suspense fallback={<div className="route-loading state-panel" role="status">Cargando lector QR...</div>}><LazyStaffQrScannerModal open onClose={() => setScannerOpen(false)} staffList={activeStaff} onAttendanceSuccess={reload} /></Suspense> : null}
     </div>
   );
 }

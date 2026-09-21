@@ -82,7 +82,6 @@ export function adaptGuestResponse(response, localGuest = {}) {
     totalSpent: localGuest.totalSpent ?? LOCAL_DEFAULTS.totalSpent,
     petIds: localGuest.petIds ?? [],
     preferences: localGuest.preferences ?? [],
-    ...(localGuest.biometric ? { biometric: localGuest.biometric } : {}),
   };
 }
 

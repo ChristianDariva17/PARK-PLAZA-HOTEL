@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { DATABASE, type Database } from '../database/database.module.js';
 import {
@@ -16,8 +16,8 @@ import { customerGuestIdentities } from '../database/schema/customer.schema.js';
 import { eq, and, desc, or, inArray, gte, lte, gt } from 'drizzle-orm';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import type { AuthenticatedCustomer } from '../customer/customer.types.js';
-import type { AuthenticatedAccount } from '../auth/auth.types.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
+import { OutboxService } from '../audit/outbox.service.js';
 import type {
   CreateAmenityBlockDto,
   CreateManualAmenityPassDto,
@@ -72,7 +72,7 @@ const DEFAULT_CONFIGS: Record<string, AmenityRuleConfig> = {
 export class AmenitiesService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
-    @Optional() private readonly realtime?: RealtimeGateway,
+    private readonly outbox: OutboxService,
   ) {}
 
   async getConfigs(propertyId: string, executor: Pick<Database, 'select'> = this.db): Promise<AmenityRuleConfig[]> {
@@ -103,72 +103,79 @@ export class AmenitiesService {
     });
   }
 
-  async updateConfig(actor: AuthenticatedAccount, dto: UpdateAmenityConfigDto): Promise<AmenityRuleConfig> {
-    const key = dto.amenityKey.toLowerCase();
-    const existing = (
-      await this.db
-        .select()
-        .from(amenityConfigs)
-        .where(
-          and(
-            eq(amenityConfigs.propertyId, actor.propertyId),
-            eq(amenityConfigs.amenityKey, key),
-          ),
-        )
-        .limit(1)
-    )[0];
+  async updateConfig(actor: AuthenticatedAccount, dto: UpdateAmenityConfigDto, context: RequestContext = {}): Promise<AmenityRuleConfig> {
+    return this.db.transaction(async (tx: any) => {
+      const key = dto.amenityKey.toLowerCase();
+      const existing = (
+        await tx
+          .select()
+          .from(amenityConfigs)
+          .where(
+            and(
+              eq(amenityConfigs.propertyId, actor.propertyId),
+              eq(amenityConfigs.amenityKey, key),
+            ),
+          )
+          .limit(1)
+      )[0];
 
-    const defaultConfig = DEFAULT_CONFIGS[key] || DEFAULT_CONFIG_PISCINA;
+      const defaultConfig = DEFAULT_CONFIGS[key] || DEFAULT_CONFIG_PISCINA;
 
-    const values = {
-      propertyId: actor.propertyId,
-      amenityKey: key,
-      name: dto.name ?? existing?.name ?? defaultConfig.name,
-      priceExternal: (dto.priceExternal !== undefined ? dto.priceExternal : existing ? Number(existing.priceExternal) : defaultConfig.priceExternal).toFixed(2),
-      priceGuest: (dto.priceGuest !== undefined ? dto.priceGuest : existing ? Number(existing.priceGuest) : defaultConfig.priceGuest).toFixed(2),
-      durationMinutes: dto.durationMinutes ?? existing?.durationMinutes ?? defaultConfig.durationMinutes,
-      maxPax: dto.maxPax ?? existing?.maxPax ?? defaultConfig.maxPax,
-      capacity: dto.capacity ?? existing?.capacity ?? defaultConfig.capacity,
-      openingHour: dto.openingHour ?? existing?.openingHour ?? defaultConfig.openingHour,
-      closingHour: dto.closingHour ?? existing?.closingHour ?? defaultConfig.closingHour,
-      isActive: dto.isActive ?? existing?.isActive ?? defaultConfig.isActive,
-      updatedAt: new Date(),
-    };
+      const values = {
+        propertyId: actor.propertyId,
+        amenityKey: key,
+        name: dto.name ?? existing?.name ?? defaultConfig.name,
+        priceExternal: (dto.priceExternal !== undefined ? dto.priceExternal : existing ? Number(existing.priceExternal) : defaultConfig.priceExternal).toFixed(2),
+        priceGuest: (dto.priceGuest !== undefined ? dto.priceGuest : existing ? Number(existing.priceGuest) : defaultConfig.priceGuest).toFixed(2),
+        durationMinutes: dto.durationMinutes ?? existing?.durationMinutes ?? defaultConfig.durationMinutes,
+        maxPax: dto.maxPax ?? existing?.maxPax ?? defaultConfig.maxPax,
+        capacity: dto.capacity ?? existing?.capacity ?? defaultConfig.capacity,
+        openingHour: dto.openingHour ?? existing?.openingHour ?? defaultConfig.openingHour,
+        closingHour: dto.closingHour ?? existing?.closingHour ?? defaultConfig.closingHour,
+        isActive: dto.isActive ?? existing?.isActive ?? defaultConfig.isActive,
+        updatedAt: new Date(),
+      };
 
-    if (existing) {
-      await this.db
-        .update(amenityConfigs)
-        .set(values)
-        .where(eq(amenityConfigs.id, existing.id));
-    } else {
-      await this.db.insert(amenityConfigs).values(values);
-    }
+      if (existing) {
+        await tx
+          .update(amenityConfigs)
+          .set(values)
+          .where(and(eq(amenityConfigs.id, existing.id), eq(amenityConfigs.propertyId, actor.propertyId)));
+      } else {
+        await tx.insert(amenityConfigs).values(values);
+      }
 
-    const updatedConfig: AmenityRuleConfig = {
-      amenityKey: key,
-      name: values.name,
-      priceExternal: Number(values.priceExternal),
-      priceGuest: Number(values.priceGuest),
-      durationMinutes: values.durationMinutes,
-      maxPax: values.maxPax,
-      capacity: values.capacity,
-      openingHour: values.openingHour,
-      closingHour: values.closingHour,
-      isActive: values.isActive,
-    };
+      const updatedConfig: AmenityRuleConfig = {
+        amenityKey: key,
+        name: values.name,
+        priceExternal: Number(values.priceExternal),
+        priceGuest: Number(values.priceGuest),
+        durationMinutes: values.durationMinutes,
+        maxPax: values.maxPax,
+        capacity: values.capacity,
+        openingHour: values.openingHour,
+        closingHour: values.closingHour,
+        isActive: values.isActive,
+      };
 
-    if (this.realtime) {
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:config_updated', updatedConfig);
-    }
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'amenity:config_updated',
+        aggregateType: 'amenity_config',
+        ...(existing?.id ? { aggregateId: existing.id } : {}),
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: updatedConfig as unknown as Record<string, unknown>,
+      });
 
-    return updatedConfig;
+      return updatedConfig;
+    });
   }
 
-  async getOccupancy(propertyId: string) {
-    const configs = await this.getConfigs(propertyId);
+  async getOccupancy(propertyId: string, executor: Pick<Database, 'select'> = this.db) {
+    const configs = await this.getConfigs(propertyId, executor);
     const now = new Date();
 
-    const activeReservations = await this.db
+    const activeReservations = await executor
       .select({
         id: amenityReservations.id,
         amenityType: amenityReservations.amenityType,
@@ -226,7 +233,7 @@ export class AmenitiesService {
     return occupancyByZone;
   }
 
-  async createManualPass(actor: AuthenticatedAccount, dto: CreateManualAmenityPassDto) {
+  async createManualPass(actor: AuthenticatedAccount, dto: CreateManualAmenityPassDto, context: RequestContext = {}) {
     const inserted = await this.db.transaction(async (tx: any) => {
       await acquirePropertyTransactionLock(tx, actor.propertyId);
       const configs = await this.getConfigs(actor.propertyId, tx);
@@ -299,19 +306,31 @@ export class AmenitiesService {
         }
       }
 
+      if (created) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'amenity:reservation_created',
+          aggregateType: 'amenity_reservation',
+          aggregateId: created.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: created as unknown as Record<string, unknown>,
+        });
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'amenity:occupancy_changed',
+          aggregateType: 'amenity',
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: await this.getOccupancy(actor.propertyId, tx as any),
+        });
+      }
+
       return created;
     });
-
-    if (this.realtime && inserted) {
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_created', inserted);
-      const occupancy = await this.getOccupancy(actor.propertyId);
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:occupancy_changed', occupancy);
-    }
 
     return inserted;
   }
 
-  async checkInReservation(actor: AuthenticatedAccount, reservationId: string) {
+  async checkInReservation(actor: AuthenticatedAccount, reservationId: string, context: RequestContext = {}) {
     const updated = await this.db.transaction(async (tx: any) => {
       await acquirePropertyTransactionLock(tx, actor.propertyId);
       const [reservation] = await tx.select()
@@ -333,34 +352,49 @@ export class AmenitiesService {
           eq(amenityReservations.status, 'confirmed'),
         ))
         .returning();
+      if (checkedIn) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'amenity:occupancy_changed',
+          aggregateType: 'amenity',
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: await this.getOccupancy(actor.propertyId, tx as any),
+        });
+      }
+
       return checkedIn;
     });
-
-    if (this.realtime && updated) {
-      const occupancy = await this.getOccupancy(actor.propertyId);
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:occupancy_changed', occupancy);
-    }
 
     return updated;
   }
 
-  async createBlock(actor: AuthenticatedAccount, dto: CreateAmenityBlockDto) {
-    const [block] = await this.db
-      .insert(amenityBlocks)
-      .values({
-        propertyId: actor.propertyId,
-        amenityKey: dto.amenityKey.toLowerCase(),
-        reason: dto.reason,
-        startTime: new Date(dto.startTime),
-        endTime: new Date(dto.endTime),
-      })
-      .returning();
+  async createBlock(actor: AuthenticatedAccount, dto: CreateAmenityBlockDto, context: RequestContext = {}) {
+    return this.db.transaction(async (tx: any) => {
+      await acquirePropertyTransactionLock(tx, actor.propertyId);
+      const [block] = await tx
+        .insert(amenityBlocks)
+        .values({
+          propertyId: actor.propertyId,
+          amenityKey: dto.amenityKey.toLowerCase(),
+          reason: dto.reason,
+          startTime: new Date(dto.startTime),
+          endTime: new Date(dto.endTime),
+        })
+        .returning();
 
-    if (this.realtime) {
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:block_created', block);
-    }
+      if (block) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'amenity:block_created',
+          aggregateType: 'amenity_block',
+          aggregateId: block.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: block as unknown as Record<string, unknown>,
+        });
+      }
 
-    return block;
+      return block;
+    });
   }
 
   async listBlocks(propertyId: string) {
@@ -524,7 +558,7 @@ export class AmenitiesService {
     return updated;
   }
 
-  async settleReservation(actor: AuthenticatedAccount, reservationId: string, data: { paymentMethod: string; amount?: number; note?: string }) {
+  async settleReservation(actor: AuthenticatedAccount, reservationId: string, data: { paymentMethod: string; amount?: number; note?: string }, context: RequestContext = {}) {
     return this.db.transaction(async (tx: any) => {
       await acquirePropertyTransactionLock(tx, actor.propertyId);
 
@@ -590,9 +624,14 @@ export class AmenitiesService {
         });
       }
 
-      if (this.realtime) {
-        this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_settled', updated);
-      }
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'amenity:reservation_settled',
+        aggregateType: 'amenity_reservation',
+        aggregateId: reservationId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: updated as unknown as Record<string, unknown>,
+      });
 
       return {
         success: true,
@@ -603,7 +642,7 @@ export class AmenitiesService {
     });
   }
 
-  async createReservation(actor: AuthenticatedCustomer, data: { amenityType: string; startTime: string; endTime?: string | undefined; pax?: number | undefined; documentNumber?: string | undefined; customerName?: string | undefined }, idempotencyKey: string) {
+  async createReservation(actor: AuthenticatedCustomer, data: { amenityType: string; startTime: string; endTime?: string | undefined; pax?: number | undefined; documentNumber?: string | undefined; customerName?: string | undefined }, idempotencyKey: string, context: RequestContext = {}) {
     const fingerprint = createHash('sha256').update(JSON.stringify({
       customer: actor.customerAccountId,
       property: actor.propertyId,
@@ -682,16 +721,25 @@ export class AmenitiesService {
         fingerprint,
         response: { status: 201, body: inserted },
       });
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'amenity:reservation_created',
+        aggregateType: 'amenity_reservation',
+        aggregateId: inserted.id,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: inserted as unknown as Record<string, unknown>,
+      });
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'amenity:occupancy_changed',
+        aggregateType: 'amenity',
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: await this.getOccupancy(actor.propertyId, tx as any),
+      });
     }
 
     return inserted;
     });
-
-    if (this.realtime && inserted) {
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:reservation_created', inserted);
-      const occupancy = await this.getOccupancy(actor.propertyId);
-      this.realtime.emitToProperty(actor.propertyId, 'amenity:occupancy_changed', occupancy);
-    }
 
     return inserted;
   }

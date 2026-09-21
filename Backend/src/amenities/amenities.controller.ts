@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Req } from '@nestjs/common';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
-import type { AuthenticatedAccount } from '../auth/auth.types.js';
+import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
+import { getRequestContext } from '../auth/request-context.js';
 import { AmenitiesService } from './amenities.service.js';
 import {
   CreateAmenityBlockDto,
@@ -23,9 +24,10 @@ export class AmenitiesController {
   @RequirePermissions('amenities.config')
   async updateConfig(
     @CurrentAccount() account: AuthenticatedAccount,
+    @Req() request: AuthenticatedRequest,
     @Body() body: UpdateAmenityConfigDto,
   ) {
-    return this.amenitiesService.updateConfig(account, body);
+    return this.amenitiesService.updateConfig(account, body, getRequestContext(request));
   }
 
   @Get('occupancy')
@@ -44,9 +46,10 @@ export class AmenitiesController {
   @RequirePermissions('amenities.block')
   async createBlock(
     @CurrentAccount() account: AuthenticatedAccount,
+    @Req() request: AuthenticatedRequest,
     @Body() body: CreateAmenityBlockDto,
   ) {
-    return this.amenitiesService.createBlock(account, body);
+    return this.amenitiesService.createBlock(account, body, getRequestContext(request));
   }
 
   @Get('reservations')
@@ -59,9 +62,10 @@ export class AmenitiesController {
   @RequirePermissions('amenities.create', 'cash.move')
   async createManualPass(
     @CurrentAccount() account: AuthenticatedAccount,
+    @Req() request: AuthenticatedRequest,
     @Body() body: CreateManualAmenityPassDto,
   ) {
-    return this.amenitiesService.createManualPass(account, body);
+    return this.amenitiesService.createManualPass(account, body, getRequestContext(request));
   }
 
   @Get('reservations/:id/tab')
@@ -78,8 +82,9 @@ export class AmenitiesController {
   async checkInReservation(
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.amenitiesService.checkInReservation(account, id);
+    return this.amenitiesService.checkInReservation(account, id, getRequestContext(request));
   }
 
   @Patch('reservations/:id/identity')
@@ -98,7 +103,8 @@ export class AmenitiesController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: { paymentMethod: string; amount?: number; note?: string },
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.amenitiesService.settleReservation(account, id, body);
+    return this.amenitiesService.settleReservation(account, id, body, getRequestContext(request));
   }
 }

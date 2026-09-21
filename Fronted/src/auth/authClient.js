@@ -1,4 +1,7 @@
+import { normalizeRequestError, RequestError } from '../api/requestError.js';
+
 const SESSION_URL = '/api/auth/session';
+const VERSIONED_API_PREFIX = '/api/v1';
 
 let initialSessionRequest;
 const unauthorizedListeners = new Set();
@@ -24,18 +27,11 @@ const KNOWN_ERROR_MESSAGES = new Map([
   ['Google registration is not configured', 'El registro con Google todavía no está configurado.'],
 ]);
 
-export class AuthRequestError extends Error {
+export class AuthRequestError extends RequestError {
   constructor(message, options = {}, legacyKnown = false) {
-    const { status = null, code = 'transport', retryable = false, ambiguous = false, reloadRecommended = false, requestId = null, cause, known = legacyKnown } = typeof options === 'number' ? { status: options } : options;
-    super(message, cause === undefined ? undefined : { cause });
+    const normalizedOptions = typeof options === 'number' ? { status: options } : options;
+    super(message, { ...normalizedOptions, known: normalizedOptions?.known ?? legacyKnown });
     this.name = 'AuthRequestError';
-    this.status = status;
-    this.code = code;
-    this.retryable = retryable;
-    this.ambiguous = ambiguous;
-    this.reloadRecommended = reloadRecommended;
-    this.requestId = requestId;
-    this.known = known;
   }
 }
 
@@ -46,8 +42,7 @@ const RESOURCE_ERROR_CODES = new Map([
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 
 export function normalizeResourceError(error) {
-  if (error instanceof AuthRequestError) return Object.freeze({ code: error.code, status: error.status, retry: error.retryable, requestId: error.requestId });
-  return Object.freeze({ code: 'transport', status: null, retry: true, requestId: null });
+  return normalizeRequestError(error);
 }
 
 export function serializeExactMoney(value) {
@@ -101,7 +96,9 @@ async function readErrorPayload(response) {
   try {
     const payload = await response.json();
     return {
-      message: typeof payload?.message === 'string' && payload.message.length <= 200 ? payload.message : null,
+      message: typeof payload?.detail === 'string' && payload.detail.length <= 200
+        ? payload.detail
+        : typeof payload?.message === 'string' && payload.message.length <= 200 ? payload.message : null,
       code: typeof payload?.code === 'string' && payload.code.length <= 100 ? payload.code : null,
       requestId: typeof payload?.requestId === 'string' && payload.requestId.length <= 100 ? payload.requestId : null,
     };
@@ -117,15 +114,32 @@ const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
 
 const isReadRetry = (method, attempt, signal) => method === 'GET' && attempt === 0 && !signal?.aborted;
 
+function telemetryPath(url) {
+  try {
+    const segments = new URL(url, globalThis.location?.origin || 'http://localhost').pathname.split('/').filter(Boolean);
+    if (segments[0] === 'api') return `/${segments.slice(0, 2).join('/')}`;
+    return `/${segments[0] || 'unknown'}`;
+  } catch {
+    return '/unknown';
+  }
+}
+
 function reportFailure({ method, url, error, attempt }) {
-  requestTelemetryListeners.forEach((listener) => listener({
+  const event = Object.freeze({
     method,
-    path: new URL(url, globalThis.location?.origin || 'http://localhost').pathname,
+    path: telemetryPath(url),
     status: error.status,
     code: error.code,
     requestId: error.requestId,
     attempt,
-  }));
+  });
+  requestTelemetryListeners.forEach((listener) => {
+    try {
+      listener(event);
+    } catch {
+      // Observability must never replace the request error or break retries.
+    }
+  });
 }
 
 export async function authRequest(url, options = {}) {
@@ -135,7 +149,7 @@ export async function authRequest(url, options = {}) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let response;
     try {
-      response = await fetch(url, {
+      response = await fetch(versionedApiUrl(url), {
         credentials: 'include',
         ...fetchOptions,
         headers: fetchOptions.body ? { 'Content-Type': 'application/json', ...fetchOptions.headers } : fetchOptions.headers,
@@ -179,6 +193,10 @@ export async function authRequest(url, options = {}) {
   }
 
   throw new Error('Unreachable request retry state.');
+}
+
+function versionedApiUrl(url) {
+  return url.replace(/^\/api(?=\/|$)/, VERSIONED_API_PREFIX);
 }
 
 export async function getSession() {

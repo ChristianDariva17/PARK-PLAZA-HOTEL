@@ -22,6 +22,7 @@ describe('EventsService', () => {
       update: vi.fn().mockReturnThis(),
       set: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([]),
+      delete: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
       values: vi.fn().mockReturnThis(),
       onConflictDoNothing: vi.fn().mockReturnThis(),
@@ -87,7 +88,7 @@ describe('EventsService', () => {
         timezone: 'UTC',
         attendees: 10,
         idempotencyKey: 'key-1',
-      });
+      }, 'key-1');
 
       expect(result.status).toBe('draft');
       expect(tx.insert).toHaveBeenCalled();
@@ -110,7 +111,7 @@ describe('EventsService', () => {
         { response: { id: 'existing-1', status: 'draft' }, fingerprint: requestFingerprint({ operation: 'create', payload: request }), operation: 'create' }
       ]);
 
-      const result = await service.createEvent('prop-1', 'actor-1', request);
+      const result = await service.createEvent('prop-1', 'actor-1', request, 'key-1');
 
       expect(result).toEqual({ id: 'existing-1', status: 'draft' });
       expect(tx.insert).not.toHaveBeenCalled();
@@ -130,7 +131,7 @@ describe('EventsService', () => {
         timezone: 'UTC',
         attendees: 10,
         idempotencyKey: 'key-1',
-      })).rejects.toThrow(ConflictException);
+      }, 'key-1')).rejects.toThrow(ConflictException);
     });
   });
 
@@ -171,5 +172,27 @@ describe('EventsService', () => {
         idempotencyKey: 'key-1', expectedVersion: 1
       })).rejects.toThrow(ConflictException);
     });
+  });
+
+  it('persists category and per-person mode when replacing space services', async () => {
+    await service.replaceSpaceServices('prop-1', 'space-1', [{
+      code: 'coffee_break',
+      name: 'Coffee Break',
+      category: 'Gastronomía & Catering',
+      unitAmount: 125.5,
+      perPerson: true,
+      active: true,
+    }]);
+
+    expect(tx.values).toHaveBeenCalledWith([{
+      propertyId: 'prop-1',
+      spaceId: 'space-1',
+      code: 'coffee_break',
+      name: 'Coffee Break',
+      category: 'Gastronomía & Catering',
+      unitAmount: '125.5',
+      perPerson: true,
+      active: true,
+    }]);
   });
 });

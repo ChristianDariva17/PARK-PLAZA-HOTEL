@@ -125,6 +125,14 @@
          { "idx": 48, "version": "7", "when": 1788330600000, "tag": "0048_amenity_permissions", "breakpoints": true },
           { "idx": 49, "version": "7", "when": 1788334200000, "tag": "0049_customer_amenity_checkout_facts", "breakpoints": true },
            { "idx": 50, "version": "7", "when": 1789401022163, "tag": "0050_phase_1_security_boundaries", "breakpoints": true },
-           { "idx": 51, "version": "7", "when": 1789402000000, "tag": "0051_phase_2_transaction_integrity", "breakpoints": true }
+     { "idx": 51, "version": "7", "when": 1789402000000, "tag": "0051_phase_2_transaction_integrity", "breakpoints": true },
+       { "idx": 52, "version": "7", "when": 1789403000000, "tag": "0052_phase_3_operations", "breakpoints": true },
+        { "idx": 53, "version": "7", "when": 1789490000000, "tag": "0053_phase_1_realtime_outbox", "breakpoints": true },
+         { "idx": 54, "version": "7", "when": 1789493600000, "tag": "0054_purchase_order_sequences", "breakpoints": true },
+         { "idx": 55, "version": "7", "when": 1789497200000, "tag": "0055_reconcile_legacy_contract_migration", "breakpoints": true },
+          { "idx": 56, "version": "7", "when": 1789499000000, "tag": "0056_reconcile_schema_sentinel", "breakpoints": true },
+           { "idx": 57, "version": "7", "when": 1789532346197, "tag": "0057_property_scoped_outbox_relationships", "breakpoints": true },
+            { "idx": 58, "version": "7", "when": 1789536000000, "tag": "0058_reliable_outbox", "breakpoints": true },
+            { "idx": 59, "version": "7", "when": 1789669800000, "tag": "0059_event_space_service_metadata", "breakpoints": true }
   ]
 }

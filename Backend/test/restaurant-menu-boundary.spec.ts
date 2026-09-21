@@ -23,7 +23,7 @@ function setup(selections: unknown[][]) {
     transaction: vi.fn((run: (transaction: typeof tx) => unknown) => run(tx)),
   };
   const audit = { record: vi.fn() } as unknown as AuditService;
-  return { service: new RestaurantService(database as unknown as Database, {} as FolioService, audit), database, tx };
+  return { service: new RestaurantService(database as unknown as Database, {} as FolioService, { enqueue: vi.fn().mockResolvedValue(undefined) } as any), database, tx };
 }
 
 const manual = { id: 'manual', propertyId: actor.propertyId, status: 'active', isPublished: true, isAvailable: true, managementMode: 'manual', salePrice: '10.00' };

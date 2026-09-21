@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { subscribeToEvent } from '../realtime/socketClient.js';
+import { createResourceSnapshot } from '../api/resourceState.js';
 
 /**
  * Retorna el estado, los datos y una función de reintento para un recurso de restaurante específico.
@@ -23,20 +24,16 @@ export function useRestaurantResource(state, commands, resourceKey) {
   useEffect(() => {
     if (!commands.reloadResource) return;
 
+    const reloadOrders = () => {
+      const result = commands.reloadResource('orders');
+      if (result && typeof result.catch === 'function') result.catch(() => {});
+    };
+
     if (resourceKey === 'orders') {
-      const unsub1 = subscribeToEvent('order:created', () => {
-        console.log('[WebSocket] Nuevo pedido en tiempo real recibido');
-        commands.reloadResource('orders');
-      });
-      const unsub2 = subscribeToEvent('order:status_changed', () => {
-        commands.reloadResource('orders');
-      });
-      const unsub3 = subscribeToEvent('order:cancelled', () => {
-        commands.reloadResource('orders');
-      });
-      const unsub4 = subscribeToEvent('order:updated', () => {
-        commands.reloadResource('orders');
-      });
+      const unsub1 = subscribeToEvent('order:created', reloadOrders);
+      const unsub2 = subscribeToEvent('order:status_changed', reloadOrders);
+      const unsub3 = subscribeToEvent('order:cancelled', reloadOrders);
+      const unsub4 = subscribeToEvent('order:updated', reloadOrders);
 
       return () => {
         unsub1();
@@ -48,17 +45,14 @@ export function useRestaurantResource(state, commands, resourceKey) {
   }, [commands, resourceKey]);
 
   return {
-    status: meta?.status || 'idle',
-    permission: meta?.permission,
-    error: meta?.error,
-    updatedAt: meta?.updatedAt,
-    isForbidden: meta?.status === 'forbidden',
-    isUnavailable: meta?.status === 'unavailable',
-    isLoading: meta?.status === 'loading',
-    isError: meta?.status === 'error',
-    isSuccess: meta?.status === 'success',
-    isIdle: !meta || meta.status === 'idle',
-    data,
+    ...createResourceSnapshot({
+      status: meta?.status,
+      data,
+      error: meta?.error,
+      errorDetails: meta?.errorDetails,
+      updatedAt: meta?.updatedAt,
+      permission: meta?.permission,
+    }),
     reload,
   };
 }

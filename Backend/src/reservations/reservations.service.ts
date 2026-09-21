@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gt, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import { AuditService } from '../audit/audit.service.js';
@@ -10,6 +10,7 @@ import { getPostgresErrorFields } from '../database/postgres-error.js';
 import { ACTIVE_RESERVATION_STATUSES, guests, identityDocuments, properties, reservationGuests, reservations, roomCategories, rooms } from '../database/schema/index.js';
 import { customerGuestIdentities, customerReservationCommands, customerReservations } from '../database/schema/customer.schema.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
+import { safeErrorFields } from '../observability/safe-error.js';
 import { assertInterval, proratedAmount, resolveLocalMinute, type PropertyIntervalPolicy } from './interval-policy.js';
 
 function parseCivilDates(policy: PropertyIntervalPolicy, input: { checkInDate: string; checkOutDate: string }) {
@@ -53,6 +54,8 @@ export interface AvailabilityResponse {
 
 @Injectable()
 export class ReservationsService {
+  private readonly logger = new Logger(ReservationsService.name);
+
   constructor(@Inject(DATABASE) private readonly database: Database, private readonly audit: AuditService) {}
 
   async list(propertyId: string): Promise<ReservationResponse[]> {
@@ -132,7 +135,7 @@ export class ReservationsService {
         categories: resultCategories,
       };
     } catch (err) {
-      console.error('CUSTOMER AVAILABILITY ERROR:', err);
+      this.logger.error(JSON.stringify({ event: 'reservation.customer_availability_failed', ...safeErrorFields(err) }));
       throw err;
     }
   }

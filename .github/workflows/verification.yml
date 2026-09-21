@@ -1,0 +1,153 @@
+name: Verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: park_plaza_ci
+          POSTGRES_USER: park_plaza_ci
+          POSTGRES_PASSWORD: ci-password-123456789
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U park_plaza_ci -d park_plaza_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: test
+      API_HOST: 127.0.0.1
+      API_PORT: 3000
+      API_TRUST_PROXY_HOPS: 0
+      API_REPLICA_MODE: single
+      POSTGRES_DB: park_plaza_ci
+      POSTGRES_USER: park_plaza_ci
+      POSTGRES_PASSWORD: ci-password-123456789
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      DATABASE_SSL: false
+      DATABASE_SSL_REJECT_UNAUTHORIZED: true
+      DATABASE_POOL_MAX: 5
+      DATABASE_CONNECTION_TIMEOUT_MS: 5000
+      DATABASE_IDLE_TIMEOUT_MS: 10000
+      DATABASE_STATEMENT_TIMEOUT_MS: 30000
+      DATABASE_SCHEMA_VERSION: 0059_event_space_service_metadata
+      AUTH_COOKIE_NAME: pp_session
+      CUSTOMER_COOKIE_NAME: customer_session
+      AUTH_SESSION_MAX_HOURS: 8
+      AUTH_SESSION_IDLE_MINUTES: 30
+      AUTH_LOGIN_MAX_FAILURES: 5
+      AUTH_LOGIN_BASE_DELAY_MS: 0
+      AUTH_LOGIN_MAX_DELAY_MS: 0
+      AUTH_LOGIN_LOCK_MINUTES: 15
+      AUTH_LOGIN_WINDOW_MINUTES: 15
+      ATTENDANCE_QR_SECRET: ci-attendance-secret-at-least-32-characters
+      BIOMETRIC_BRIDGE_CAPABILITY_SECRET: ci-biometric-secret-at-least-32-characters
+      CUSTOMER_PORTAL_PROPERTY_ID: 00000000-0000-4000-8000-000000000001
+      FIREBASE_PROJECT_ID: park-plaza-ci
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:5173,http://127.0.0.1:5174
+      E2E_REUSE_EXISTING_SERVER: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            Backend/package-lock.json
+            Fronted/package-lock.json
+            Fronted-Cliente/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci --prefix Backend
+      - name: Install staff frontend dependencies
+        run: npm ci --prefix Fronted
+      - name: Install customer frontend dependencies
+        run: npm ci --prefix Fronted-Cliente
+      - name: Backend lint and typecheck
+        run: |
+          npm run lint --prefix Backend
+          npm run typecheck --prefix Backend
+          npm run architecture:check --prefix Backend
+      - name: Backend build and unit tests
+        run: |
+          npm run build --prefix Backend
+          npm test --prefix Backend
+          npm run test:coverage --prefix Backend
+      - name: Migrate and verify PostgreSQL
+        run: |
+          npm run migrate --prefix Backend
+          npm run test:integration --prefix Backend
+          npm run audit:production --prefix Backend
+      - name: Start API for contract and E2E gates
+        run: npm run start:dev --prefix Backend > /tmp/park-plaza-api.log 2>&1 &
+      - name: Wait for API
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health/ready > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/park-plaza-api.log
+          exit 1
+      - name: Verify OpenAPI contract
+        run: npm run verify:contract --prefix Backend
+      - name: Run OWASP ZAP API baseline
+        run: >-
+          docker run --rm --network host
+          -v "${{ github.workspace }}:/zap/wrk/:rw"
+          ghcr.io/zaproxy/zaproxy:stable
+          zap-api-scan.py
+          -t http://127.0.0.1:3000/api/docs-json
+          -f openapi
+          -S
+          -I
+          -r zap-api-report.html
+          -J zap-api-report.json
+      - name: Upload OWASP ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-api-report
+          path: |
+            zap-api-report.html
+            zap-api-report.json
+          if-no-files-found: warn
+      - name: Build and lint staff frontend
+        run: |
+          npm run format:check --prefix Fronted
+          npm run lint --prefix Fronted
+          npm run build --prefix Fronted
+          {
+            echo '## Frontend bundle metrics'
+            echo '```json'
+            node Fronted/scripts/report-bundle.mjs
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          npm run bundle:check --prefix Fronted
+      - name: Build and lint customer frontend
+        run: |
+          npm run lint --prefix Fronted-Cliente
+          npm run build --prefix Fronted-Cliente
+      - name: Run frontend unit tests
+        run: |
+          npm test --prefix Fronted
+          npm test --prefix Fronted-Cliente
+      - name: Run frontend E2E smoke tests
+        run: |
+          npx --no-install --prefix Fronted playwright install --with-deps chromium
+          npm run test:e2e --prefix Fronted
+          npm run test:e2e --prefix Fronted-Cliente

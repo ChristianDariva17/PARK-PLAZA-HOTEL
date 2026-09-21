@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req, ForbiddenException, Headers } from '@nestjs/common';
 import { DocumentsService } from './documents.service.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import { AuthenticatedAccount } from '../auth/auth.types.js';
@@ -13,6 +13,7 @@ import {
   ListEvidenceQueryDto,
   ListAuditEventsQueryDto
 } from './documents.dto.js';
+import { parseIdempotencyKey } from '../stays/stays.dto.js';
 
 @Controller('documents')
 export class DocumentsController {
@@ -31,12 +32,14 @@ export class DocumentsController {
   async createContract(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
-    @Body() dto: CreateContractDto
+    @Body() dto: CreateContractDto,
+    @Headers('idempotency-key') idempotencyKey: unknown,
   ) {
     return this.documentsService.createContract(
       account.propertyId,
       account.accountId,
       dto,
+      parseIdempotencyKey(idempotencyKey),
       this.getRequestContext(req)
     );
   }
@@ -73,7 +76,8 @@ export class DocumentsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
     @Param('id') id: string,
-    @Body() dto: TransitionContractDto
+    @Body() dto: TransitionContractDto,
+    @Headers('idempotency-key') idempotencyKey: unknown,
   ) {
     if (dto.targetState === 'VOID' && !account.permissions.includes('contracts.void')) {
       throw new ForbiddenException('Insufficient permissions');
@@ -83,23 +87,26 @@ export class DocumentsController {
       account.accountId,
       id,
       dto,
+      parseIdempotencyKey(idempotencyKey),
       this.getRequestContext(req)
     );
   }
 
   @Post('contracts/:id/link-evidence')
-  @RequirePermissions('contracts.amend')
+  @RequirePermissions('evidence.manage')
   async linkEvidence(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
     @Param('id') id: string,
-    @Body() dto: LinkEvidenceDto
+    @Body() dto: LinkEvidenceDto,
+    @Headers('idempotency-key') idempotencyKey: unknown,
   ) {
     return this.documentsService.linkEvidence(
       account.propertyId,
       account.accountId,
       id,
       dto,
+      parseIdempotencyKey(idempotencyKey),
       this.getRequestContext(req)
     );
   }
@@ -109,12 +116,14 @@ export class DocumentsController {
   async registerEvidence(
     @CurrentAccount() account: AuthenticatedAccount,
     @Req() req: FastifyRequest,
-    @Body() dto: RegisterEvidenceDto
+    @Body() dto: RegisterEvidenceDto,
+    @Headers('idempotency-key') idempotencyKey: unknown,
   ) {
     return this.documentsService.registerEvidence(
       account.propertyId,
       account.accountId,
       dto,
+      parseIdempotencyKey(idempotencyKey),
       this.getRequestContext(req)
     );
   }

@@ -30,7 +30,7 @@ function normalize(error) {
     );
   if (error.status === 400) return new CleaningRequestError('Revise los datos de la tarea de limpieza.', 400);
   if (error.status === 401) return new CleaningRequestError('La sesión venció. Inicie sesión nuevamente.', 401);
-  if (error.status === 403) return new CleaningRequestError('No cuenta with permiso para realizar esta operación.', 403);
+  if (error.status === 403) return new CleaningRequestError('No cuenta con permiso para realizar esta operación.', 403);
   if ([404, 409].includes(error.status))
     return new CleaningRequestError(
       'La tarea de limpieza o la habitación ya cambió. Actualice los datos.',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { databaseUrlFromEnv, validateEnv } from '../src/config/environment.js';
+import { postgresPoolOptions } from '../src/database/connection-options.js';
 import { ACTIVE_RESERVATION_STATUSES } from '../src/database/schema/reservations.schema.js';
 
 const valid = {
@@ -18,8 +19,25 @@ describe('environment', () => {
     const env = validateEnv(valid);
     expect(env.API_PORT).toBe(3000);
     expect(env.API_TRUST_PROXY_HOPS).toBe(0);
+    expect(env.API_REPLICA_MODE).toBe('single');
+    expect(env.REDIS_TLS).toBe(false);
+    expect(env.REDIS_TLS_REQUIRED).toBe(true);
+    expect(env.DATABASE_SSL_REQUIRED).toBe(true);
     expect(env.AUTH_LOGIN_MAX_DELAY_MS).toBe(4000);
+    expect(env.DATABASE_SCHEMA_VERSION).toBe('0059_event_space_service_metadata');
+    expect(postgresPoolOptions(env)).toMatchObject({
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+      statement_timeout: 30000,
+      ssl: false,
+    });
     expect(databaseUrlFromEnv({ ...env, POSTGRES_PASSWORD: 'safe@password/123' })).toContain('safe%40password%2F123');
+    expect(databaseUrlFromEnv({ ...env, DATABASE_SSL: true })).toContain('?sslmode=require');
+  });
+
+  it('supports verified TLS with an optional CA', () => {
+    const env = validateEnv({ ...valid, DATABASE_SSL: 'true', DATABASE_SSL_CA: 'test-ca' });
+    expect(postgresPoolOptions(env).ssl).toEqual({ rejectUnauthorized: true, ca: 'test-ca' });
   });
 
   it('rejects weak credentials and invalid database names', () => {

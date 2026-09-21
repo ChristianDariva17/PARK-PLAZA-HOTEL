@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const modalSource = readFileSync(new URL('./CashZReportModal.jsx', import.meta.url), 'utf8');
-const operationalViewsSource = readFileSync(new URL('../components/views/OperationalViews.jsx', import.meta.url), 'utf8');
+const cashViewSource = readFileSync(new URL('./CashView.jsx', import.meta.url), 'utf8');
 
 describe('CashZReportModal (Corte Z Thermal Ticket Contract)', () => {
   it('contains the thermal 80mm printable layout and print media queries', () => {
@@ -32,11 +32,11 @@ describe('CashZReportModal (Corte Z Thermal Ticket Contract)', () => {
   });
 
   it('is properly integrated into OperationalCashView with auto-display on close and manual triggers', () => {
-    expect(operationalViewsSource).toContain('import { CashZReportModal } from \'../../cash/CashZReportModal.jsx\';');
-    expect(operationalViewsSource).toContain('const [reportSession, setReportSession] = useState(null);');
-    expect(operationalViewsSource).toContain('onSessionClosed');
-    expect(operationalViewsSource).toContain('setReportSession(closed)');
-    expect(operationalViewsSource).toContain('<CashZReportModal');
-    expect(operationalViewsSource).toContain('Ticket Z');
+    expect(cashViewSource).toContain("import { CashZReportModal } from '../cash/CashZReportModal.jsx';");
+    expect(cashViewSource).toContain('const [reportSession, setReportSession] = useState(null);');
+    expect(cashViewSource).toContain('onSessionClosed');
+    expect(cashViewSource).toContain('setReportSession(closed)');
+    expect(cashViewSource).toContain('<CashZReportModal');
+    expect(cashViewSource).toContain('Ticket Z');
   });
 });

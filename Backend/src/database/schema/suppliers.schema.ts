@@ -1,11 +1,13 @@
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -50,7 +52,7 @@ export const suppliers = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     archivedAt: timestamp('archived_at'),
-    archivedByAccountId: uuid('archived_by_account_id').references(() => accounts.id),
+    archivedByAccountId: uuid('archived_by_account_id'),
   },
   (table) => ({
     // Unique compound constraint required for isolation and relationships
@@ -58,6 +60,11 @@ export const suppliers = pgTable(
       table.id,
       table.propertyId,
     ),
+    archivedByPropertyForeignKey: foreignKey({
+      name: 'suppliers_archived_by_property_fkey',
+      columns: [table.archivedByAccountId, table.propertyId],
+      foreignColumns: [accounts.id, accounts.propertyId],
+    }).onDelete('restrict'),
     
     // Deduplication rule for active suppliers in the same property
     activeTaxIdUnique: uniqueIndex('idx_suppliers_tax_id_active')
@@ -72,7 +79,7 @@ export const suppliers = pgTable(
 export const supplierBankDetails = pgTable(
   'supplier_bank_details',
   {
-    supplierId: uuid('supplier_id').primaryKey().references(() => suppliers.id),
+    supplierId: uuid('supplier_id').primaryKey(),
     propertyId: uuid('property_id').notNull().references(() => properties.id),
     
     bankName: text('bank_name'),
@@ -85,7 +92,39 @@ export const supplierBankDetails = pgTable(
     
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  }
+  },
+  (table) => [
+    foreignKey({
+      name: 'supplier_bank_details_supplier_property_fkey',
+      columns: [table.supplierId, table.propertyId],
+      foreignColumns: [suppliers.id, suppliers.propertyId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_bank_details_property_fkey',
+      columns: [table.propertyId],
+      foreignColumns: [properties.id],
+    }).onDelete('restrict'),
+  ]
+);
+
+export const purchaseOrderSequences = pgTable(
+  'purchase_order_sequences',
+  {
+    propertyId: uuid('property_id')
+      .notNull()
+      .references(() => properties.id, { onDelete: 'cascade' }),
+    yearMonth: varchar('year_month', { length: 6 }).notNull(),
+    nextValue: integer('next_value').notNull().default(1),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: 'purchase_order_sequences_pkey',
+      columns: [table.propertyId, table.yearMonth],
+    }),
+    nextValueCheck: check('purchase_order_sequences_next_value_check', sql`${table.nextValue} >= 1`),
+  }),
 );
 
 export const purchaseOrders = pgTable(
@@ -95,9 +134,7 @@ export const purchaseOrders = pgTable(
     propertyId: uuid('property_id')
       .notNull()
       .references(() => properties.id),
-    supplierId: uuid('supplier_id')
-      .notNull()
-      .references(() => suppliers.id),
+    supplierId: uuid('supplier_id').notNull(),
     orderNumber: varchar('order_number', { length: 40 }).notNull(),
     status: varchar('status', { length: 30 }).notNull().default('draft'), // draft, sent, received, cancelled
     expectedDeliveryDate: timestamp('expected_delivery_date'),
@@ -128,6 +165,11 @@ export const purchaseOrders = pgTable(
       name: 'purchase_orders_supplier_property_fkey',
       columns: [table.supplierId, table.propertyId],
       foreignColumns: [suppliers.id, suppliers.propertyId],
+    }).onDelete('restrict'),
+    issuedByPropertyForeignKey: foreignKey({
+      name: 'purchase_orders_issued_by_property_fkey',
+      columns: [table.issuedByAccountId, table.propertyId],
+      foreignColumns: [accounts.id, accounts.propertyId],
     }).onDelete('restrict'),
   })
 );

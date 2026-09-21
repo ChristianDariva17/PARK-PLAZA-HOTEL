@@ -4,7 +4,6 @@ import type { AuditService } from '../src/audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../src/auth/auth.types.js';
 import { CleaningService } from '../src/cleaning/cleaning.service.js';
 import type { Database } from '../src/database/database.module.js';
-import type { RealtimeGateway } from '../src/realtime/realtime.gateway.js';
 
 const actor: AuthenticatedAccount = {
   accountId: 'account-id', propertyId: 'property-id', roleKey: 'cleaning', email: 'cleaning@example.invalid',
@@ -39,9 +38,11 @@ function cleaningService(selections: unknown[][]) {
     })),
   };
   const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
-  const realtime = { emitToProperty: vi.fn() };
+  const outbox = { enqueue: vi.fn().mockResolvedValue(undefined) };
   return {
-    service: new CleaningService(database, { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService, realtime as unknown as RealtimeGateway),
+    service: new CleaningService(database, { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService, outbox as any),
+    outbox,
+    tx,
     updateValues,
   };
 }
@@ -54,12 +55,36 @@ describe('CleaningService stay linkage', () => {
 
     expect(result.room).toEqual({ id: task.roomId, status: 'available' });
     expect(setup.updateValues).toEqual(expect.arrayContaining([{ status: 'available' }]));
+    expect(setup.outbox.enqueue).toHaveBeenCalledWith(setup.tx, expect.objectContaining({
+      eventType: 'cleaning:task_updated',
+      propertyId: actor.propertyId,
+      aggregateId: task.id,
+    }));
   });
 
   it('rejects approval when the linked stay is no longer a checked-out stay', async () => {
     const setup = cleaningService([[], [task], []]);
 
     await expect(setup.service.progressTask(actor, task.id, { expectedStatus: 'completed' }, 'key', context)).rejects.toBeInstanceOf(ConflictException);
+
+    expect(setup.updateValues).toEqual([]);
+  });
+
+  it('releases a manually generated cleaning task when its room is still in cleaning', async () => {
+    const manualTask = { ...task, stayId: null };
+    const setup = cleaningService([[], [manualTask], [{ id: manualTask.roomId, status: 'cleaning' }], []]);
+
+    const result = await setup.service.progressTask(actor, manualTask.id, { expectedStatus: 'completed' }, 'manual-key', context);
+
+    expect(result.room).toEqual({ id: manualTask.roomId, status: 'available' });
+    expect(setup.updateValues).toEqual(expect.arrayContaining([{ status: 'available' }]));
+  });
+
+  it('rejects updates after a task has been approved', async () => {
+    const approvedTask = { ...task, status: 'approved' as const };
+    const setup = cleaningService([[], [approvedTask]]);
+
+    await expect(setup.service.updateTask(actor, approvedTask.id, { observation: 'Late note' }, 'approved-key', context)).rejects.toBeInstanceOf(ConflictException);
 
     expect(setup.updateValues).toEqual([]);
   });

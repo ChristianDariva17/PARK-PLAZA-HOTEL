@@ -9,7 +9,7 @@ import { acquirePropertyTransactionLock } from '../database/transaction-policy.j
 import { assertEligibleEarlyCheckIn, assertInterval, proratedAmount, type PropertyIntervalPolicy } from '../reservations/interval-policy.js';
 import type { CheckInDto, CheckOutDto, WalkInDto } from './stays.dto.js';
 import { FolioService } from '../folios/folio.service.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { OutboxService } from '../audit/outbox.service.js';
 
 export interface StayCommandResponse extends Record<string, unknown> {
   stay: { id: string; reservationId: string; roomId: string; status: 'active' | 'checked_out'; checkInAt: string; checkOutAt: string | null };
@@ -29,7 +29,7 @@ export class StaysService {
     @Inject(DATABASE) private readonly database: Database,
     private readonly audit: AuditService,
     private readonly foliosService: FolioService,
-    private readonly realtime: RealtimeGateway,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(propertyId: string): Promise<PersistentStayResponse[]> {
@@ -160,8 +160,22 @@ export class StaysService {
         if (!policy) throw new NotFoundException('Property not found');
         const response = await run(tx, policy);
         await tx.insert(stayCommands).values({ propertyId: actor.propertyId, operation, idempotencyKey: key, response });
-        this.realtime.emitToProperty(actor.propertyId, 'room:status_changed', response.room);
-        this.realtime.emitToProperty(actor.propertyId, 'stay:status_changed', response);
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'room:status_changed',
+          aggregateType: 'room',
+          aggregateId: response.room.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: response.room as unknown as Record<string, unknown>,
+        });
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'stay:status_changed',
+          aggregateType: 'stay',
+          aggregateId: response.stay.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: response as unknown as Record<string, unknown>,
+        });
         return response;
       });
     } catch (error) {

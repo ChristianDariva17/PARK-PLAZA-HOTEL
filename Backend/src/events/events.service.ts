@@ -10,6 +10,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { randomUUID } from 'crypto';
 import { requestFingerprint } from '../database/idempotency.js';
 import { OutboxService } from '../audit/outbox.service.js';
+import type { RequestContext } from '../auth/auth.types.js';
 
 @Injectable()
 export class EventsService {
@@ -120,7 +121,14 @@ export class EventsService {
       if (!space) throw new NotFoundException('Event space not found');
       await tx.delete(schema.eventSpaceServices).where(and(eq(schema.eventSpaceServices.propertyId, propertyId), eq(schema.eventSpaceServices.spaceId, spaceId)));
       if (services.length) await tx.insert(schema.eventSpaceServices).values(services.map((service) => ({
-        propertyId, spaceId, code: service.code, name: service.name, unitAmount: String(service.unitAmount), active: service.active,
+        propertyId,
+        spaceId,
+        code: service.code,
+        name: service.name,
+        category: service.category ?? 'General',
+        unitAmount: String(service.unitAmount),
+        perPerson: service.perPerson ?? false,
+        active: service.active,
       })));
       const savedServices = await tx.select().from(schema.eventSpaceServices).where(and(
         eq(schema.eventSpaceServices.propertyId, propertyId),
@@ -214,22 +222,23 @@ export class EventsService {
     return null;
   }
 
-  private async enqueueRealtime(tx: any, propertyId: string, eventType: string, payload: unknown, aggregateId?: string): Promise<void> {
+  private async enqueueRealtime(tx: any, propertyId: string, eventType: string, payload: unknown, aggregateId?: string, context: RequestContext = {}): Promise<void> {
     if (!this.outbox) return;
     await this.outbox.enqueue(tx, {
       propertyId,
       eventType,
       aggregateType: 'event',
       ...(aggregateId ? { aggregateId } : {}),
+      ...(context.requestId ? { requestId: context.requestId } : {}),
       payload: payload as Record<string, unknown>,
     });
   }
 
-  async createEvent(propertyId: string, accountId: string, data: any) {
+  async createEvent(propertyId: string, accountId: string, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
 
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, 'create', data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, 'create', data);
       if (previousResponse) return previousResponse;
 
       const pricing = await this.calculateServerPricing(tx, propertyId, data);
@@ -275,12 +284,13 @@ export class EventsService {
         propertyId,
         eventId: newEventId,
         operation: 'create',
-        idempotencyKey: data.idempotencyKey,
+        idempotencyKey,
         fingerprint: requestFingerprint({ operation: 'create', payload: data }),
         response: event,
       });
 
       await this.auditService.record({
+        ...context,
         actorAccountId: accountId,
         propertyId,
         eventType: 'event.created',
@@ -288,14 +298,14 @@ export class EventsService {
         subjectId: newEventId,
         metadata: { title: data.title },
       }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:created', event, newEventId);
+      await this.enqueueRealtime(tx, propertyId, 'event:created', event, newEventId, context);
 
       return event;
     });
     return result;
   }
 
-  async createCustomerPreReservation(customer: { propertyId: string; customerAccountId: string }, data: any, idempotencyKey: string) {
+  async createCustomerPreReservation(customer: { propertyId: string; customerAccountId: string }, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const quote = await this.quote(customer.propertyId, data);
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, customer.propertyId);
@@ -333,8 +343,8 @@ export class EventsService {
         propertyId: customer.propertyId, eventId, serviceCode: service.code, quantity: service.quantity, unitAmount: String(service.unitAmount), totalAmount: String(service.totalAmount),
       })));
       await tx.insert(schema.eventCommands).values({ propertyId: customer.propertyId, eventId, operation: 'customer_pre_reservation', idempotencyKey, fingerprint: requestFingerprint({ operation: 'customer_event_pre_reservation', payload: data }), response: event });
-      await this.auditService.record({ eventType: 'event.pre_reserved', subjectType: 'event', subjectId: eventId, propertyId: customer.propertyId, metadata: { customerAccountId: customer.customerAccountId, expiresAt: expiresAt.toISOString() } }, tx as any);
-      await this.enqueueRealtime(tx, customer.propertyId, 'event:created', event, eventId);
+      await this.auditService.record({ ...context, eventType: 'event.pre_reserved', subjectType: 'event', subjectId: eventId, propertyId: customer.propertyId, metadata: { customerAccountId: customer.customerAccountId, expiresAt: expiresAt.toISOString() } }, tx as any);
+      await this.enqueueRealtime(tx, customer.propertyId, 'event:created', event, eventId, context);
       return event;
     });
     return result;
@@ -349,7 +359,7 @@ export class EventsService {
     });
   }
 
-  async cancelCustomerEvent(customer: { propertyId: string; customerAccountId: string }, eventId: string, reason: string, idempotencyKey: string) {
+  async cancelCustomerEvent(customer: { propertyId: string; customerAccountId: string }, eventId: string, reason: string, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, customer.propertyId);
       const previousResponse = await this.checkIdempotency(tx, customer.propertyId, idempotencyKey, 'customer_cancel_event', { eventId, reason });
@@ -359,18 +369,18 @@ export class EventsService {
       if (!['draft', 'tentative'].includes(event.status)) throw new ConflictException('This event can no longer be cancelled online');
       const [updated] = await tx.update(schema.events).set({ status: 'cancelled', cancellationReason: reason, cancelledAt: new Date(), updatedAt: new Date(), version: event.version + 1 }).where(eq(schema.events.id, eventId)).returning();
       await tx.insert(schema.eventCommands).values({ propertyId: customer.propertyId, eventId, operation: 'customer_cancel_event', idempotencyKey, fingerprint: requestFingerprint({ operation: 'customer_cancel_event', payload: { eventId, reason } }), response: updated });
-      await this.auditService.record({ eventType: 'event.cancelled_by_customer', subjectType: 'event', subjectId: eventId, propertyId: customer.propertyId, metadata: { customerAccountId: customer.customerAccountId, reason } }, tx as any);
-      await this.enqueueRealtime(tx, customer.propertyId, 'event:cancelled', updated, eventId);
+       await this.auditService.record({ ...context, eventType: 'event.cancelled_by_customer', subjectType: 'event', subjectId: eventId, propertyId: customer.propertyId, metadata: { customerAccountId: customer.customerAccountId, reason } }, tx as any);
+       await this.enqueueRealtime(tx, customer.propertyId, 'event:cancelled', updated, eventId, context);
       return updated;
     });
     return result;
   }
 
-  async updateEvent(propertyId: string, eventId: string, accountId: string, data: any) {
+  async updateEvent(propertyId: string, eventId: string, accountId: string, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
 
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, 'update', data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, 'update', data);
       if (previousResponse) return previousResponse;
 
       const event = await tx.query.events.findFirst({
@@ -449,12 +459,13 @@ export class EventsService {
         propertyId,
         eventId,
         operation: 'update',
-        idempotencyKey: data.idempotencyKey,
+        idempotencyKey,
         fingerprint: requestFingerprint({ operation: 'update', payload: data }),
         response: updated,
       });
 
       await this.auditService.record({
+        ...context,
         actorAccountId: accountId,
         propertyId,
         eventType: 'event.updated',
@@ -462,18 +473,18 @@ export class EventsService {
         subjectId: eventId,
         metadata: { fromVersion: event.version, toVersion: updated!.version },
       }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:updated', updated, eventId);
+      await this.enqueueRealtime(tx, propertyId, 'event:updated', updated, eventId, context);
 
       return updated;
     });
     return result;
   }
 
-  async confirmEvent(propertyId: string, eventId: string, accountId: string, data: any) {
+  async confirmEvent(propertyId: string, eventId: string, accountId: string, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
 
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, 'confirm', data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, 'confirm', data);
       if (previousResponse) return previousResponse;
 
       const event = await tx.query.events.findFirst({
@@ -502,12 +513,13 @@ export class EventsService {
         propertyId,
         eventId,
         operation: 'confirm',
-        idempotencyKey: data.idempotencyKey,
+        idempotencyKey,
         fingerprint: requestFingerprint({ operation: 'confirm', payload: data }),
         response: updated,
       });
 
       await this.auditService.record({
+        ...context,
         actorAccountId: accountId,
         propertyId,
         eventType: 'event.confirmed',
@@ -519,18 +531,18 @@ export class EventsService {
           notes: data.notes 
         },
       }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:confirmed', updated, eventId);
+       await this.enqueueRealtime(tx, propertyId, 'event:confirmed', updated, eventId, context);
 
       return updated;
     });
     return result;
   }
 
-  async cancelEvent(propertyId: string, eventId: string, accountId: string, data: any) {
+  async cancelEvent(propertyId: string, eventId: string, accountId: string, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
 
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, 'cancel', data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, 'cancel', data);
       if (previousResponse) return previousResponse;
 
       const event = await tx.query.events.findFirst({
@@ -557,12 +569,13 @@ export class EventsService {
         propertyId,
         eventId,
         operation: 'cancel',
-        idempotencyKey: data.idempotencyKey,
+        idempotencyKey,
         fingerprint: requestFingerprint({ operation: 'cancel', payload: data }),
         response: updated,
       });
 
       await this.auditService.record({
+        ...context,
         actorAccountId: accountId,
         propertyId,
         eventType: 'event.cancelled',
@@ -570,17 +583,17 @@ export class EventsService {
         subjectId: eventId,
         metadata: { reason: data.reason },
       }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:cancelled', updated, eventId);
+       await this.enqueueRealtime(tx, propertyId, 'event:cancelled', updated, eventId, context);
 
       return updated;
     });
     return result;
   }
 
-  async advanceEvent(propertyId: string, eventId: string, accountId: string, status: 'preparing' | 'in_progress' | 'completed', data: any) {
+  async advanceEvent(propertyId: string, eventId: string, accountId: string, status: 'preparing' | 'in_progress' | 'completed', data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, status, data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, status, data);
       if (previousResponse) return previousResponse;
       const event = await tx.query.events.findFirst({ where: and(eq(schema.events.propertyId, propertyId), eq(schema.events.id, eventId)) });
       if (!event) throw new NotFoundException('Event not found');
@@ -588,19 +601,19 @@ export class EventsService {
       const allowedFrom = status === 'preparing' ? ['confirmed'] : status === 'in_progress' ? ['preparing'] : ['in_progress'];
       if (!allowedFrom.includes(event.status)) throw new ConflictException(`Event cannot move to ${status} from ${event.status}`);
       const [updated] = await tx.update(schema.events).set({ status, version: event.version + 1, updatedAt: new Date() }).where(eq(schema.events.id, eventId)).returning();
-      await tx.insert(schema.eventCommands).values({ propertyId, eventId, operation: status, idempotencyKey: data.idempotencyKey, fingerprint: requestFingerprint({ operation: status, payload: data }), response: updated });
-      await this.auditService.record({ actorAccountId: accountId, eventType: `event.${status}`, subjectType: 'event', subjectId: eventId, propertyId, metadata: {} }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:status_changed', updated, eventId);
+      await tx.insert(schema.eventCommands).values({ propertyId, eventId, operation: status, idempotencyKey, fingerprint: requestFingerprint({ operation: status, payload: data }), response: updated });
+       await this.auditService.record({ ...context, actorAccountId: accountId, eventType: `event.${status}`, subjectType: 'event', subjectId: eventId, propertyId, metadata: {} }, tx as any);
+       await this.enqueueRealtime(tx, propertyId, 'event:status_changed', updated, eventId, context);
       return updated;
     });
     return result;
   }
 
-  async archiveEvent(propertyId: string, eventId: string, accountId: string, data: any) {
+  async archiveEvent(propertyId: string, eventId: string, accountId: string, data: any, idempotencyKey: string, context: RequestContext = {}) {
     const result = await this.db.transaction(async (tx) => {
       await acquirePropertyTransactionLock(tx as any, propertyId);
 
-      const previousResponse = await this.checkIdempotency(tx, propertyId, data.idempotencyKey, 'archive', data);
+      const previousResponse = await this.checkIdempotency(tx, propertyId, idempotencyKey, 'archive', data);
       if (previousResponse) return previousResponse;
 
       const event = await tx.query.events.findFirst({
@@ -624,12 +637,13 @@ export class EventsService {
         propertyId,
         eventId,
         operation: 'archive',
-        idempotencyKey: data.idempotencyKey,
+        idempotencyKey,
         fingerprint: requestFingerprint({ operation: 'archive', payload: data }),
         response: updated,
       });
 
       await this.auditService.record({
+        ...context,
         actorAccountId: accountId,
         propertyId,
         eventType: 'event.archived',
@@ -637,7 +651,7 @@ export class EventsService {
         subjectId: eventId,
         metadata: {},
       }, tx as any);
-      await this.enqueueRealtime(tx, propertyId, 'event:archived', updated, eventId);
+       await this.enqueueRealtime(tx, propertyId, 'event:archived', updated, eventId, context);
 
       return updated;
     });

@@ -6,9 +6,11 @@ import { eq } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
-import { databaseUrlFromEnv, validateEnv } from '../config/environment.js';
+import { validateEnv } from '../config/environment.js';
+import { safeErrorFields } from '../observability/safe-error.js';
 import * as schema from '../database/schema/index.js';
 import { MenuImportService } from '../restaurant/menu-import.service.js';
+import { postgresPoolOptions } from '../database/connection-options.js';
 
 const bootstrapSchema = z.object({
   BOOTSTRAP_ADMIN_EMAIL: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
@@ -18,7 +20,7 @@ const bootstrapSchema = z.object({
 const env = validateEnv(process.env);
 const bootstrap = bootstrapSchema.parse(process.env);
 
-const pool = new Pool({ connectionString: databaseUrlFromEnv(env), ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false, max: 10 });
+const pool = new Pool(postgresPoolOptions(env));
 const database = drizzle(pool, { schema });
 const audit = new AuditService(database);
 const menuImportService = new MenuImportService(database, audit);
@@ -60,7 +62,7 @@ try {
   console.log('Items:', result.items);
   console.log('Variants:', result.variants);
 } catch (error) {
-  console.error('Failed to import menu:', error);
+  console.error('Failed to import menu:', safeErrorFields(error));
   process.exit(1);
 } finally {
   await pool.end();

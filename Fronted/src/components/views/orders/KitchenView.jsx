@@ -3,6 +3,7 @@ import { ChefHat, Clock, CheckCircle2, Flame, Bell, Star, RefreshCw, AlertCircle
 import { useHotel } from '../../../state/hotelContext.js';
 import { formatMoney } from '../../../domain/hotelModel.js';
 import { useRestaurantResource } from '../../../restaurant/useRestaurantResource.js';
+import { ConfirmAction } from '../SharedViewParts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ACTIVE_STATUSES = ['Pedido recibido', 'Confirmado', 'En preparacion', 'Listo'];
@@ -170,6 +171,7 @@ export default function KitchenView({ notify }) {
   const ordersResource = useRestaurantResource(state, restaurantCommands, 'orders');
   
   const [advancing, setAdvancing] = useState(null);
+  const [pendingCancellation, setPendingCancellation] = useState(null);
   const [, setTick] = useState(0);
 
   // Tick + auto-reload every 30s to refresh elapsed counters
@@ -198,19 +200,23 @@ export default function KitchenView({ notify }) {
     }
   }, [advancing, restaurantCommands, notify]);
 
-  const handleCancel = useCallback(async (order) => {
-    if (!window.confirm(`\u00BFCancelar el pedido de ${order.source}?`)) return;
-    if (advancing) return;
-    setAdvancing(order.id);
+  const handleCancel = useCallback((order) => {
+    if (!advancing) setPendingCancellation(order);
+  }, [advancing]);
+
+  const confirmCancel = useCallback(async () => {
+    if (!pendingCancellation || advancing) return;
+    setAdvancing(pendingCancellation.id);
     try {
-      await restaurantCommands.cancelOrder(order.id, { reason: 'Cancelaci\u00F3n desde cocina' });
+      await restaurantCommands.cancelOrder(pendingCancellation.id, { reason: 'Cancelaci\u00F3n desde cocina' });
       notify?.('Pedido cancelado', 'El pedido fue cancelado.', 'success');
     } catch (err) {
       notify?.('Error al cancelar', err.message || 'Error desconocido', 'error');
     } finally {
       setAdvancing(null);
+      setPendingCancellation(null);
     }
-  }, [advancing, restaurantCommands, notify]);
+  }, [advancing, notify, pendingCancellation, restaurantCommands]);
 
   return (
     <div className="kitchen-view">
@@ -274,6 +280,15 @@ export default function KitchenView({ notify }) {
           ))}
         </div>
       )}
+      <ConfirmAction
+        open={Boolean(pendingCancellation)}
+        onCancel={() => setPendingCancellation(null)}
+        onConfirm={confirmCancel}
+        title="Cancelar pedido"
+        description={pendingCancellation ? `¿Desea cancelar el pedido de ${pendingCancellation.source}?` : undefined}
+        confirmLabel="Cancelar pedido"
+        busy={Boolean(advancing)}
+      />
     </div>
   );
 }

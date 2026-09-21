@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsOptional, IsObject, IsInt, Min, Max, IsISO8601, IsIn, MaxLength, IsNotEmpty } from 'class-validator';
+import { IsString, IsUUID, IsOptional, IsObject, IsInt, Min, Max, IsISO8601, IsIn, IsUrl, Matches, MaxLength, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export const CONTRACT_TARGET_STATES = ['DRAFT', 'PENDING_SIGNATURE', 'SIGNED', 'ARCHIVED', 'VOID'] as const;
@@ -28,8 +28,6 @@ export class CreateContractDto {
   @MaxLength(255)
   reason?: string;
 
-  @IsUUID()
-  idempotencyKey!: string;
 }
 
 export class TransitionContractDto {
@@ -42,8 +40,6 @@ export class TransitionContractDto {
   @MaxLength(255)
   reason?: string;
 
-  @IsUUID()
-  idempotencyKey!: string;
 }
 
 export class LinkEvidenceDto {
@@ -52,11 +48,10 @@ export class LinkEvidenceDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/)
   @MaxLength(64)
   relationType!: string;
 
-  @IsUUID()
-  idempotencyKey!: string;
 }
 
 export class RegisterEvidenceDto {
@@ -79,6 +74,7 @@ export class RegisterEvidenceDto {
 
   @IsString()
   @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   @MaxLength(255)
   url?: string;
 
@@ -86,8 +82,6 @@ export class RegisterEvidenceDto {
   @IsOptional()
   metadata?: Record<string, unknown>;
 
-  @IsUUID()
-  idempotencyKey!: string;
 }
 
 export class ListContractsQueryDto {

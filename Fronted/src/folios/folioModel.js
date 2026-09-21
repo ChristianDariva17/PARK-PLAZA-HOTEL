@@ -6,6 +6,11 @@ export function validateFolioAmount(value) {
   return amount;
 }
 
+export function formatFolioAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : String(value ?? '');
+}
+
 export function canOverrideCheckout(permissions, folio) {
   return Number(folio?.balance ?? 0) > 0 && permissions?.includes('stays.check_out') && permissions?.includes('stays.check_out_override');
 }

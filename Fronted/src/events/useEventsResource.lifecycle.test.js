@@ -9,5 +9,7 @@ describe('events realtime reload policy', () => {
     expect(source).toContain('window.setTimeout');
     expect(source).toContain('request.controller?.abort()');
     expect(source).toContain('generation !== eventsRequestRef.current.generation');
+    expect(source).toContain('errorDetails');
+    expect(source).toContain('statusForCollection');
   });
 });

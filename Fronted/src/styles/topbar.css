@@ -56,6 +56,7 @@
 @media (max-width: 1024px) {
   .topbar { padding-inline: 22px; }
   .global-search-trigger { width: 210px; }
+  .menu-button { display: inline-flex; }
 }
 
 @media (max-width: 768px) {

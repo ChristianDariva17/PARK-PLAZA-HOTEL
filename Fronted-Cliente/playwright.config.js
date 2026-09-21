@@ -54,7 +54,7 @@ export default defineConfig({
       cwd: '.',
       url: 'http://127.0.0.1:5174',
       env: { VITE_E2E_ANONYMOUS: hasCustomerCredentials ? 'false' : 'true' },
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !process.env.CI || process.env.E2E_REUSE_EXISTING_SERVER === 'true',
       timeout: 120000,
     },
     {
@@ -62,7 +62,7 @@ export default defineConfig({
       command: process.env.CUSTOMER_E2E_MUTATIONS === 'true' ? 'npm start' : 'npm run start:dev',
       cwd: '../Backend',
       url: 'http://127.0.0.1:3000/api/health/live',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !process.env.CI || process.env.E2E_REUSE_EXISTING_SERVER === 'true',
       timeout: 120000,
     },
   ],

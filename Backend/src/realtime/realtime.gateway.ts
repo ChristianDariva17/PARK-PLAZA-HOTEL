@@ -1,17 +1,21 @@
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Socket } from 'socket.io';
 import { createHash } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { accounts, customerAccounts, customerReservations, customerSessions, roles, sessions, stays } from '../database/schema/index.js';
 import type { Environment } from '../config/environment.js';
+import { RedisService } from '../infrastructure/redis.service.js';
+import { MetricsService } from '../observability/metrics.service.js';
+import { createAdapter } from '@socket.io/redis-adapter';
 
 @WebSocketGateway({
   path: '/api/socket.io',
@@ -19,16 +23,27 @@ import type { Environment } from '../config/environment.js';
   pingTimeout: 30000,
   pingInterval: 10000,
 })
-export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
-  server!: Server;
+  server!: Namespace;
 
   private readonly logger = new Logger(RealtimeGateway.name);
 
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     private readonly config: ConfigService<Environment, true>,
+    private readonly redis: RedisService,
+    private readonly metrics: MetricsService,
   ) {}
+
+  afterInit(server: Namespace): void {
+    this.server = server;
+    if (this.config.get('API_REPLICA_MODE', { infer: true }) === 'shared') {
+      if (!this.redis.isEnabled()) throw new Error('Redis shared infrastructure is not connected');
+      const { pubClient, subClient } = this.redis.getPubSubClients();
+      server.server.adapter(createAdapter(pubClient, subClient));
+    }
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -71,14 +86,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           await client.join(propertyRoom);
           await client.join(roleRoom);
 
-          this.logger.log(`[Staff Connected] Socket ${client.id} joined rooms: ${propertyRoom}, ${roleRoom} (${account.email} - ${account.roleKey})`);
+          this.logger.log(`[Staff Connected] Socket ${client.id} joined rooms: ${propertyRoom}, ${roleRoom} (${account.roleKey})`);
 
-          client.emit('connection:ack', {
+           client.emit('connection:ack', {
             status: 'connected',
             type: 'staff',
             propertyId: account.propertyId,
             role: account.roleKey,
           });
+          client.data.metricsTracked = true;
+          this.metrics.connectionOpened();
           return;
         }
       }
@@ -92,6 +109,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
             await Promise.all(activeStays.map((stayId) => client.join(`stay:${stayId}`)));
             this.logger.log(`[Customer Connected] Socket ${client.id} joined ${activeStays.length} authorized stay room(s)`);
             client.emit('connection:ack', { status: 'connected', type: 'customer', stayIds: activeStays });
+            client.data.metricsTracked = true;
+            this.metrics.connectionOpened();
             return;
           }
         }
@@ -101,8 +120,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.emit('connection:ack', { status: 'rejected' });
       client.disconnect(true);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      this.logger.warn(`[Socket Error] Connection handler error for ${client.id}: ${message}`);
+      const errorType = err instanceof Error ? err.constructor.name : typeof err;
+      this.logger.warn(`[Socket Error] Connection handler failed for ${client.id}: ${errorType}`);
       client.disconnect(true);
     }
   }
@@ -110,6 +129,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   handleDisconnect(client: Socket) {
     const timer = client.data.staffSessionTimer as NodeJS.Timeout | undefined;
     if (timer) clearTimeout(timer);
+    if (client.data.metricsTracked) this.metrics.connectionClosed();
     this.logger.log(`[Socket Disconnected] Socket ${client.id}`);
   }
 

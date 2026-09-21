@@ -1,0 +1,137 @@
+services:
+  tls-init:
+    image: postgres:17-bookworm
+    volumes:
+      - local_tls:/tls
+    command:
+      - bash
+      - -ec
+      - |
+        set -eu
+        if [ -f /tls/ca/ca.crt ] && [ -f /tls/postgres/server.crt ] && [ -f /tls/redis/server.crt ]; then
+          chmod 755 /tls /tls/ca /tls/postgres /tls/redis
+          chmod 644 /tls/ca/ca.crt /tls/postgres/server.crt /tls/postgres/server.key /tls/redis/server.crt /tls/redis/server.key
+          chmod 600 /tls/ca/ca.key
+          exit 0
+        fi
+        umask 077
+        mkdir -p /tls/ca /tls/postgres /tls/redis
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+          -subj "/CN=Park Plaza Local CA" \
+          -keyout /tls/ca/ca.key \
+          -out /tls/ca/ca.crt >/dev/null 2>&1
+        for service in postgres redis; do
+          if [ "$$service" = "postgres" ]; then
+            san="DNS:postgres,DNS:localhost,IP:127.0.0.1"
+          else
+            san="DNS:redis,DNS:localhost,IP:127.0.0.1"
+          fi
+          cat > "/tmp/$$service.cnf" <<EOF
+        [req]
+        distinguished_name = req_distinguished_name
+        req_extensions = req_ext
+        prompt = no
+
+        [req_distinguished_name]
+        CN = $$service
+
+        [req_ext]
+        subjectAltName = $$san
+        extendedKeyUsage = serverAuth
+        EOF
+          openssl req -new -newkey rsa:2048 -nodes \
+            -subj "/CN=$$service" \
+            -keyout "/tls/$$service/server.key" \
+            -out "/tmp/$$service.csr" >/dev/null 2>&1
+          openssl x509 -req -sha256 -days 365 \
+            -in "/tmp/$$service.csr" \
+            -CA /tls/ca/ca.crt \
+            -CAkey /tls/ca/ca.key \
+            -CAcreateserial \
+            -out "/tls/$$service/server.crt" \
+            -extfile "/tmp/$$service.cnf" \
+            -extensions req_ext >/dev/null 2>&1
+          rm -f /tls/ca/ca.srl "/tmp/$$service.csr" "/tmp/$$service.cnf"
+        done
+        chmod 755 /tls /tls/ca /tls/postgres /tls/redis
+        chmod 644 /tls/ca/ca.crt /tls/postgres/server.crt /tls/postgres/server.key /tls/redis/server.crt /tls/redis/server.key
+        chmod 600 /tls/ca/ca.key
+
+  postgres:
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+    ports: !override
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - local_tls_postgres_data:/var/lib/postgresql/data
+      - local_tls:/run/local-tls:ro
+    command:
+      - bash
+      - -ec
+      - |
+        set -eu
+        install -d -o postgres -g postgres -m 700 /var/lib/postgresql/tls
+        install -o postgres -g postgres -m 600 /run/local-tls/postgres/server.key /var/lib/postgresql/tls/server.key
+        install -o postgres -g postgres -m 644 /run/local-tls/postgres/server.crt /var/lib/postgresql/tls/server.crt
+        exec docker-entrypoint.sh postgres \
+          -c ssl=on \
+          -c ssl_cert_file=/var/lib/postgresql/tls/server.crt \
+          -c ssl_key_file=/var/lib/postgresql/tls/server.key
+
+  redis:
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+    volumes:
+      - local_tls:/run/local-tls:ro
+    command:
+      - redis-server
+      - --port
+      - '0'
+      - --tls-port
+      - '6379'
+      - --tls-cert-file
+      - /run/local-tls/redis/server.crt
+      - --tls-key-file
+      - /run/local-tls/redis/server.key
+      - --tls-ca-cert-file
+      - /run/local-tls/ca/ca.crt
+      - --tls-auth-clients
+      - 'no'
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /run/local-tls/ca/ca.crt -h 127.0.0.1 -p 6379 ping | grep -q PONG"]
+
+  setup:
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+    volumes:
+      - local_tls:/run/local-tls:ro
+    environment:
+      DATABASE_SSL: 'true'
+      DATABASE_SSL_REQUIRED: 'true'
+      DATABASE_SSL_REJECT_UNAUTHORIZED: 'true'
+      DATABASE_SSL_CA_FILE: /run/local-tls/ca/ca.crt
+
+  api:
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+    volumes:
+      - local_tls:/run/local-tls:ro
+    environment:
+      DATABASE_SSL: 'true'
+      DATABASE_SSL_REQUIRED: 'true'
+      DATABASE_SSL_REJECT_UNAUTHORIZED: 'true'
+      DATABASE_SSL_CA_FILE: /run/local-tls/ca/ca.crt
+      REDIS_URL: rediss://redis:6379
+      REDIS_TLS: 'true'
+      REDIS_TLS_REQUIRED: 'true'
+      REDIS_TLS_CA_FILE: /run/local-tls/ca/ca.crt
+    ports: !override
+      - "127.0.0.1:3100:3000"
+
+volumes:
+  local_tls:
+  local_tls_postgres_data:

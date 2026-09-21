@@ -202,7 +202,8 @@ export const orders = pgTable('orders', {
   unique('orders_id_property_unique').on(t.id, t.propertyId),
   foreignKey({ name: 'orders_property_id_fkey', columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
   foreignKey({ name: 'orders_stay_property_fkey', columns: [t.stayId, t.propertyId], foreignColumns: [stays.id, stays.propertyId] }).onDelete('restrict'),
-  foreignKey({ name: 'orders_amenity_property_fkey', columns: [t.amenityReservationId], foreignColumns: [amenityReservations.id] }).onDelete('set null'),
+  // The migration uses SET NULL only for amenity_reservation_id because property_id is NOT NULL.
+  foreignKey({ name: 'orders_amenity_property_fkey', columns: [t.amenityReservationId, t.propertyId], foreignColumns: [amenityReservations.id, amenityReservations.propertyId] }).onDelete('set null'),
   check('orders_customer_checkout_facts_check', sql`(
     (${t.checkoutClassification} = 'legacy_unknown' AND ${t.deliveryMode} IS NULL AND ${t.paymentMode} IS NULL)
     OR (${t.checkoutClassification} = 'customer_checkout' AND (

@@ -127,7 +127,9 @@ export const eventSpaceServices = pgTable('event_space_services', {
   spaceId: uuid('space_id').notNull().references(() => eventSpaces.id),
   code: varchar('code', { length: 64 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
+  category: varchar('category', { length: 64 }).notNull().default('General'),
   unitAmount: numeric('unit_amount', { precision: 12, scale: 2 }).notNull().default('0'),
+  perPerson: boolean('per_person').notNull().default(false),
   active: boolean('active').notNull().default(true),
 }, (table) => [
   uniqueIndex('idx_event_space_services_code').on(table.spaceId, table.code),
@@ -140,25 +142,41 @@ export const eventSpaceServices = pgTable('event_space_services', {
 
 export const eventRecurrence = pgTable('event_recurrence', {
   propertyId: uuid('property_id').notNull().references(() => properties.id),
-  eventId: uuid('event_id').primaryKey().references(() => events.id), // 1:1 relation to the master event
+  eventId: uuid('event_id').primaryKey(), // 1:1 relation to the master event
   rrule: varchar('rrule', { length: 500 }).notNull(),
   seriesTimezone: varchar('series_timezone', { length: 64 }).notNull(),
   until: timestamp('until', { withTimezone: true }),
   count: integer('count'),
-});
+}, (table) => [
+  foreignKey({
+    name: 'event_recurrence_event_property_fkey',
+    columns: [table.eventId, table.propertyId],
+    foreignColumns: [events.id, events.propertyId],
+  }).onDelete('cascade'),
+]);
 
 export const eventOccurrenceExceptions = pgTable('event_occurrence_exceptions', {
   id: uuid('id').primaryKey().defaultRandom(),
   propertyId: uuid('property_id').notNull().references(() => properties.id),
-  eventId: uuid('event_id').notNull().references(() => events.id),
+  eventId: uuid('event_id').notNull(),
   occurrenceStartAt: timestamp('occurrence_start_at', { withTimezone: true }).notNull(),
   kind: exceptionKindEnum('kind').notNull(),
   overrideStartsAt: timestamp('override_starts_at', { withTimezone: true }),
   overrideEndsAt: timestamp('override_ends_at', { withTimezone: true }),
-  overrideSpaceId: uuid('override_space_id').references(() => eventSpaces.id),
+  overrideSpaceId: uuid('override_space_id'),
   overridePayload: jsonb('override_payload'),
 }, (table) => [
   uniqueIndex('idx_event_exceptions_occurrence').on(table.eventId, table.occurrenceStartAt),
+  foreignKey({
+    name: 'event_occurrence_exceptions_event_property_fkey',
+    columns: [table.eventId, table.propertyId],
+    foreignColumns: [events.id, events.propertyId],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'event_occurrence_exceptions_override_space_property_fkey',
+    columns: [table.overrideSpaceId, table.propertyId],
+    foreignColumns: [eventSpaces.id, eventSpaces.propertyId],
+  }).onDelete('restrict'),
 ]);
 
 export const eventCommands = pgTable('event_commands', {

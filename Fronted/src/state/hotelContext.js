@@ -4,6 +4,7 @@ export const HotelStateContext = createContext(null);
 export const HotelCommandsContext = createContext(null);
 export const HotelShellStateContext = createContext(null);
 export const HotelSearchStateContext = createContext(null);
+export const HotelDashboardStateContext = createContext(null);
 
 export function useHotel() {
   const state = useContext(HotelStateContext);
@@ -27,5 +28,11 @@ export function useHotelShellState() {
 export function useHotelSearchState() {
   const state = useContext(HotelSearchStateContext);
   if (!state) throw new Error('useHotelSearchState debe utilizarse dentro de HotelProvider');
+  return state;
+}
+
+export function useHotelDashboardState() {
+  const state = useContext(HotelDashboardStateContext);
+  if (!state) throw new Error('useHotelDashboardState debe utilizarse dentro de HotelProvider');
   return state;
 }

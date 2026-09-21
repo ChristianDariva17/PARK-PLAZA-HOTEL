@@ -37,10 +37,8 @@ export interface RequestContext {
 export class DocumentsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async createContract(propertyId: string, accountId: string, data: any, ctx: RequestContext) {
+  async createContract(propertyId: string, accountId: string, data: any, idempotencyKey: string, ctx: RequestContext) {
     const { reservationId, metadata, reason } = data;
-    const idempotencyKey = data.idempotencyKey;
-    if (!idempotencyKey) throw new BadRequestException('La clave de idempotencia es obligatoria');
     const reference = data.reference || `DOC-ESTADIA-${new Date().getFullYear()}-${idempotencyKey.slice(0, 6).toUpperCase()}`;
     const initialStatus = data.status || (metadata?.signatures?.guestSignature ? 'Vigente' : 'Borrador');
 
@@ -176,10 +174,9 @@ export class DocumentsService {
     });
   }
 
-  async transitionContract(propertyId: string, accountId: string, contractId: string, data: any, ctx: RequestContext) {
-    const { targetState, idempotencyKey, reason } = data;
+  async transitionContract(propertyId: string, accountId: string, contractId: string, data: any, idempotencyKey: string, ctx: RequestContext) {
+    const { targetState, reason } = data;
     if (!CONTRACT_TARGET_STATES.includes(targetState)) throw new BadRequestException('Estado de contrato inválido');
-    if (!idempotencyKey) throw new BadRequestException('La clave de idempotencia es obligatoria');
     const status = contractTargetStateToStatus[targetState as keyof typeof contractTargetStateToStatus];
 
     return await this.db.transaction(async (tx: any) => {
@@ -227,8 +224,8 @@ export class DocumentsService {
     });
   }
 
-  async registerEvidence(propertyId: string, accountId: string, data: any, ctx: RequestContext) {
-    const { sourceType, referenceId, evidenceType, description, url, metadata, idempotencyKey } = data;
+  async registerEvidence(propertyId: string, accountId: string, data: any, idempotencyKey: string, ctx: RequestContext) {
+    const { sourceType, referenceId, evidenceType, description, url, metadata } = data;
     const evidenceMetadata = {
       ...(metadata || {}),
       evidenceType,
@@ -284,8 +281,8 @@ export class DocumentsService {
     return results;
   }
 
-  async linkEvidence(propertyId: string, accountId: string, contractId: string, data: any, ctx: RequestContext) {
-    const { evidenceId, relationType, idempotencyKey } = data;
+  async linkEvidence(propertyId: string, accountId: string, contractId: string, data: any, idempotencyKey: string, ctx: RequestContext) {
+    const { evidenceId, relationType } = data;
 
     return await this.db.transaction(async (tx: any) => {
       await acquirePropertyTransactionLock(tx, propertyId);

@@ -24,7 +24,11 @@ function useOverlayFocus(open, onClose, initialFocusRef) {
     if (activeOverlayCount === 1 && appRoot && !supportsInert) appRoot.setAttribute('aria-hidden', 'true');
     const onKeyDown = (event) => {
       if (overlayLevel !== activeOverlayCount) return;
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
       if (event.key !== 'Tab' || !panel) return;
       const elements = [...panel.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
       if (!elements.length) return;

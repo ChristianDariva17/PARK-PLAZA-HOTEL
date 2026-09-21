@@ -40,6 +40,8 @@ export function adaptMenuItem(raw) {
       id: ing.id,
       inventoryItemId: ing.inventoryItemId,
       quantity: Number(ing.quantity),
+      unit: ing.unit ?? null,
+      detail: ing.detail ?? null,
     })),
     variants,
     createdAt: raw.createdAt,
@@ -167,6 +169,75 @@ export function adaptOrder(raw) {
 export function adaptOrdersList(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.map(adaptOrder).filter(Boolean);
+}
+
+const UNIT_FACTORS = {
+  mg: ['mass', 0.001],
+  g: ['mass', 1],
+  kg: ['mass', 1000],
+  ml: ['volume', 1],
+  l: ['volume', 1000],
+  und: ['unit', 1],
+  unidad: ['unit', 1],
+  unidades: ['unit', 1],
+};
+
+function unitFactor(unit) {
+  return UNIT_FACTORS[String(unit || 'und').trim().toLowerCase()] || null;
+}
+
+function convertQuantity(quantity, fromUnit, toUnit) {
+  const from = unitFactor(fromUnit);
+  const to = unitFactor(toUnit);
+  if (!from || !to || from[0] !== to[0]) return null;
+  return quantity * from[1] / to[1];
+}
+
+export function getRecipeMaxQuantity(recipe, inventory = []) {
+  if (!recipe?.ingredients?.length) return null;
+  const inventoryById = new Map(inventory.map((item) => [String(item.id), item]));
+  let maxQuantity = Infinity;
+  let hasCalculableIngredient = false;
+
+  for (const ingredient of recipe.ingredients) {
+    const inventoryItem = inventoryById.get(String(ingredient.inventoryItemId));
+    const required = convertQuantity(Number(ingredient.quantity), ingredient.unit, inventoryItem?.unit);
+    if (!inventoryItem || !Number.isFinite(required) || required <= 0 || !Number.isFinite(Number(inventoryItem.available))) return null;
+    hasCalculableIngredient = true;
+    maxQuantity = Math.min(maxQuantity, Math.floor((Number(inventoryItem.available) + Number.EPSILON) / required));
+  }
+
+  return hasCalculableIngredient ? maxQuantity : null;
+}
+
+export function validateOrderForm(form, recipes = [], inventory = []) {
+  const errors = {};
+  if (!String(form.source || '').trim()) errors.source = 'Seleccione el origen del pedido.';
+  if (form.source === 'Habitación' && !form.stayId) errors.stayId = 'Seleccione la estadía o habitación asociada.';
+  if (!Array.isArray(form.items) || !form.items.length) {
+    errors.items = 'Agregue al menos un producto al pedido.';
+    return errors;
+  }
+
+  const recipesById = new Map(recipes.map((recipe) => [String(recipe.id), recipe]));
+  form.items.forEach((item, index) => {
+    const key = `items.${index}`;
+    if (!item.menuItemId) {
+      errors[`${key}.menuItemId`] = 'Seleccione un producto.';
+      return;
+    }
+    const quantity = Number(item.quantity);
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+      errors[`${key}.quantity`] = 'La cantidad debe ser un entero positivo.';
+      return;
+    }
+    const maxQuantity = getRecipeMaxQuantity(recipesById.get(String(item.menuItemId)), inventory);
+    if (maxQuantity !== null && quantity > maxQuantity) {
+      errors[`${key}.quantity`] = `Stock insuficiente. Disponible para ${maxQuantity} unidad(es).`;
+    }
+  });
+
+  return errors;
 }
 
 // ─── Menu Import Result Adapter ───────────────────────────────────────────────

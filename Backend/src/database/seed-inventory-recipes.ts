@@ -1,7 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { databaseUrlFromEnv, validateEnv } from '../config/environment.js';
+import { validateEnv } from '../config/environment.js';
+import { safeErrorFields } from '../observability/safe-error.js';
+import { postgresPoolOptions } from './connection-options.js';
 import { inventoryItems, inventoryLedger, menuItemIngredients, menuItems, properties } from './schema/index.js';
 
 export const INVENTORY_CATALOG = [
@@ -114,10 +116,7 @@ export async function seedInventoryAndRecipes(): Promise<void> {
   await import('dotenv/config');
   const env = validateEnv(process.env);
 
-  const pool = new Pool({
-    connectionString: databaseUrlFromEnv(env),
-    ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false,
-  });
+  const pool = new Pool(postgresPoolOptions(env));
 
   const db = drizzle(pool);
 
@@ -625,7 +624,7 @@ if (process.argv[1]?.includes('seed-inventory-recipes')) {
     console.log('[Seed] Seeding completed successfully.');
     process.exit(0);
   }).catch((err) => {
-    console.error('[Seed] Error during seeding:', err);
+    console.error('[Seed] Error during seeding:', safeErrorFields(err));
     process.exit(1);
   });
 }

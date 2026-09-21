@@ -11,7 +11,7 @@ test('API requests are relative and include the customer cookie', async (context
     return { ok: true, status: 200, json: async () => ({ categories: [] }) };
   };
   await getAvailability({ checkInDate: '2028-02-28', checkOutDate: '2028-03-01', guestCount: 2 });
-  assert.match(request.url, /^\/api\/customer\/reservations\/availability\?/);
+  assert.match(request.url, /^\/api\/v1\/customer\/reservations\/availability\?/);
   assert.equal(request.options.credentials, 'include');
   assert.match(request.url, /guestCount=2/);
   assert.match(request.url, /checkInDate=2028-02-28/);

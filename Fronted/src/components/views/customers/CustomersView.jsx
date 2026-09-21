@@ -8,12 +8,14 @@ import { useHotel, useHotelCommands } from "../../../state/hotelContext";
 import { Pagination, SortableHeader } from "../../ui/CollectionTable";
 import { FormWizard } from "../../ui/FormWizard";
 import { Dialog, Drawer } from "../../ui/Overlay";
+import { FilterBar } from "../../ui/FilterBar";
 import {
   DetailGrid,
   EmptyState,
   MetricStrip,
   PageHeader,
   StatusBadge,
+  ConfirmAction,
 } from "../SharedViewParts";
 
 const EMPTY_CLIENT = {
@@ -411,6 +413,8 @@ export default function CustomersView({
   const [editor, setEditor] = useState(undefined);
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
+  const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  const [processingClientId, setProcessingClientId] = useState(null);
   const deferred = useDeferredValue(query.toLowerCase());
 
   useEffect(() => {
@@ -448,6 +452,30 @@ export default function CustomersView({
   const loadingWithoutData =
     state.guestRequest.status === "loading" && state.clients.length === 0;
 
+  const requestStatusChange = (client, action) => {
+    setPendingStatusChange({ client, action });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingStatusChange || processingClientId) return;
+    const { client, action } = pendingStatusChange;
+    setProcessingClientId(client.id);
+    try {
+      if (action === "archive") {
+        await guestCommands.archive(client.id);
+        notify("Huésped archivado", "", "success");
+      } else {
+        await guestCommands.reactivate(client.id);
+        notify("Huésped reactivado", "", "success");
+      }
+    } catch (error) {
+      notify("Error", error.message, "error");
+    } finally {
+      setProcessingClientId(null);
+      setPendingStatusChange(null);
+    }
+  };
+
   return (
     <div className="view-container">
       <PageHeader
@@ -484,7 +512,7 @@ export default function CustomersView({
           },
         ]}
       />
-      <div className="filter-bar">
+      <FilterBar label="Filtros de clientes">
         <label className="search-label">
           <Search size={16} />
           <input
@@ -496,7 +524,7 @@ export default function CustomersView({
           />
         </label>
         <span className="filter-result">{records.length} perfiles</span>
-      </div>
+      </FilterBar>
       {loadingWithoutData ? (
         <div className="alert-banner alert-banner-info" role="status">
           Cargando huéspedes...
@@ -587,18 +615,7 @@ export default function CustomersView({
                           className="quick-action-btn btn-action-lock"
                           data-tooltip="Archivar huésped"
                           aria-label={`Archivar ${client.name}`}
-                          onClick={() => {
-                            if (window.confirm("¿Archivar este huésped?")) {
-                              guestCommands
-                                .archive(client.id)
-                                .then(() =>
-                                  notify("Huésped archivado", "", "success"),
-                                )
-                                .catch((e) =>
-                                  notify("Error", e.message, "error"),
-                                );
-                            }
-                          }}
+                          onClick={() => requestStatusChange(client, "archive")}
                         >
                           <Archive size={15} />
                         </button>
@@ -610,18 +627,7 @@ export default function CustomersView({
                           className="quick-action-btn btn-action-unlock"
                           data-tooltip="Reactivar huésped"
                           aria-label={`Reactivar ${client.name}`}
-                          onClick={() => {
-                            if (window.confirm("¿Reactivar este huésped?")) {
-                              guestCommands
-                                .reactivate(client.id)
-                                .then(() =>
-                                  notify("Huésped reactivado", "", "success"),
-                                )
-                                .catch((e) =>
-                                  notify("Error", e.message, "error"),
-                                );
-                            }
-                          }}
+                          onClick={() => requestStatusChange(client, "reactivate")}
                         >
                           <RotateCcw size={15} />
                         </button>
@@ -710,6 +716,16 @@ export default function CustomersView({
           />
         ) : null}
       </Dialog>
+      <ConfirmAction
+        open={Boolean(pendingStatusChange)}
+        onCancel={() => setPendingStatusChange(null)}
+        onConfirm={confirmStatusChange}
+        title={pendingStatusChange?.action === "archive" ? "Archivar huésped" : "Reactivar huésped"}
+        description={pendingStatusChange ? `Se cambiará el estado de ${pendingStatusChange.client.name}.` : undefined}
+        confirmLabel={pendingStatusChange?.action === "archive" ? "Archivar huésped" : "Reactivar huésped"}
+        tone={pendingStatusChange?.action === "archive" ? "danger" : "primary"}
+        busy={Boolean(processingClientId)}
+      />
     </div>
   );
 }

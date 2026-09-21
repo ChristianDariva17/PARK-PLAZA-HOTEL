@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useCommunications } from './useCommunications';
 import { DEPARTMENT_CONFIG, PRIORITY_CONFIG } from './communicationsModel';
 import { CheckCheck, Trash2, RefreshCw, Search, ArrowRight, Sparkles, Inbox, Clock } from 'lucide-react';
+import { FilterBar } from '../components/ui/FilterBar.jsx';
+import { ConfirmAction } from '../components/views/SharedViewParts.jsx';
 
 const EMPTY_NOTIFICATIONS = [];
 
@@ -19,6 +21,7 @@ export function NotificationsView({ navigate, notify }) {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all'); // 'all' | 'unread' | 'read'
   const [searchTerm, setSearchTerm] = useState('');
+  const [clearReadConfirmationOpen, setClearReadConfirmationOpen] = useState(false);
 
   const items = notifications.data ?? EMPTY_NOTIFICATIONS;
 
@@ -74,15 +77,18 @@ export function NotificationsView({ navigate, notify }) {
     }
   };
 
-  const onClearAllRead = async () => {
-    if (window.confirm('¿Desea eliminar de la bandeja todas las notificaciones ya leídas?')) {
-      const ok = await handleClearRead();
-      if (ok) {
-        notify('Bandeja depurada', 'Se eliminaron las notificaciones leídas.', 'success');
-      } else {
-        notify('Aviso', 'No se pudieron eliminar los registros.', 'error');
-      }
+  const onClearAllRead = () => {
+    setClearReadConfirmationOpen(true);
+  };
+
+  const confirmClearAllRead = async () => {
+    const ok = await handleClearRead();
+    if (ok) {
+      notify('Bandeja depurada', 'Se eliminaron las notificaciones leídas.', 'success');
+    } else {
+      notify('Aviso', 'No se pudieron eliminar los registros.', 'error');
     }
+    setClearReadConfirmationOpen(false);
   };
 
   return (
@@ -186,7 +192,7 @@ export function NotificationsView({ navigate, notify }) {
       </div>
 
       {/* Search & Sub-Filter Bar */}
-      <div className="notifications-filter-bar">
+      <FilterBar label="Filtros de notificaciones" className="notifications-filter-bar">
         <div className="notifications-search">
           <Search size={15} className="notifications-search-icon" />
           <input
@@ -221,7 +227,7 @@ export function NotificationsView({ navigate, notify }) {
             Leídas ({items.length - unreadCount})
           </button>
         </div>
-      </div>
+      </FilterBar>
 
       {/* Notifications List */}
       {notifications.status === 'loading' && items.length === 0 ? (
@@ -318,6 +324,15 @@ export function NotificationsView({ navigate, notify }) {
           })}
         </div>
       )}
+      <ConfirmAction
+        open={clearReadConfirmationOpen}
+        onCancel={() => setClearReadConfirmationOpen(false)}
+        onConfirm={confirmClearAllRead}
+        title="Limpiar notificaciones leídas"
+        description="Se eliminarán de la bandeja todas las notificaciones que ya fueron leídas."
+        confirmLabel="Limpiar leídas"
+        busy={actionLoading}
+      />
     </div>
   );
 }

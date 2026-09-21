@@ -19,15 +19,16 @@ export const setCustomerSessionRefresher = (refresher) => {
 export async function apiRequest(path, options = {}) {
   const { __customerSessionRetried = false, ...requestOptions } = options;
   const method = options.method?.toUpperCase() || 'GET';
-  const isMutation = ['POST', 'PUT', 'PATCH'].includes(method);
+  const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const hasIdempotencyKey = Object.keys(options.headers || {}).some((key) => key.toLowerCase() === 'idempotency-key');
   
   const headers = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(isMutation && !options.headers?.['Idempotency-Key'] ? { 'Idempotency-Key': crypto.randomUUID() } : {}),
+    ...(isMutation && !hasIdempotencyKey ? { 'Idempotency-Key': crypto.randomUUID() } : {}),
     ...options.headers,
   };
 
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`/api/v1${path}`, {
     ...requestOptions,
     credentials: 'include',
     headers,
@@ -41,9 +42,11 @@ export async function apiRequest(path, options = {}) {
       && path !== '/customer/auth/logout'
       && refreshCustomerSession;
     if (canRefresh && await refreshCustomerSession()) {
-      return apiRequest(path, { ...requestOptions, __customerSessionRetried: true });
+      return apiRequest(path, { ...requestOptions, headers, __customerSessionRetried: true });
     }
-    const message = typeof payload?.message === 'string' ? payload.message : 'The request could not be completed.';
+    const message = typeof payload?.detail === 'string'
+      ? payload.detail
+      : typeof payload?.message === 'string' ? payload.message : 'The request could not be completed.';
     throw new ApiError(message, response.status, payload);
   }
   return payload;

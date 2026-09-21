@@ -23,12 +23,17 @@ describe('HttpExceptionFilter', () => {
     new HttpExceptionFilter().catch(new HttpException('Resource conflict', 409), host);
 
     expect(status).toHaveBeenCalledWith(409);
-    expect(send).toHaveBeenCalledWith({
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'urn:park-plaza:problem:http_409',
+      title: 'Conflict',
+      status: 409,
+      detail: 'Resource conflict',
+      code: 'HTTP_409',
       statusCode: 409,
       error: 'Conflict',
       message: 'Resource conflict',
       requestId: 'request-string',
-    });
+    }));
   });
 
   it('normalizes a structured message array into a stable string', () => {
@@ -41,12 +46,21 @@ describe('HttpExceptionFilter', () => {
 
     new HttpExceptionFilter().catch(exception, host);
 
-    expect(send).toHaveBeenCalledWith({
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'urn:park-plaza:problem:http_400',
+      title: 'Bad Request',
+      status: 400,
+      detail: 'email must be valid; password is required',
+      code: 'HTTP_400',
+      errors: [
+        { field: '_global', messages: ['email must be valid'] },
+        { field: '_global', messages: ['password is required'] },
+      ],
       statusCode: 400,
       error: 'Bad Request',
       message: 'email must be valid; password is required',
       requestId: 'request-validation',
-    });
+    }));
   });
 
   it('hides unexpected error details and logs only sanitized diagnostics', () => {
@@ -56,12 +70,17 @@ describe('HttpExceptionFilter', () => {
     new HttpExceptionFilter(logger).catch(new Error('password=secret SQL select * from accounts'), host);
 
     expect(status).toHaveBeenCalledWith(500);
-    expect(send).toHaveBeenCalledWith({
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'urn:park-plaza:problem:internal_server_error',
+      title: 'Internal Server Error',
+      status: 500,
+      detail: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
       statusCode: 500,
       error: 'Internal Server Error',
       message: 'Internal server error',
       requestId: 'request-500',
-    });
+    }));
     expect(logger.error).toHaveBeenCalledWith({ requestId: 'request-500', exceptionType: 'Error' });
     expect(JSON.stringify(logger.error.mock.calls)).not.toContain('secret');
     expect(JSON.stringify(send.mock.calls)).not.toContain('select *');
@@ -73,7 +92,8 @@ describe('HttpExceptionFilter', () => {
 
     new HttpExceptionFilter().catch(new HttpException({ error: 'Teapot', message: 'Short and stout' }, 418), host);
 
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ requestId }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ requestId, status: 418 }));
     expect(header).toHaveBeenCalledWith('X-Request-Id', requestId);
+    expect(header).toHaveBeenCalledWith('Content-Type', 'application/problem+json');
   });
 });

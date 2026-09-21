@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const petPassModalSource = readFileSync(new URL('./PetPassModal.jsx', import.meta.url), 'utf8');
-const p1ViewsSource = readFileSync(new URL('../components/views/P1Views.jsx', import.meta.url), 'utf8');
+const petsViewSource = readFileSync(new URL('./PetsView.jsx', import.meta.url), 'utf8');
 const petsModelSource = readFileSync(new URL('./petsModel.js', import.meta.url), 'utf8');
 
 describe('Pets Enhancements Contract and Integration', () => {
@@ -15,22 +15,22 @@ describe('Pets Enhancements Contract and Integration', () => {
     expect(petPassModalSource).toContain('Normas de Convivencia Pet-Friendly');
   });
 
-  it('PetEditor in P1Views supports dual mode (Huésped vs Cliente Externo) and quick rates', () => {
-    expect(p1ViewsSource).toContain('Huésped de Habitación');
-    expect(p1ViewsSource).toContain('Cliente Externo / Restaurante / Guardería');
-    expect(p1ViewsSource).toContain('Carnet de Vacunación y Antirrábica al día verificado');
-    expect(p1ViewsSource).toContain('Kit de Bienvenida entregado');
-    expect(p1ViewsSource).toContain('Pase de Día (S/ 15)');
-    expect(p1ViewsSource).toContain('Por Noche (S/ 35)');
-    expect(p1ViewsSource).toContain('Spa / Limpieza Ozono (S/ 50)');
+  it('PetEditor in PetsView supports dual mode (Huésped vs Cliente Externo) and quick rates', () => {
+    expect(petsViewSource).toContain('Huésped de Habitación');
+    expect(petsViewSource).toContain('Cliente Externo / Restaurante / Guardería');
+    expect(petsViewSource).toContain('Carnet de Vacunación y Antirrábica al día verificado');
+    expect(petsViewSource).toContain('Kit de Bienvenida entregado');
+    expect(petsViewSource).toContain('Pase de Día (S/ 15)');
+    expect(petsViewSource).toContain('Por Noche (S/ 35)');
+    expect(petsViewSource).toContain('Spa / Limpieza Ozono (S/ 50)');
   });
 
-  it('P1PetsView renders pet metrics, search bar, and pass modal trigger', () => {
-    expect(p1ViewsSource).toContain('Programa Pet-Friendly · Control Sanitario y Convivencia');
-    expect(p1ViewsSource).toContain('Vacunación Verificada');
-    expect(p1ViewsSource).toContain('Kits Entregados');
-    expect(p1ViewsSource).toContain('Pase Pet-Friendly');
-    expect(p1ViewsSource).toContain('PetPassModal');
+  it('PetsView renders pet metrics, search bar, and pass modal trigger', () => {
+    expect(petsViewSource).toContain('Programa Pet-Friendly · Control Sanitario y Convivencia');
+    expect(petsViewSource).toContain('Vacunación Verificada');
+    expect(petsViewSource).toContain('Kits Entregados');
+    expect(petsViewSource).toContain('Pase Pet-Friendly');
+    expect(petsViewSource).toContain('PetPassModal');
   });
 
   it('petsModel supports visitor pet fields and vaccination mapping', () => {

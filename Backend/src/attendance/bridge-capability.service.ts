@@ -25,7 +25,7 @@ export class BridgeCapabilityService {
   }
 
   issue(operation: BridgeCapabilityOperation, subject?: { type: 'client' | 'employee'; id: string }, propertyId?: string) {
-    const expiresAt = new Date(Date.now() + 60_000);
+    const expiresAt = new Date(Date.now() + (operation === 'health' ? 60_000 : 180_000));
     const payload: BridgeCapabilityPayload = {
       op: operation,
       exp: Math.floor(expiresAt.getTime() / 1000),

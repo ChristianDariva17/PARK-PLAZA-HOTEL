@@ -8,10 +8,18 @@ import { formatReservationInstant, formatReservationMoney, RESERVATION_STATUS_LA
 import { useHotel, useHotelCommands } from '../../../state/hotelContext';
 import { Pagination, SortableHeader } from '../../ui/CollectionTable';
 import { Dialog, Drawer } from '../../ui/Overlay';
+import { FilterBar } from '../../ui/FilterBar';
+import { FormField } from '../../ui/FormField';
+import { AsyncButton } from '../../ui/P1Atoms';
 import { DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
+import { validateReservationForm } from '../../../reservations/reservationFormModel.js';
 
 const EMPTY_FORM = Object.freeze({ checkInAt: '', checkOutAt: '', guestCount: '1', primaryGuestId: '', roomId: '' });
-const localInputToUtc = (value) => value ? new Date(value).toISOString() : '';
+const localInputToUtc = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+};
 
 const EXTRA_SERVICES = [
   { id: 'breakfast', name: 'Desayuno Buffet Ejecutivo', icon: '🥐', price: 35, type: 'per_night', desc: 'Acceso diario al restaurante gourmet' },
@@ -126,16 +134,20 @@ function calculateStayNights(checkInAt, checkOutAt) {
   return { nights, hours: diffHours.toFixed(1) };
 }
 
-function ReservationForm({ onClose, notify }) {
+export function ReservationForm({ onClose, notify }) {
   const { state, reservationCommands } = useHotel();
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [floorFilter, setFloorFilter] = useState('ALL');
   const [activePreset, setActivePreset] = useState(null);
   const [quickGuestOpen, setQuickGuestOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [selectedExtras, setSelectedExtras] = useState(new Set());
   const activeRef = useRef(true);
+  const submitLockRef = useRef(false);
+  const formErrorRef = useRef(null);
 
   useEffect(() => {
     activeRef.current = true;
@@ -144,6 +156,10 @@ function ReservationForm({ onClose, notify }) {
       reservationCommands.clearAvailability();
     };
   }, [reservationCommands]);
+
+  useEffect(() => {
+    if (formError) formErrorRef.current?.focus();
+  }, [formError]);
 
   const availability = state.reservationAvailability;
   const categoryById = new Map(state.roomCategories.map((category) => [category.id, category]));
@@ -178,6 +194,12 @@ function ReservationForm({ onClose, notify }) {
   const change = (field, value) => {
     setForm((current) => ({ ...current, [field]: value, ...(field === 'primaryGuestId' ? {} : { roomId: '' }) }));
     setFormError('');
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      if (field !== 'primaryGuestId') delete next.roomId;
+      return next;
+    });
     if (field !== 'primaryGuestId') {
       setActivePreset(null);
       reservationCommands.clearAvailability();
@@ -196,10 +218,17 @@ function ReservationForm({ onClose, notify }) {
     setActivePreset(nights);
     setForm((current) => ({ ...current, checkInAt: checkInStr, checkOutAt: checkOutStr, roomId: '' }));
     setFormError('');
+    setFieldErrors({});
     reservationCommands.clearAvailability();
   };
 
   const consultAvailability = async () => {
+    const errors = validateReservationForm(form, { requireSelection: false });
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      setFormError('Revise los campos marcados antes de consultar disponibilidad.');
+      return;
+    }
     setFormError('');
     try {
       await reservationCommands.availability(availabilityInput);
@@ -209,17 +238,28 @@ function ReservationForm({ onClose, notify }) {
   };
 
   const refreshForRetry = async () => {
+    if (retrying) return;
+    setRetrying(true);
     setFormError('');
     try {
       await reservationCommands.refreshForRetry(availabilityInput);
     } catch (error) {
       if (activeRef.current) setFormError(error.message || 'No se pudieron actualizar los datos.');
+    } finally {
+      if (activeRef.current) setRetrying(false);
     }
   };
 
   const submit = async (event) => {
     event.preventDefault();
-    if (busy || retryBlocked || !selectedRoom) return;
+    if (submitLockRef.current || busy || retryBlocked) return;
+    const errors = validateReservationForm({ ...form, roomId: selectedRoom ? form.roomId : '' });
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      setFormError('Revise los campos marcados antes de registrar la reserva.');
+      return;
+    }
+    submitLockRef.current = true;
     setFormError('');
     try {
       const created = await reservationCommands.create({
@@ -234,7 +274,19 @@ function ReservationForm({ onClose, notify }) {
       onClose();
     } catch (error) {
       if (activeRef.current) setFormError(error.message || 'No se pudo registrar la reserva.');
+    } finally {
+      if (activeRef.current) submitLockRef.current = false;
     }
+  };
+
+  const selectRoom = (roomId) => {
+    setForm((current) => ({ ...current, roomId }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next.roomId;
+      return next;
+    });
+    setFormError('');
   };
 
   const availableRooms = availability?.rooms || [];
@@ -256,10 +308,15 @@ function ReservationForm({ onClose, notify }) {
         notify={notify}
         onCreated={(guest) => {
           setForm((current) => ({ ...current, primaryGuestId: guest.id }));
+          setFieldErrors((current) => {
+            const next = { ...current };
+            delete next.primaryGuestId;
+            return next;
+          });
         }}
       />
 
-      <form className="form-grid reservation-form" onSubmit={submit}>
+      <form className="form-grid reservation-form" onSubmit={submit} noValidate>
         <div className="alert-banner alert-banner-info span-2 reservation-info-banner">
           <span className="reservation-info-icon">ℹ️</span>
           <div className="reservation-info-copy">
@@ -300,24 +357,21 @@ function ReservationForm({ onClose, notify }) {
           ) : null}
         </div>
 
-        <label className="reservation-field-label">
-          <span>📅 Ingreso (Check-in)</span>
+        <FormField label="📅 Ingreso (Check-in)" required error={fieldErrors.checkInAt} className="reservation-field-label">
           <input required type="datetime-local" step="1800" value={form.checkInAt} onChange={(event) => change('checkInAt', event.target.value)} />
-        </label>
+        </FormField>
 
-        <label className="reservation-field-label">
-          <span>📅 Salida (Check-out)</span>
+        <FormField label="📅 Salida (Check-out)" required error={fieldErrors.checkOutAt} className="reservation-field-label">
           <input required type="datetime-local" step="1800" value={form.checkOutAt} onChange={(event) => change('checkOutAt', event.target.value)} />
-        </label>
+        </FormField>
 
-        <label className="reservation-field-label">
-          <span>👥 Cantidad de Huéspedes</span>
+        <FormField label="👥 Cantidad de Huéspedes" required error={fieldErrors.guestCount} className="reservation-field-label">
           <input required min="1" step="1" type="number" value={form.guestCount} onChange={(event) => change('guestCount', event.target.value)} />
-        </label>
+        </FormField>
 
-        <label className="reservation-field-label">
+        <div className="reservation-field-label">
           <div className="reservation-guest-heading">
-            <span>👤 Huésped Principal</span>
+            <label htmlFor="reservation-primary-guest">👤 Huésped Principal <span className="form-required" aria-hidden="true"> *</span></label>
             <button
               type="button"
               className="btn btn-sm btn-outline reservation-new-guest"
@@ -326,7 +380,14 @@ function ReservationForm({ onClose, notify }) {
               <UserPlus size={13} /> + Nuevo Huésped
             </button>
           </div>
-          <select required value={form.primaryGuestId} onChange={(event) => change('primaryGuestId', event.target.value)}>
+          <select
+            required
+            id="reservation-primary-guest"
+            aria-invalid={fieldErrors.primaryGuestId ? 'true' : undefined}
+            aria-describedby={fieldErrors.primaryGuestId ? 'reservation-primary-guest-error' : undefined}
+            value={form.primaryGuestId}
+            onChange={(event) => change('primaryGuestId', event.target.value)}
+          >
             <option value="">Seleccione un huésped activo</option>
             {activeGuests.map((guest) => (
               <option key={guest.id} value={guest.id}>
@@ -334,13 +395,15 @@ function ReservationForm({ onClose, notify }) {
               </option>
             ))}
           </select>
-        </label>
+          {fieldErrors.primaryGuestId ? <span id="reservation-primary-guest-error" className="form-error" role="alert">{fieldErrors.primaryGuestId}</span> : null}
+        </div>
 
           <div className="span-2 reservation-availability-actions">
           <button
             type="button"
             className="btn btn-outline reservation-availability-button"
             disabled={loadingAvailability || busy || !form.checkInAt || !form.checkOutAt || !form.guestCount}
+            aria-busy={loadingAvailability}
             onClick={consultAvailability}
           >
             <CalendarSearch size={16} aria-hidden="true" className="reservation-button-icon" />
@@ -418,7 +481,17 @@ function ReservationForm({ onClose, notify }) {
                 return (
                   <div
                     key={room.roomId}
-                    onClick={() => setForm((current) => ({ ...current, roomId: room.roomId }))}
+                    onClick={() => selectRoom(room.roomId)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        selectRoom(room.roomId);
+                      }
+                    }}
+                    role="button"
+                    tabIndex="0"
+                    aria-pressed={isSelected}
+                    aria-label={`Seleccionar habitación ${room.number}`}
                     className={`reservation-room-card ${isSelected ? 'is-selected' : ''}`}
                   >
                     <div className="reservation-room-header">
@@ -570,12 +643,12 @@ function ReservationForm({ onClose, notify }) {
         {retryBlocked ? (
           <div className="alert-banner alert-banner-danger span-2" role="alert">
             <span>{state.reservationCreateRequest.error}</span>
-            <button type="button" className="btn btn-sm btn-outline" onClick={refreshForRetry}>Actualizar datos</button>
+            <button type="button" className="btn btn-sm btn-outline" disabled={retrying} aria-busy={retrying} onClick={refreshForRetry}>{retrying ? 'Actualizando…' : 'Actualizar datos'}</button>
           </div>
         ) : null}
 
         {formError && !retryBlocked ? (
-          <div className="alert-banner alert-banner-danger span-2" role="alert">{formError}</div>
+          <div ref={formErrorRef} className="alert-banner alert-banner-danger span-2" role="alert" tabIndex="-1">{formError}</div>
         ) : null}
 
         <div className="form-actions span-2 reservation-form-actions">
@@ -583,12 +656,14 @@ function ReservationForm({ onClose, notify }) {
             Cancelar
           </button>
 
-          <button
-            className={`btn btn-primary reservation-submit-button ${selectedRoom && form.primaryGuestId ? 'is-ready' : ''}`}
-            disabled={busy || retryBlocked || !selectedRoom || !form.primaryGuestId}
+          <AsyncButton
+            className={`reservation-submit-button ${selectedRoom && form.primaryGuestId ? 'is-ready' : ''}`}
+            pending={busy}
+            pendingLabel="Confirmando reserva…"
+            disabled={retryBlocked || !selectedRoom || !form.primaryGuestId}
           >
-            {busy ? 'Confirmando reserva…' : selectedRoom ? `Registrar Reserva · S/ ${grandTotal.toFixed(2)}` : 'Seleccione una habitación para continuar'}
-          </button>
+            {!form.primaryGuestId ? 'Seleccione un huésped para continuar' : selectedRoom ? `Registrar Reserva · S/ ${grandTotal.toFixed(2)}` : 'Seleccione una habitación para continuar'}
+          </AsyncButton>
         </div>
       </form>
     </>
@@ -656,7 +731,7 @@ export default function ReservationsView({ notify, navigationIntent, consumeNavi
     <MetricStrip items={[{ label: 'Total', value: state.persistentReservations.length }, { label: 'Pendientes', value: state.persistentReservations.filter((item) => item.status === 'pending').length }, { label: 'Confirmadas', value: state.persistentReservations.filter((item) => item.status === 'confirmed').length }, { label: 'Presentes', value: state.persistentReservations.filter((item) => item.status === 'checked_in').length }]} />
     {loadingWithoutData ? <div className="alert-banner alert-banner-info state-stale" role="status">Cargando reservas persistentes…</div> : null}
     {state.reservationRequest.status === 'error' ? <div className="alert-banner alert-banner-danger" role="alert"><span>{state.reservationRequest.error}</span> <button className="btn btn-sm btn-outline" onClick={retry}>Reintentar</button></div> : null}
-    <div className="filter-bar"><label className="search-label"><Search size={16} /><input aria-label="Buscar reservas" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por código, huésped o habitación..." disabled={loadingWithoutData} /></label><label>Estado<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="Todos">Todos</option>{Object.entries(RESERVATION_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><span className="filter-result">{records.length} reservas</span></div>
+    <FilterBar label="Filtros de reservas"><label className="search-label"><Search size={16} /><input aria-label="Buscar reservas" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por código, huésped o habitación..." disabled={loadingWithoutData} /></label><label>Estado<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="Todos">Todos</option>{Object.entries(RESERVATION_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><span className="filter-result">{records.length} reservas</span></FilterBar>
     {!loadingWithoutData && table.total ? <section className="card table-container"><table className="custom-table"><caption>Reservas registradas en el servidor</caption><thead><tr>{columns.map((column) => <SortableHeader key={column.key} column={column} sort={table.sort} onSort={table.toggleSort} />)}<th scope="col">Acciones</th></tr></thead><tbody>{table.visible.map((item) => <tr key={item.id}><td><strong>{item.id.slice(0, 8)}</strong></td><td>{item.guestName}</td><td>{item.roomReference}</td><td>{formatReservationInstant(item.checkInAt)}<br /><small>hasta {formatReservationInstant(item.checkOutAt)}</small></td><td>{formatReservationMoney(item.totalAmount)}<br /><small>{formatReservationMoney(item.nightlyRate)} por noche</small></td><td><StatusBadge>{item.statusLabel}</StatusBadge></td><td><div className="quick-actions-row"><button type="button" className="quick-action-btn btn-action-view" data-tooltip="Ver detalle de reserva" aria-label={`Ver reserva ${item.id.slice(0, 8)}`} onClick={() => setSelectedId(item.id)}><Eye size={15} /></button></div></td></tr>)}</tbody></table><Pagination {...table} onPage={table.setPage} /></section> : null}
     {!loadingWithoutData && state.reservationRequest.status === 'success' && !table.total ? <EmptyState title={query || status !== 'Todos' ? 'Sin coincidencias' : 'Sin reservas registradas'} description={query || status !== 'Todos' ? 'No hay reservas que coincidan con los filtros.' : 'La propiedad todavía no tiene reservas persistentes.'} /> : null}
     <Drawer open={Boolean(selected)} onClose={() => setSelectedId(null)} title={selected ? `Reserva #${selected.id.slice(0, 8)}` : 'Reserva'} description={detail ? `${detail.checkIn} a ${detail.checkOut}` : selected ? `${formatReservationInstant(selected.checkInAt)} a ${formatReservationInstant(selected.checkOutAt)}` : ''}>{detail ? <div className="form-grid"><DetailGrid items={[{ label: 'Huésped', value: detail.primaryGuest.name }, { label: 'Habitación', value: `Habitación ${detail.room.number} · Piso ${detail.room.floor}` }, { label: 'Estado', node: <StatusBadge>{reservationStatusToLabel(detail.status)}</StatusBadge> }, { label: 'Ingreso civil', value: detail.checkIn }, { label: 'Salida civil', value: detail.checkOut }, { label: 'Último cambio', value: detail.lifecycle.changedAt ? formatReservationInstant(detail.lifecycle.changedAt) : 'Sin cambios de ciclo' }, { label: 'Motivo', value: detail.lifecycle.reason || '—' }]} />{detail.permittedActions.length ? <><label>Motivo{detail.permittedActions.some((action) => action !== 'confirm') ? <textarea required value={lifecycle.reason} onChange={(event) => setLifecycle((current) => ({ ...current, reason: event.target.value }))} /> : null}</label>{detail.permittedActions.includes('disposition') ? <label>Disposición<select value={lifecycle.disposition} onChange={(event) => setLifecycle((current) => ({ ...current, disposition: event.target.value }))}><option value="no_show">No presentado</option><option value="expired">Vencida</option></select></label> : null}<div className="form-actions">{detail.permittedActions.includes('confirm') ? <button className="btn btn-primary" disabled={lifecycle.busy} onClick={() => runLifecycle('confirm')}>Confirmar</button> : null}{detail.permittedActions.includes('cancel') ? <button className="btn btn-outline" disabled={lifecycle.busy || !lifecycle.reason.trim()} onClick={() => runLifecycle('cancel')}>Cancelar reserva</button> : null}{detail.permittedActions.includes('disposition') ? <button className="btn btn-outline" disabled={lifecycle.busy || !lifecycle.reason.trim()} onClick={() => runLifecycle('disposition')}>Registrar disposición</button> : null}</div></> : <p>El servidor no permite acciones para esta reserva.</p>}{lifecycle.feedback ? <div className="alert-banner alert-banner-info" role="status">{lifecycle.feedback}</div> : null}{lifecycle.error ? <div className="alert-banner alert-banner-danger" role="alert">{lifecycle.error}</div> : null}</div> : selected ? <div role="status">Cargando detalle autorizado…</div> : null}</Drawer>

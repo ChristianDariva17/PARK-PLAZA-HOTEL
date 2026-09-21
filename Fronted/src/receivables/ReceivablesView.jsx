@@ -5,6 +5,7 @@ import { useHotel } from '../state/hotelContext.js';
 import { collectReceivable, getReceivable, getReceivables, reverseReceivableCollection } from './receivablesClient';
 import { getFolio } from '../folios/folioClient';
 import { DataTable, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../components/views/SharedViewParts';
+import { FilterBar } from '../components/ui/FilterBar';
 import { Drawer } from '../components/ui/Overlay';
 import FolioPanel from '../folios/FolioPanel';
 import { CreditCard, Building2, RefreshCw } from 'lucide-react';
@@ -155,36 +156,47 @@ export default function ReceivablesView({ notify }) {
       {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
 
       {/* Navigation Tabs between In-House Stays and Post-Checkout Receivables */}
-      <div className="menu-surface-secondary5">
-        <button
-          type="button"
-          onClick={() => setActiveTab('inhouse')}
-          className={`menu-surface-secondary ${activeTab === 'inhouse' ? 'is-active' : ''}`}
-        >
-          <Building2 size={16} /> 🏨 Saldos de Habitaciones en Curso ({activeStaysList.length})
-          {inHouseWithDebtCount > 0 && (
-            <span className="menu-surface-secondary7">
-              {inHouseWithDebtCount} con saldo
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('receivables')}
-          className={`menu-surface-secondary ${activeTab === 'receivables' ? 'is-active' : ''}`}
-        >
-          <CreditCard size={16} /> 📋 Cuentas por Cobrar (Post Check-out) ({items.length})
-        </button>
-
-        <div className="menu-surface-secondary9">
+      <div className="receivables-tabs-container">
+        <div className="receivables-tabs-segmented" role="tablist">
           <button
             type="button"
-            className="btn btn-sm btn-outline menu-row0"
+            role="tab"
+            aria-selected={activeTab === 'inhouse'}
+            onClick={() => setActiveTab('inhouse')}
+            className={`receivables-tab-btn ${activeTab === 'inhouse' ? 'is-active' : ''}`}
+          >
+            <Building2 size={16} />
+            <span>Saldos de Habitaciones en Curso</span>
+            <span className="receivables-count-badge">({activeStaysList.length})</span>
+            {inHouseWithDebtCount > 0 && (
+              <span className="receivables-debt-pill">
+                {inHouseWithDebtCount} con saldo
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'receivables'}
+            onClick={() => setActiveTab('receivables')}
+            className={`receivables-tab-btn ${activeTab === 'receivables' ? 'is-active' : ''}`}
+          >
+            <CreditCard size={16} />
+            <span>Cuentas por Cobrar (Post Check-out)</span>
+            <span className="receivables-count-badge">({items.length})</span>
+          </button>
+        </div>
+
+        <div className="receivables-tabs-actions">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline receivables-refresh-btn"
             onClick={() => void refreshAll()}
             disabled={loading}
           >
-            <RefreshCw size={14} className={loading ? 'spin' : ''} /> Actualizar Datos
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+            <span>Actualizar Datos</span>
           </button>
         </div>
       </div>
@@ -192,7 +204,7 @@ export default function ReceivablesView({ notify }) {
       {/* TAB 1: IN-HOUSE STAYS (Huéspedes alojados actualmente con consumos o saldos) */}
       {activeTab === 'inhouse' && (
         <div>
-          <div className="menu-row1">
+          <div className="receivables-tab-hint">
             Huéspedes que se encuentran actualmente hospedados en el hotel. Puedes registrar abonos, liquidar consumos o revisar su estado de cuenta en tiempo real.
           </div>
 
@@ -245,7 +257,7 @@ export default function ReceivablesView({ notify }) {
       {/* TAB 2: POST-CHECKOUT RECEIVABLES */}
       {activeTab === 'receivables' && (
         <div>
-          <div className="filter-bar menu-row8">
+          <FilterBar label="Filtros de cuentas por cobrar" className="menu-row8">
             <label className="menu-row9">
               Estado
               <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
@@ -266,7 +278,7 @@ export default function ReceivablesView({ notify }) {
             <button className="btn btn-outline" onClick={() => void refreshReceivables()} disabled={loading}>
               Filtrar
             </button>
-          </div>
+          </FilterBar>
 
           <DataTable
             caption="Cuentas por cobrar"

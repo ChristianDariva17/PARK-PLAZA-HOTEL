@@ -1,11 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Bell, CalendarPlus, CheckCheck, Clock3, Menu, Search, X } from 'lucide-react';
-import GlobalSearch from './GlobalSearch';
 import { getAccountInitials, getRoleLabel } from '../../auth/authContext';
 import { usePermissions } from '../../auth/authContext';
 import { PERMISSIONS } from '../../auth/permissions';
 import { canAccessRoute } from './navigation';
-import { useHotelSearchState } from '../../state/hotelContext';
+import { loadOverlayStyles } from '../../styles/loadOverlayStyles.js';
+
+const GlobalSearch = lazy(() => import('./GlobalSearch'));
 
 const TITLES = {
   dashboard: ['Panel operativo', 'Resumen del estado compartido'], habitaciones: ['Habitaciones', 'Mapa y detalle operativo'], reservas: ['Reservas', 'Disponibilidad, precio y adelantos'],
@@ -21,7 +22,6 @@ const TITLES = {
 
 export default function Topbar({ currentView, notifications, menuOpen, onMenu, onNavigate, onRead, onReadAll, account }) {
   const { can } = usePermissions();
-  const searchState = useHotelSearchState();
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -30,6 +30,9 @@ export default function Topbar({ currentView, notifications, menuOpen, onMenu, o
   const notificationPanelId = useId();
   const [title, subtitle] = TITLES[currentView] || ['Hotel Park Plaza', 'Sistema integral de gestión'];
   const canSearch = [PERMISSIONS.guestsRead, PERMISSIONS.reservationsRead, PERMISSIONS.roomsRead, PERMISSIONS.ordersRead].some(can);
+  const openSearch = () => {
+    void loadOverlayStyles().then(() => setSearchOpen(true)).catch(() => setSearchOpen(true));
+  };
   const authorizedNotifications = useMemo(() => notifications.filter((item) => canAccessRoute(can, item.route)), [can, notifications]);
   const unreadNotificationIds = authorizedNotifications.filter((item) => !item.read).map((item) => item.id);
   const unread = unreadNotificationIds.length;
@@ -66,7 +69,7 @@ export default function Topbar({ currentView, notifications, menuOpen, onMenu, o
     const openSearch = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setSearchOpen(true);
+         openSearch();
       }
     };
     document.addEventListener('keydown', openSearch);
@@ -80,14 +83,14 @@ export default function Topbar({ currentView, notifications, menuOpen, onMenu, o
     </div>
     <div className="topbar-right">
       <div className="topbar-datetime" aria-label="Fecha y hora actuales"><Clock3 size={16} aria-hidden="true" /><time dateTime={now.toISOString()}><strong>{now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</strong><span>{now.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}</span></time></div>
-      {canSearch ? <button type="button" className="global-search-trigger" onClick={() => setSearchOpen(true)} aria-haspopup="dialog"><Search size={17} aria-hidden="true" /><span>Buscar en el hotel</span><kbd>Ctrl K</kbd></button> : null}
+       {canSearch ? <button type="button" className="global-search-trigger" onClick={openSearch} aria-haspopup="dialog"><Search size={17} aria-hidden="true" /><span>Buscar en el hotel</span><kbd>Ctrl K</kbd></button> : null}
       {can(PERMISSIONS.notificationsRead) ? <div className="notification-wrap" ref={panelRef}>
         <button ref={notificationTriggerRef} className="topbar-bell-btn" aria-label={`Notificaciones: ${unread} sin leer`} aria-expanded={open} aria-controls={notificationPanelId} onClick={() => setOpen((value) => !value)}><Bell size={18} />{unread ? <span className="bell-badge">{unread}</span> : null}</button>
         {open ? <section id={notificationPanelId} className="notification-panel" aria-label="Notificaciones internas"><header><span><strong>Notificaciones internas</strong><small>{unread} sin leer · canal local</small></span><button className="icon-button" aria-label="Cerrar notificaciones" onClick={() => { setOpen(false); notificationTriggerRef.current?.focus(); }}><X size={16} /></button></header><div>{authorizedNotifications.length ? authorizedNotifications.map((item) => <button key={item.id} className={item.read ? 'read' : ''} onClick={() => { if (!item.read && can(PERMISSIONS.notificationsUpdate)) onRead(item.id); onNavigate(item.route); setOpen(false); notificationTriggerRef.current?.focus(); }}><strong>{item.title}</strong><span>{item.description}</span><small>{item.read ? 'Leída' : 'Sin leer'} · destino {item.route}</small></button>) : <p>Sin notificaciones internas.</p>}</div>{can(PERMISSIONS.notificationsUpdate) ? <footer><button className="btn btn-sm btn-outline" disabled={!unread} onClick={() => onReadAll(unreadNotificationIds)}><CheckCheck size={15} /> Marcar leídas</button></footer> : null}</section> : null}
       </div> : null}
-      {can(PERMISSIONS.reservationsCreate) ? <button className="btn btn-primary topbar-cta" onClick={() => onNavigate('reservas', { type: 'create-reservation' })}><CalendarPlus size={17} /><span>Nueva reserva</span></button> : null}
+      {can(PERMISSIONS.reservationsCreate) ? <button className="btn btn-primary topbar-cta" aria-label="Nueva reserva" onClick={() => onNavigate('reservas', { type: 'create-reservation' })}><CalendarPlus size={17} /><span>Nueva reserva</span></button> : null}
        <div className="topbar-profile"><span className="topbar-avatar">{getAccountInitials(account.email)}</span><span><strong>{account.email}</strong><small>{getRoleLabel(account.role)}</small></span></div>
     </div>
-    <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} state={searchState} onNavigate={onNavigate} can={can} />
+    {searchOpen ? <Suspense fallback={<span className="sr-only" role="status" aria-live="polite">Cargando búsqueda…</span>}><GlobalSearch open onClose={() => setSearchOpen(false)} onNavigate={onNavigate} can={can} /></Suspense> : null}
   </header>;
 }

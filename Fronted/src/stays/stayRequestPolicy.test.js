@@ -14,7 +14,17 @@ describe('stay request policy', () => {
     expect(isCurrentStayOperation(2, 2, controller.signal)).toBe(false);
   });
   it('requires all authoritative collections to reload before an ambiguous retry', () => {
-    expect(stayReconciliationSucceeded([{ status: 'fulfilled', value: [] }, { status: 'fulfilled', value: [] }, { status: 'fulfilled', value: [] }])).toBe(true);
-    expect(stayReconciliationSucceeded([{ status: 'fulfilled', value: [] }, { status: 'rejected', reason: new Error('offline') }, { status: 'fulfilled', value: [] }])).toBe(false);
+    expect(stayReconciliationSucceeded([
+      { status: 'fulfilled', value: [] },
+      { status: 'fulfilled', value: [] },
+      { status: 'fulfilled', value: [] },
+      { status: 'fulfilled', value: [] },
+    ])).toBe(true);
+    expect(stayReconciliationSucceeded([
+      { status: 'fulfilled', value: [] },
+      { status: 'rejected', reason: new Error('offline') },
+      { status: 'fulfilled', value: [] },
+      { status: 'fulfilled', value: [] },
+    ])).toBe(false);
   });
 });

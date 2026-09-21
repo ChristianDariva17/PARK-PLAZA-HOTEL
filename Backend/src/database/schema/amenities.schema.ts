@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, foreignKey, integer, numeric, pgTable, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { properties } from './hotel.schema.js';
 import { stays } from './stays.schema.js';
 import { customerAccounts } from './customer.schema.js';
@@ -6,7 +6,7 @@ import { customerAccounts } from './customer.schema.js';
 export const amenityReservations = pgTable('amenity_reservations', {
   id: uuid('id').defaultRandom().primaryKey(),
   propertyId: uuid('property_id').notNull().references(() => properties.id, { onDelete: 'restrict' }),
-  stayId: uuid('stay_id').references(() => stays.id, { onDelete: 'restrict' }),
+  stayId: uuid('stay_id'),
   customerAccountId: uuid('customer_account_id').references(() => customerAccounts.id, { onDelete: 'restrict' }),
   amenityType: varchar('amenity_type', { length: 50 }).notNull(), // 'Piscina', 'Mirador', 'pool', 'mirador'
   documentNumber: varchar('document_number', { length: 32 }),
@@ -19,7 +19,14 @@ export const amenityReservations = pgTable('amenity_reservations', {
   status: varchar('status', { length: 20 }).notNull().default('confirmed'), // 'confirmed', 'checked_in', 'completed', 'cancelled'
   checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  unique('amenity_reservations_id_property_unique').on(table.id, table.propertyId),
+  foreignKey({
+    name: 'amenity_reservations_stay_property_fkey',
+    columns: [table.stayId, table.propertyId],
+    foreignColumns: [stays.id, stays.propertyId],
+  }).onDelete('restrict'),
+]);
 
 export const amenityConfigs = pgTable('amenity_configs', {
   id: uuid('id').defaultRandom().primaryKey(),

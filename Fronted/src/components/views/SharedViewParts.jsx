@@ -2,6 +2,7 @@ import { Children } from 'react';
 import { AlertTriangle, CheckCircle2, Circle, Clock3, Search, XCircle } from 'lucide-react';
 import { usePermissions } from '../../auth/authContext';
 import { permissionForAction, permissionForPrimaryAction } from '../../auth/permissions';
+import { Dialog } from '../ui/Overlay.jsx';
 
 const STATUS_TONES = {
   disponible: 'green', aprobada: 'green', aprobado: 'green', pagado: 'green', firmado: 'green', activa: 'green', activo: 'green', completada: 'green', completado: 'green', confirmado: 'green', confirmada: 'green', entregado: 'green', registrado: 'green', generado: 'green', habilitado: 'green', respondida: 'green', leída: 'green', óptimo: 'green', abierta: 'green', dentro: 'green', 'sin daños': 'green', ingreso: 'green', listo: 'green', finalizado: 'green', finalizada: 'green', resuelta: 'green', cerrada: 'green', consumido: 'green', liberado: 'green',
@@ -12,6 +13,10 @@ const STATUS_TONES = {
 };
 
 const STATUS_ICONS = { green: CheckCircle2, blue: Circle, yellow: Clock3, purple: Circle, red: XCircle, gray: Circle };
+
+export function PageShell({ children, className = '', ...props }) {
+  return <div {...props} className={`view-container ${className}`.trim()}>{children}</div>;
+}
 
 export function PageHeader({ title, description, action, actionType, metadata }) {
   const { can } = usePermissions();
@@ -37,6 +42,22 @@ export function EmptyState({ title = 'Sin resultados', description = 'No hay reg
   return <div className="empty-state state-panel state-empty"><Search size={48} className="empty-state-icon" aria-hidden="true" /><h3>{title}</h3><p>{description}</p></div>;
 }
 
+export function ErrorState({ title = 'No se pudo cargar la información', description = 'Intente nuevamente.', onRetry, retryLabel = 'Reintentar' }) {
+  return <div className="error-state state-panel state-error" role="alert"><AlertTriangle size={32} aria-hidden="true" /><h3>{title}</h3><p>{description}</p>{onRetry ? <button type="button" className="btn btn-primary" onClick={onRetry}>{retryLabel}</button> : null}</div>;
+}
+
+export function ResourceState({ status = 'idle', error, children, onRetry, emptyTitle, emptyDescription, loadingFallback = null }) {
+  if (status === 'idle') return null;
+  if (status === 'loading') return loadingFallback || <div className="state-panel state-loading" role="status" aria-live="polite" aria-busy="true">Cargando...</div>;
+  if (status === 'empty') return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  if (status === 'error' || status === 'offline' || status === 'forbidden') {
+    return <ErrorState title={status === 'forbidden' ? 'Acceso denegado' : undefined} description={error || (status === 'offline' ? 'No hay conexión disponible.' : undefined)} onRetry={onRetry} />;
+  }
+  const busy = status === 'refreshing' || status === 'reconciling';
+  const busyLabel = status === 'reconciling' ? 'Verificando y actualizando la información.' : 'Actualizando la información.';
+  return <div className={`resource-state resource-state-${status}`} aria-busy={busy || undefined}>{busy ? <div className="state-refreshing" role="status" aria-live="polite"><span aria-hidden="true" />{busyLabel}</div> : null}{children}</div>;
+}
+
 export function SectionHeader({ eyebrow, title, description, action, id }) {
   return <div className="section-header"><div>{eyebrow ? <span className="section-kicker">{eyebrow}</span> : null}<h3 id={id}>{title}</h3>{description ? <p>{description}</p> : null}</div>{action}</div>;
 }
@@ -52,5 +73,35 @@ export function DetailGrid({ items, compact = false }) {
 export function DataTable({ caption, columns, children, emptyTitle, emptyDescription }) {
   const rows = Children.toArray(children);
   if (!rows.length) return <section className="card"><EmptyState title={emptyTitle} description={emptyDescription} /></section>;
-  return <section className="card table-container"><table className="custom-table"><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{rows}</tbody></table></section>;
+  return <section className="card table-container" role="region" aria-label={caption} tabIndex="0"><table className="custom-table"><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{rows}</tbody></table></section>;
+}
+
+export function ConfirmAction({
+  open,
+  onCancel,
+  onConfirm,
+  title = 'Confirmar acción',
+  description,
+  children,
+  confirmLabel = 'Confirmar',
+  cancelLabel = 'Cancelar',
+  busy = false,
+  tone = 'danger',
+}) {
+  const confirmClassName = tone === 'warning' ? 'btn-warning' : tone === 'primary' ? 'btn-primary' : 'btn-danger';
+  const handleClose = () => {
+    if (!busy) onCancel();
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} title={title} description={description}>
+      {children}
+      <div className="form-actions">
+        <button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>{cancelLabel}</button>
+        <button type="button" className={`btn ${confirmClassName}`} onClick={onConfirm} disabled={busy} aria-busy={busy}>
+          {busy ? 'Procesando...' : confirmLabel}
+        </button>
+      </div>
+    </Dialog>
+  );
 }

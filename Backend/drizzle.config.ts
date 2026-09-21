@@ -9,7 +9,7 @@ export default defineConfig({
   schema: './src/database/schema/index.ts',
   out: './drizzle',
   dbCredentials: { url: databaseUrlFromEnv(env) },
-  migrations: { table: '__drizzle_migrations', schema: 'public' },
+  migrations: { table: '__drizzle_migrations', schema: 'drizzle' },
   strict: true,
   verbose: true,
 });

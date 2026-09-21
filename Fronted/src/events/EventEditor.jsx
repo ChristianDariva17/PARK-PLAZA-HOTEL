@@ -18,6 +18,7 @@ import {
   Flower2,
 } from 'lucide-react';
 import { P1Input, P1Select, P1Badge } from '../components/ui/P1Atoms';
+import { ConfirmAction } from '../components/views/SharedViewParts.jsx';
 import { eventsClient } from './eventsClient';
 import { useHotel } from '../state/hotelContext.js';
 
@@ -50,6 +51,8 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
   const [expectedVersion, setExpectedVersion] = useState(1);
   const [guestSearch, setGuestSearch] = useState('');
   const [conflictWarning, setConflictWarning] = useState(null);
+  const [, setCheckingConflict] = useState(false);
+  const [conflictConfirmationOpen, setConflictConfirmationOpen] = useState(false);
 
   // Selected Services
   const [selectedServices, setSelectedServices] = useState({});
@@ -300,8 +303,8 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
     setFormData(prev => ({ ...prev, endsAt: end.toISOString().slice(0, 16) }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, { skipConflict = false } = {}) => {
+    e?.preventDefault();
     setLoading(true);
     setError(null);
 
@@ -317,12 +320,10 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
       return;
     }
 
-    if (conflictWarning) {
-      const proceed = window.confirm(`¡Atención! El salón ya cuenta con el evento "${conflictWarning.title}" en este horario. ¿Desea continuar de todos modos?`);
-      if (!proceed) {
-        setLoading(false);
-        return;
-      }
+    if (conflictWarning && !skipConflict) {
+      setConflictConfirmationOpen(true);
+      setLoading(false);
+      return;
     }
 
     try {
@@ -825,6 +826,19 @@ export function EventEditor({ eventId, onSaved, onCancel }) {
           </div>
         </div>
       </form>
+      <ConfirmAction
+        open={conflictConfirmationOpen}
+        onCancel={() => setConflictConfirmationOpen(false)}
+        onConfirm={() => {
+          setConflictConfirmationOpen(false);
+          void handleSubmit(undefined, { skipConflict: true });
+        }}
+        title="Conflicto de disponibilidad"
+        description={conflictWarning ? `El salón ya cuenta con el evento "${conflictWarning.title}" en este horario. ¿Desea continuar de todos modos?` : undefined}
+        confirmLabel="Continuar de todos modos"
+        tone="warning"
+        busy={loading}
+      />
     </div>
   );
 }

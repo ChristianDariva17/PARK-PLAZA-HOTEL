@@ -7,6 +7,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { AuthenticatedAccount } from '../src/auth/auth.types.js';
 import { FolioService } from '../src/folios/folio.service.js';
 import { ReceivablesService } from '../src/receivables/receivables.service.js';
+import { SuppliersService } from '../src/suppliers/suppliers.service.js';
+import { EventsService } from '../src/events/events.service.js';
 import { databaseUrlFromEnv, validateEnv } from '../src/config/environment.js';
 import * as schema from '../src/database/schema/index.js';
 
@@ -113,22 +115,102 @@ describe('PostgreSQL readiness', () => {
           and exists (select 1 from information_schema.columns where table_name = 'suppliers' and column_name = 'rating')
           and exists (select 1 from information_schema.columns where table_name = 'suppliers' and column_name = 'rating_notes')
           and exists (select 1 from pg_constraint where conname = 'purchase_orders_property_id_properties_id_fk')
-          and exists (select 1 from pg_constraint where conname = 'purchase_orders_supplier_id_suppliers_id_fk')
+           and exists (select 1 from pg_constraint where conname = 'purchase_orders_supplier_property_fkey')
           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_property_isolation')
           and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_supplier')
            and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_status') as supplier_schema_ready,
-         to_regclass('public.command_receipts') is not null
-           and to_regclass('public.outbox_events') is not null
-           and to_regclass('public.attendance_qr_nonces') is not null
+          to_regclass('public.command_receipts') is not null
+            and to_regclass('public.outbox_events') is not null
+            and exists (select 1 from information_schema.columns where table_name = 'outbox_events' and column_name = 'stay_id')
+             and exists (select 1 from information_schema.columns where table_name = 'outbox_events' and column_name = 'request_id')
+             and exists (select 1 from pg_constraint where conname = 'outbox_events_stay_property_fkey')
+             and exists (select 1 from pg_constraint where conname = 'outbox_events_stay_property_required')
+            and to_regclass('public.attendance_qr_nonces') is not null
            and exists (select 1 from pg_indexes where indexname = 'command_receipts_property_operation_key_unique')
            and exists (select 1 from pg_indexes where indexname = 'outbox_events_dispatch_idx')
            and exists (select 1 from pg_indexes where indexname = 'attendance_qr_nonces_expiry_idx')
            and exists (select 1 from pg_indexes where indexname = 'experience_participations_property_idempotency_unique')
            and exists (select 1 from pg_indexes where indexname = 'idx_purchase_orders_property_order_number')
-           and exists (select 1 from pg_constraint where conname = 'suppliers_archived_by_account_id_accounts_id_fk')
+           and to_regclass('public.purchase_order_sequences') is not null
+           and exists (select 1 from pg_constraint where conname = 'purchase_order_sequences_pkey')
+            and exists (select 1 from pg_constraint where conname = 'suppliers_archived_by_property_fkey')
            and exists (select 1 from pg_constraint where conname = 'events_space_property_fkey')
            and exists (select 1 from pg_constraint where conname = 'events_guest_property_fkey') as phase2_integrity_ready`);
     expect(result.rows[0]).toEqual({ schema_ready: true, constraint_ready: true, guest_scope_ready: true, security_ready: true, audit_guard_ready: true, session_guard_ready: true, system_roles_ready: true, folio_ready: true, cleaning_stay_ready: true, supplier_schema_ready: true, phase2_integrity_ready: true });
+  });
+});
+
+describe('PostgreSQL realtime outbox transaction boundaries', () => {
+  it('rolls back a stay-scoped event with the business transaction', async () => {
+    const suffix = uniqueHex();
+    const fixture: StayFixture = {
+      propertyId: randomUUID(), categoryId: randomUUID(), roomId: randomUUID(),
+      primaryGuestId: randomUUID(), secondaryGuestId: randomUUID(),
+      propertyCode: `inv-ob-${suffix.slice(0, 25)}`, roomNumber: `ob-${suffix.slice(0, 13)}`,
+      reservationId: randomUUID(), stayId: randomUUID(),
+    };
+    const eventId = randomUUID();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      await insertStayDependencies(client, fixture);
+      await client.query(
+        `INSERT INTO outbox_events (id, property_id, stay_id, event_type, payload)
+         VALUES ($1, $2, $3, 'stay:status_changed', $4::jsonb)`,
+        [eventId, fixture.propertyId, fixture.stayId, JSON.stringify({ stayId: fixture.stayId, status: 'active' })],
+      );
+
+      const insideTransaction = await client.query<{ n: number }>('SELECT count(*)::integer AS n FROM outbox_events WHERE id = $1', [eventId]);
+      expect(insideTransaction.rows).toEqual([{ n: 1 }]);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+
+    const afterRollback = await pool.query<{ n: number }>('SELECT count(*)::integer AS n FROM outbox_events WHERE id = $1', [eventId]);
+    expect(afterRollback.rows).toEqual([{ n: 0 }]);
+  });
+});
+
+describe('PostgreSQL property relationship audit', () => {
+  it('has no cross-property or unresolved references in critical domains', async () => {
+    const result = await pool.query<{ check_name: string; violations: number }>(`with violations(check_name, violations) as (
+      select 'contracts_reservation', count(*)::integer from contracts c join reservations r on r.id = c.reservation_id where c.reservation_id is not null and c.property_id <> r.property_id
+      union all select 'contract_versions_contract', count(*)::integer from contract_versions v join contracts c on c.id = v.contract_id where v.property_id <> c.property_id
+      union all select 'contract_versions_creator', count(*)::integer from contract_versions v join accounts a on a.id = v.creator_account_id where v.property_id <> a.property_id
+      union all select 'evidences_creator', count(*)::integer from evidences e join accounts a on a.id = e.creator_account_id where e.property_id <> a.property_id
+      union all select 'evidence_origin_unknown', count(*)::integer from evidences where lower(origin_type) not in ('maintenance', 'cleaning', 'contracts', 'incidents')
+      union all select 'evidence_origin_orphan', count(*)::integer from evidences e where (lower(e.origin_type) = 'cleaning' and not exists (select 1 from cleaning_tasks t where t.id = e.origin_id and t.property_id = e.property_id)) or (lower(e.origin_type) = 'maintenance' and not exists (select 1 from incidents i where i.id = e.origin_id and i.property_id = e.property_id and i.type = 'maintenance')) or (lower(e.origin_type) = 'incidents' and not exists (select 1 from incidents i where i.id = e.origin_id and i.property_id = e.property_id)) or (lower(e.origin_type) = 'contracts' and not exists (select 1 from contracts c where c.id = e.origin_id and c.property_id = e.property_id))
+      union all select 'events_space', count(*)::integer from events e join event_spaces s on s.id = e.space_id where e.property_id <> s.property_id
+      union all select 'events_guest', count(*)::integer from events e join guests g on g.id = e.guest_id where e.property_id <> g.property_id
+      union all select 'event_services_event', count(*)::integer from event_services es join events e on e.id = es.event_id where es.property_id <> e.property_id
+      union all select 'event_exceptions_event', count(*)::integer from event_occurrence_exceptions ex join events e on e.id = ex.event_id where ex.property_id <> e.property_id
+      union all select 'event_exceptions_space', count(*)::integer from event_occurrence_exceptions ex join events e on e.id = ex.event_id join event_spaces s on s.id = ex.override_space_id where ex.override_space_id is not null and e.property_id <> s.property_id
+      union all select 'experiences_published_by', count(*)::integer from experiences e join accounts a on a.id = e.published_by where e.published_by is not null and e.property_id <> a.property_id
+      union all select 'experience_participations_experience', count(*)::integer from experience_participations p join experiences e on e.id = p.experience_id where p.property_id <> e.property_id
+      union all select 'experience_participations_stay', count(*)::integer from experience_participations p join stays s on s.id = p.stay_id where p.stay_id is not null and p.property_id <> s.property_id
+      union all select 'experience_participations_guest', count(*)::integer from experience_participations p join guests g on g.id = p.guest_id where p.guest_id is not null and p.property_id <> g.property_id
+      union all select 'amenity_reservations_stay', count(*)::integer from amenity_reservations ar join stays s on s.id = ar.stay_id where ar.stay_id is not null and ar.property_id <> s.property_id
+      union all select 'orders_stay', count(*)::integer from orders o join stays s on s.id = o.stay_id where o.stay_id is not null and o.property_id <> s.property_id
+      union all select 'orders_amenity', count(*)::integer from orders o join amenity_reservations ar on ar.id = o.amenity_reservation_id where o.amenity_reservation_id is not null and o.property_id <> ar.property_id
+      union all select 'order_items_order', count(*)::integer from order_items oi join orders o on o.id = oi.order_id where oi.property_id <> o.property_id
+      union all select 'order_items_menu_item', count(*)::integer from order_items oi join menu_items mi on mi.id = oi.menu_item_id where oi.property_id <> mi.property_id
+      union all select 'supplier_archive_account', count(*)::integer from suppliers s join accounts a on a.id = s.archived_by_account_id where s.archived_by_account_id is not null and s.property_id <> a.property_id
+      union all select 'purchase_orders_supplier', count(*)::integer from purchase_orders p join suppliers s on s.id = p.supplier_id where p.property_id <> s.property_id
+      union all select 'inventory_supplier_orphan', count(*)::integer from inventory_items i where i.supplier_id is not null and not exists (select 1 from suppliers s where s.id::text = i.supplier_id and s.property_id = i.property_id)
+      union all select 'identity_documents_guest', count(*)::integer from identity_documents d join guests g on g.id = d.guest_id where d.property_id <> g.property_id
+      union all select 'stay_guests_stay', count(*)::integer from stay_guests sg join stays s on s.id = sg.stay_id where sg.property_id <> s.property_id
+      union all select 'stay_guests_guest', count(*)::integer from stay_guests sg join guests g on g.id = sg.guest_id where sg.property_id <> g.property_id
+      union all select 'folios_stay', count(*)::integer from folios f join stays s on s.id = f.stay_id where f.property_id <> s.property_id
+      union all select 'folio_entries_folio', count(*)::integer from folio_entries fe join folios f on f.id = fe.folio_id where fe.property_id <> f.property_id
+      union all select 'folio_entries_stay', count(*)::integer from folio_entries fe join stays s on s.id = fe.stay_id where fe.property_id <> s.property_id
+      union all select 'customer_guest_identities_guest', count(*)::integer from customer_guest_identities c join guests g on g.id = c.guest_id where c.property_id <> g.property_id
+      union all select 'customer_reservations_reservation', count(*)::integer from customer_reservations c join reservations r on r.id = c.reservation_id where c.property_id <> r.property_id
+      union all select 'outbox_stay', count(*)::integer from outbox_events o join stays s on s.id = o.stay_id where o.stay_id is not null and o.property_id is not null and o.property_id <> s.property_id
+    ) select check_name, violations from violations where violations > 0 order by check_name`);
+
+    expect(result.rows).toEqual([]);
   });
 });
 
@@ -152,6 +234,73 @@ describe('PostgreSQL room invariants', () => {
 
       const roomsByProperty = await client.query<{ property_id: string; number: string }>('SELECT property_id, number FROM rooms WHERE property_id = ANY($1::uuid[]) ORDER BY property_id', [[firstPropertyId, secondPropertyId]]);
       expect(roomsByProperty.rows).toEqual([{ property_id: firstPropertyId, number: '101' }, { property_id: secondPropertyId, number: '101' }].toSorted((left, right) => left.property_id.localeCompare(right.property_id)));
+    });
+  });
+});
+
+describe('PostgreSQL document relationship invariants', () => {
+  it('rejects cross-property contracts, evidence, and link actors', async () => {
+    await inRolledBackTransaction(async (client) => {
+      const suffix = uniqueHex();
+      const firstPropertyId = randomUUID();
+      const secondPropertyId = randomUUID();
+      const firstRoleId = randomUUID();
+      const secondRoleId = randomUUID();
+      const firstAccountId = randomUUID();
+      const secondAccountId = randomUUID();
+      const firstContractId = randomUUID();
+      const secondContractId = randomUUID();
+      const firstEvidenceId = randomUUID();
+      const secondEvidenceId = randomUUID();
+
+      await client.query('INSERT INTO properties (id, code, name) VALUES ($1, $2, $3), ($4, $5, $6)', [firstPropertyId, `inv-doc-1-${suffix.slice(0, 20)}`, 'First Document Property', secondPropertyId, `inv-doc-2-${suffix.slice(0, 20)}`, 'Second Document Property']);
+      await client.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3), ($4, $5, $6)', [firstRoleId, `doc_first_${suffix}`, 'Document First Role', secondRoleId, `doc_second_${suffix}`, 'Document Second Role']);
+      await client.query(
+        `INSERT INTO accounts (id, property_id, role_id, email, password_hash)
+         VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`,
+        [firstAccountId, firstPropertyId, firstRoleId, `doc-first-${suffix}@example.invalid`, 'integration-test-only', secondAccountId, secondPropertyId, secondRoleId, `doc-second-${suffix}@example.invalid`, 'integration-test-only'],
+      );
+      await client.query(
+        `INSERT INTO contracts (id, property_id, reference) VALUES ($1, $2, $3), ($4, $5, $6)`,
+        [firstContractId, firstPropertyId, `DOC-FIRST-${suffix}`, secondContractId, secondPropertyId, `DOC-SECOND-${suffix}`],
+      );
+      await client.query(
+        `INSERT INTO evidences (id, property_id, origin_type, origin_id, description, creator_account_id)
+         VALUES ($1, $2, 'incidents', $3, $4, $5), ($6, $7, 'incidents', $8, $9, $10)`,
+        [firstEvidenceId, firstPropertyId, randomUUID(), 'First evidence', firstAccountId, secondEvidenceId, secondPropertyId, randomUUID(), 'Second evidence', secondAccountId],
+      );
+
+      const crossPropertyEvidence = await captureViolation(client, () => client.query(
+        `INSERT INTO contract_evidence_links (property_id, contract_id, evidence_id, relation_type, linked_by_account_id)
+         VALUES ($1, $2, $3, 'supporting', $4)`,
+        [firstPropertyId, firstContractId, secondEvidenceId, firstAccountId],
+      ));
+      expectPostgresViolation(crossPropertyEvidence, '23503', 'contract_evidence_links_evidence_property_fkey');
+
+      const crossPropertyContract = await captureViolation(client, () => client.query(
+        `INSERT INTO contract_evidence_links (property_id, contract_id, evidence_id, relation_type, linked_by_account_id)
+         VALUES ($1, $2, $3, 'supporting', $4)`,
+        [firstPropertyId, secondContractId, firstEvidenceId, firstAccountId],
+      ));
+      expectPostgresViolation(crossPropertyContract, '23503', 'contract_evidence_links_contract_property_fkey');
+
+      const crossPropertyActor = await captureViolation(client, () => client.query(
+        `INSERT INTO contract_evidence_links (property_id, contract_id, evidence_id, relation_type, linked_by_account_id)
+         VALUES ($1, $2, $3, 'supporting', $4)`,
+        [firstPropertyId, firstContractId, firstEvidenceId, secondAccountId],
+      ));
+      expectPostgresViolation(crossPropertyActor, '23503', 'contract_evidence_links_linked_by_property_fkey');
+
+      await client.query(
+        `INSERT INTO contract_evidence_links (property_id, contract_id, evidence_id, relation_type, linked_by_account_id)
+         VALUES ($1, $2, $3, 'supporting', $4)`,
+        [firstPropertyId, firstContractId, firstEvidenceId, firstAccountId],
+      );
+      const validLink = await client.query<{ n: number }>(
+        'SELECT count(*)::integer AS n FROM contract_evidence_links WHERE property_id = $1 AND contract_id = $2 AND evidence_id = $3',
+        [firstPropertyId, firstContractId, firstEvidenceId],
+      );
+      expect(validLink.rows).toEqual([{ n: 1 }]);
     });
   });
 });
@@ -735,6 +884,298 @@ describe('PostgreSQL stay invariants', () => {
   });
 });
 
+describe('PostgreSQL command idempotency races', () => {
+  it('replays one purchase-order response for concurrent identical commands', async () => {
+    const suffix = uniqueHex();
+    const propertyId = randomUUID();
+    const roleId = randomUUID();
+    const accountId = randomUUID();
+    const supplierId = randomUUID();
+    const inventoryItemId = randomUUID();
+    const propertyCode = `inv-po-${suffix.slice(0, 25)}`;
+    const setup = await pool.connect();
+
+    try {
+      await setup.query('BEGIN');
+      await setup.query('INSERT INTO properties (id, code, name) VALUES ($1, $2, $3)', [propertyId, propertyCode, 'Purchase Order Race Property']);
+      await setup.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3)', [roleId, `p0_po_${suffix}`, 'Purchase Order Race Role']);
+      await setup.query(
+        'INSERT INTO accounts (id, property_id, role_id, email, password_hash) VALUES ($1, $2, $3, $4, $5)',
+        [accountId, propertyId, roleId, `p0-po-${suffix}@example.invalid`, 'integration-test-only'],
+      );
+      await setup.query(
+        `INSERT INTO suppliers (id, property_id, legal_name, legal_name_normalized, tax_id, tax_id_normalized)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [supplierId, propertyId, 'Race Supplier', 'RACE SUPPLIER', `RACE-${suffix}`, `RACE${suffix}`],
+      );
+      await setup.query(
+        `INSERT INTO inventory_items (id, property_id, name, unit, stock, cost, supplier_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [inventoryItemId, propertyId, 'Race Inventory Item', 'unit', '0', '10.00', supplierId],
+      );
+      await setup.query('COMMIT');
+    } finally {
+      setup.release();
+    }
+
+    const dto = {
+      supplierId,
+      currency: 'PEN',
+      items: [{ inventoryItemId, quantity: 2, unitCost: 10 }],
+    };
+    const idempotencyKey = randomUUID();
+    const racePool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 2 });
+    const clientA = await racePool.connect();
+    const clientB = await racePool.connect();
+
+    try {
+      const serviceFor = (client: PoolClient) => new SuppliersService(drizzle(client, { schema }));
+      const results = await Promise.all([
+        serviceFor(clientA).createPurchaseOrder(propertyId, dto as any, idempotencyKey, accountId),
+        serviceFor(clientB).createPurchaseOrder(propertyId, dto as any, idempotencyKey, accountId),
+      ]);
+
+      expect(results[0]?.id).toBe(results[1]?.id);
+      expect(results[0]?.orderNumber).toBe(results[1]?.orderNumber);
+
+      const conflictingDto = { ...dto, items: [{ inventoryItemId, quantity: 2, unitCost: 11 }] };
+      await expect(serviceFor(clientA).createPurchaseOrder(propertyId, conflictingDto as any, idempotencyKey, accountId))
+        .rejects.toThrow('IDEMPOTENCY_KEY_REUSED');
+
+      const persisted = await pool.query<{ purchase_orders: number; receipts: number }>(
+        `SELECT
+           (SELECT count(*)::integer FROM purchase_orders WHERE property_id = $1) AS purchase_orders,
+           (SELECT count(*)::integer FROM command_receipts WHERE property_id = $1 AND operation = 'suppliers.purchase-order.create' AND idempotency_key = $2) AS receipts`,
+        [propertyId, idempotencyKey],
+      );
+      expect(persisted.rows).toEqual([{ purchase_orders: 1, receipts: 1 }]);
+    } finally {
+      clientA.release();
+      clientB.release();
+      await racePool.end();
+      await pool.query('DELETE FROM command_receipts WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM purchase_orders WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM inventory_items WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM suppliers WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM accounts WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM roles WHERE id = $1', [roleId]);
+      await pool.query('DELETE FROM properties WHERE id = $1', [propertyId]);
+    }
+  });
+
+  it('allocates monotonic order numbers for concurrent distinct commands without reusing deleted numbers', async () => {
+    const suffix = uniqueHex();
+    const propertyId = randomUUID();
+    const roleId = randomUUID();
+    const accountId = randomUUID();
+    const supplierId = randomUUID();
+    const inventoryItemId = randomUUID();
+    const setup = await pool.connect();
+
+    try {
+      await setup.query('BEGIN');
+      await setup.query('INSERT INTO properties (id, code, name) VALUES ($1, $2, $3)', [propertyId, `inv-po-seq-${suffix.slice(0, 21)}`, 'Purchase Order Sequence Property']);
+      await setup.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3)', [roleId, `p0_po_seq_${suffix}`, 'Purchase Order Sequence Role']);
+      await setup.query(
+        'INSERT INTO accounts (id, property_id, role_id, email, password_hash) VALUES ($1, $2, $3, $4, $5)',
+        [accountId, propertyId, roleId, `p0-po-seq-${suffix}@example.invalid`, 'integration-test-only'],
+      );
+      await setup.query(
+        `INSERT INTO suppliers (id, property_id, legal_name, legal_name_normalized, tax_id, tax_id_normalized)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [supplierId, propertyId, 'Sequence Supplier', 'SEQUENCE SUPPLIER', `SEQ-${suffix}`, `SEQ${suffix}`],
+      );
+      await setup.query(
+        `INSERT INTO inventory_items (id, property_id, name, unit, stock, cost, supplier_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [inventoryItemId, propertyId, 'Sequence Inventory Item', 'unit', '0', '10.00', supplierId],
+      );
+      await setup.query('COMMIT');
+    } finally {
+      setup.release();
+    }
+
+    const dto = {
+      supplierId,
+      currency: 'PEN',
+      items: [{ inventoryItemId, quantity: 1, unitCost: 10 }],
+    };
+    const database = drizzle(pool, { schema });
+    const service = new SuppliersService(database as any);
+    const first = await service.createPurchaseOrder(propertyId, dto as any, randomUUID(), accountId);
+    const firstSequence = Number(first.orderNumber.split('-')[2]);
+
+    await pool.query('DELETE FROM command_receipts WHERE property_id = $1 AND operation = $2', [propertyId, 'suppliers.purchase-order.create']);
+    await pool.query('DELETE FROM purchase_orders WHERE id = $1', [first.id]);
+
+    const second = await service.createPurchaseOrder(propertyId, dto as any, randomUUID(), accountId);
+    expect(Number(second.orderNumber.split('-')[2])).toBe(firstSequence + 1);
+
+    const racePool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 2 });
+    const clientA = await racePool.connect();
+    const clientB = await racePool.connect();
+
+    try {
+      const serviceFor = (client: PoolClient) => new SuppliersService(drizzle(client, { schema }));
+      const results = await Promise.all([
+        serviceFor(clientA).createPurchaseOrder(propertyId, dto as any, randomUUID(), accountId),
+        serviceFor(clientB).createPurchaseOrder(propertyId, dto as any, randomUUID(), accountId),
+      ]);
+
+      const sequences = results.map((result) => Number(result.orderNumber.split('-')[2]));
+      expect(new Set(sequences).size).toBe(2);
+      expect(sequences.toSorted()).toEqual([firstSequence + 2, firstSequence + 3]);
+    } finally {
+      clientA.release();
+      clientB.release();
+      await racePool.end();
+      await pool.query('DELETE FROM command_receipts WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM purchase_orders WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM purchase_order_sequences WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM inventory_items WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM suppliers WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM accounts WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM roles WHERE id = $1', [roleId]);
+      await pool.query('DELETE FROM properties WHERE id = $1', [propertyId]);
+    }
+  }, 15_000);
+});
+
+describe('PostgreSQL transaction rollback boundaries', () => {
+  it('rolls back business, audit, and outbox rows after a late failure', async () => {
+    const propertyId = randomUUID();
+    const commandIdempotencyKey = randomUUID();
+    const outboxId = randomUUID();
+    const auditRequestId = `p0-rollback-${uniqueHex()}`;
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query('INSERT INTO properties (id, code, name) VALUES ($1, $2, $3)', [propertyId, `inv-rb-${uniqueHex().slice(0, 25)}`, 'Rollback Boundary Property']);
+      await client.query(
+        `INSERT INTO command_receipts (property_id, operation, idempotency_key, request_fingerprint, response)
+         VALUES ($1, 'rollback.business', $2, $3, '{}'::jsonb)`,
+        [propertyId, commandIdempotencyKey, uniqueHex()],
+      );
+      await client.query(
+        `INSERT INTO audit_events (event_type, request_id, property_id, metadata)
+         VALUES ('rollback.audit', $1, $2, '{}'::jsonb)`,
+        [auditRequestId, propertyId],
+      );
+      await client.query(
+        `INSERT INTO outbox_events (id, property_id, event_type, payload)
+         VALUES ($1, $2, 'rollback.outbox', '{}'::jsonb)`,
+        [outboxId, propertyId],
+      );
+
+      await expect(client.query('SELECT 1 / 0')).rejects.toThrow();
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+
+    const remaining = await pool.query<{ business: number; audit: number; outbox: number; property: number }>(
+      `SELECT
+         (SELECT count(*)::integer FROM command_receipts WHERE property_id = $1 AND idempotency_key = $2) AS business,
+         (SELECT count(*)::integer FROM audit_events WHERE request_id = $3) AS audit,
+         (SELECT count(*)::integer FROM outbox_events WHERE id = $4) AS outbox,
+         (SELECT count(*)::integer FROM properties WHERE id = $1) AS property`,
+      [propertyId, commandIdempotencyKey, auditRequestId, outboxId],
+    );
+    expect(remaining.rows).toEqual([{ business: 0, audit: 0, outbox: 0, property: 0 }]);
+  });
+});
+
+describe('PostgreSQL event command races', () => {
+  it('replays one event response for concurrent identical commands', async () => {
+    const suffix = uniqueHex();
+    const propertyId = randomUUID();
+    const roleId = randomUUID();
+    const accountId = randomUUID();
+    const guestId = randomUUID();
+    const spaceId = randomUUID();
+    const setup = await pool.connect();
+
+    try {
+      await setup.query('BEGIN');
+      await setup.query('INSERT INTO properties (id, code, name) VALUES ($1, $2, $3)', [propertyId, `inv-ev-${suffix.slice(0, 25)}`, 'Event Race Property']);
+      await setup.query('INSERT INTO roles (id, key, name) VALUES ($1, $2, $3)', [roleId, `p0_ev_${suffix}`, 'Event Race Role']);
+      await setup.query(
+        'INSERT INTO accounts (id, property_id, role_id, email, password_hash) VALUES ($1, $2, $3, $4, $5)',
+        [accountId, propertyId, roleId, `p0-event-${suffix}@example.invalid`, 'integration-test-only'],
+      );
+      await setup.query(
+        'INSERT INTO guests (id, property_id, first_name, last_name) VALUES ($1, $2, $3, $4)',
+        [guestId, propertyId, 'Event', 'Race'],
+      );
+      await setup.query(
+        `INSERT INTO event_spaces (id, property_id, code, name, capacity, minimum_duration_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [spaceId, propertyId, `RACE-${suffix.slice(0, 20)}`, 'Event Race Space', 20, 60],
+      );
+      await setup.query('COMMIT');
+    } finally {
+      setup.release();
+    }
+
+    const idempotencyKey = randomUUID();
+    const dto = {
+      spaceId,
+      guestId,
+      title: 'Concurrent Event',
+      timeKind: 'time_bound',
+      startsAt: '2037-02-10T10:00:00.000Z',
+      endsAt: '2037-02-10T12:00:00.000Z',
+      eventStartsAt: '2037-02-10T10:00:00.000Z',
+      eventEndsAt: '2037-02-10T12:00:00.000Z',
+      timezone: 'UTC',
+       attendees: 5,
+       services: [],
+    };
+    const racePool = new Pool({ connectionString: databaseUrlFromEnv(env), max: 2 });
+    const clientA = await racePool.connect();
+    const clientB = await racePool.connect();
+
+    try {
+      const serviceFor = (client: PoolClient) => new EventsService(
+        drizzle(client, { schema }) as any,
+        { record: async () => undefined } as any,
+        {} as any,
+        {} as any,
+      );
+      const results = await Promise.all([
+        serviceFor(clientA).createEvent(propertyId, accountId, dto, idempotencyKey),
+        serviceFor(clientB).createEvent(propertyId, accountId, dto, idempotencyKey),
+      ]);
+
+      expect(results[0]?.id).toBe(results[1]?.id);
+
+      const conflictingDto = { ...dto, title: 'Changed Concurrent Event' };
+      await expect(serviceFor(clientA).createEvent(propertyId, accountId, conflictingDto, idempotencyKey))
+        .rejects.toThrow('IDEMPOTENCY_KEY_REUSED');
+
+      const persisted = await pool.query<{ events: number; commands: number }>(
+        `SELECT
+           (SELECT count(*)::integer FROM events WHERE property_id = $1) AS events,
+           (SELECT count(*)::integer FROM event_commands WHERE property_id = $1 AND idempotency_key = $2) AS commands`,
+        [propertyId, idempotencyKey],
+      );
+      expect(persisted.rows).toEqual([{ events: 1, commands: 1 }]);
+    } finally {
+      clientA.release();
+      clientB.release();
+      await racePool.end();
+      await pool.query('DELETE FROM event_commands WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM events WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM event_spaces WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM guests WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM accounts WHERE property_id = $1', [propertyId]);
+      await pool.query('DELETE FROM roles WHERE id = $1', [roleId]);
+      await pool.query('DELETE FROM properties WHERE id = $1', [propertyId]);
+    }
+  }, 15_000);
+});
+
 describe('PostgreSQL financial folio invariants', () => {
   it('posts one real UUID ancillary entry for a deterministic parking-exit replay', async () => {
     await inRolledBackTransaction(async (client) => {
@@ -884,5 +1325,5 @@ describe('PostgreSQL financial folio invariants', () => {
       await pool.query('DELETE FROM room_categories WHERE id = $1', [fixture.categoryId]);
       await pool.query('DELETE FROM properties WHERE id = $1', [fixture.propertyId]);
     }
-  });
+  }, 15_000);
 });

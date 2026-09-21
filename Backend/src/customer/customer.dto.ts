@@ -27,6 +27,7 @@ export const parseFirebaseExchangeDto = (input: unknown) => parseZodHttp(firebas
 export const parseCustomerAvailabilityQuery = (input: unknown) => parseZodHttp(customerAvailabilitySchema, input, 'Invalid availability query');
 export const parseCustomerBookingDto = (input: unknown) => parseZodHttp(customerBookingSchema, input);
 export const parseCustomerReservationId = (input: unknown) => parseZodHttp(z.string().uuid(), input, 'Invalid reservation ID');
+export const parseCustomerEventSpaceId = (input: unknown) => parseZodHttp(z.string().uuid(), input, 'Invalid event space ID');
 export const parseCustomerIdempotencyKey = (input: unknown) => parseZodHttp(z.string().uuid(), input, 'Invalid Idempotency-Key');
 
 const deliveryModes = ['Room', 'Terraza', 'Recojo', 'Piscina', 'Mirador'] as const;

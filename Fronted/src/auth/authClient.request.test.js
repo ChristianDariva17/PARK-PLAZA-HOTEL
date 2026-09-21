@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuthRequestError, authRequest, createIdempotencyKey } from './authClient.js';
+import { AuthRequestError, authRequest, createIdempotencyKey, subscribeRequestTelemetry } from './authClient.js';
 
 const jsonResponse = (status, payload) => ({
   ok: status >= 200 && status < 300,
@@ -27,6 +27,28 @@ describe('authRequest retry and correlation contract', () => {
       name: 'AuthRequestError', status: 503, code: 'upstream_unavailable', requestId: 'req-123', retryable: false, ambiguous: true, reloadRecommended: true,
     });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps telemetry safe and isolated from request failures', async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse(403, { code: 'forbidden', requestId: 'req-123', message: 'denied' }));
+    const events = [];
+    vi.stubGlobal('fetch', fetch);
+    const unsubscribe = subscribeRequestTelemetry((event) => {
+      events.push(event);
+      throw new Error('telemetry sink unavailable');
+    });
+
+    await expect(authRequest('/api/customers/guest-1?email=guest@example.com')).rejects.toMatchObject({ status: 403 });
+    unsubscribe();
+
+    expect(events).toEqual([{
+      method: 'GET',
+      path: '/api/customers',
+      status: 403,
+      code: 'forbidden',
+      requestId: 'req-123',
+      attempt: 0,
+    }]);
   });
 
   it('keeps the legacy status constructor form for domain clients', () => {

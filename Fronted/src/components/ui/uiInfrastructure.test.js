@@ -6,6 +6,7 @@ const overlaySource = readSource('Overlay.jsx');
 const collectionTableSource = readSource('CollectionTable.jsx');
 const permissionButtonSource = readSource('../auth/PermissionButton.jsx');
 const actionFeedbackSource = readSource('actionFeedback.js');
+const p1AtomsSource = readSource('P1Atoms.jsx');
 const sharedPartsSource = readSource('../views/SharedViewParts.jsx');
 
 describe('UI infrastructure contracts', () => {
@@ -14,7 +15,8 @@ describe('UI infrastructure contracts', () => {
     expect(overlaySource).toContain('aria-modal="true"');
     expect(overlaySource).toContain('aria-labelledby={titleId}');
     expect(overlaySource).toContain('previousFocus.current?.focus?.()');
-    expect(overlaySource).toContain("if (event.key === 'Escape') onCloseRef.current()");
+    expect(overlaySource).toContain("if (event.key === 'Escape') {");
+    expect(overlaySource).toContain('event.preventDefault();');
   });
 
   it('supports keyboard navigation and active panel linkage for tabs', () => {
@@ -62,5 +64,32 @@ describe('UI infrastructure contracts', () => {
     expect(actionFeedbackSource).toContain("success.type || 'success'");
     expect(sharedPartsSource).toContain('permissionForAction');
     expect(sharedPartsSource).toContain('permissionForPrimaryAction');
+  });
+
+  it('exposes the complete phase 4 state and action primitive contract', () => {
+    expect(p1AtomsSource).toContain('export function AsyncButton');
+    expect(p1AtomsSource).toContain('aria-busy={pending}');
+    expect(sharedPartsSource).toContain('export function PageShell');
+    expect(sharedPartsSource).toContain('export function EmptyState');
+    expect(sharedPartsSource).toContain('export function ErrorState');
+    expect(sharedPartsSource).toContain('export function ResourceState');
+    expect(sharedPartsSource).toContain('export function ConfirmAction');
+    expect(sharedPartsSource).toContain('export function DataTable');
+  });
+
+  it('retries a failed route locally instead of reloading the whole application', () => {
+    const routeBoundarySource = readFileSync(new URL('../routing/RouteErrorBoundary.jsx', import.meta.url), 'utf8');
+    expect(routeBoundarySource).toContain('this.setState({ error: null })');
+    expect(routeBoundarySource).toContain('this.props.onRetry?.()');
+    expect(routeBoundarySource).toContain('>Reintentar módulo</button>');
+    expect(routeBoundarySource).not.toContain('window.location.reload()');
+  });
+
+  it('refreshes event collections locally after mutations', () => {
+    const eventsRootSource = readFileSync(new URL('../../events/EventsModuleRoot.jsx', import.meta.url), 'utf8');
+    expect(eventsRootSource).toContain('const [refreshVersion, setRefreshVersion] = useState(0);');
+    expect(eventsRootSource).toContain('key={`calendar-${refreshVersion}`}');
+    expect(eventsRootSource).toContain('key={`list-${refreshVersion}`}');
+    expect(eventsRootSource).not.toContain('window.location.reload()');
   });
 });

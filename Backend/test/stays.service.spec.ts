@@ -4,7 +4,6 @@ import type { AuditService } from '../src/audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../src/auth/auth.types.js';
 import type { Database } from '../src/database/database.module.js';
 import type { FolioService } from '../src/folios/folio.service.js';
-import type { RealtimeGateway } from '../src/realtime/realtime.gateway.js';
 import { StaysService, type StayCommandResponse } from '../src/stays/stays.service.js';
 
 const actor = {
@@ -60,8 +59,8 @@ function lifecycleService(selections: unknown[][], insertReturns: unknown[] = []
   const database = { transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) } as unknown as Database;
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const foliosService = { read: vi.fn().mockResolvedValue({ balance: '0.00', settlement: 'open' }) };
-  const realtime = { emitToProperty: vi.fn() };
-  return { service: new StaysService(database, audit as unknown as AuditService, foliosService as unknown as FolioService, realtime as unknown as RealtimeGateway), tx, audit, foliosService, insertedValues, updateValues };
+  const outbox = { enqueue: vi.fn().mockResolvedValue(undefined) };
+  return { service: new StaysService(database, audit as unknown as AuditService, foliosService as unknown as FolioService, outbox as any), tx, audit, foliosService, outbox, insertedValues, updateValues };
 }
 
 describe('StaysService lifecycle', () => {
@@ -83,6 +82,8 @@ describe('StaysService lifecycle', () => {
     expect(setup.tx.execute).toHaveBeenCalledTimes(1);
     expect(setup.updateValues).toEqual(expect.arrayContaining([{ status: 'occupied' }, expect.objectContaining({ status: 'checked_in' })]));
     expect(setup.audit.record).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'stay.checked_in', subjectId: 'stay-id' }), setup.tx);
+    expect(setup.outbox.enqueue).toHaveBeenNthCalledWith(1, setup.tx, expect.objectContaining({ eventType: 'room:status_changed', propertyId: actor.propertyId }));
+    expect(setup.outbox.enqueue).toHaveBeenNthCalledWith(2, setup.tx, expect.objectContaining({ eventType: 'stay:status_changed', aggregateId: 'stay-id' }));
   });
 
   it('rejects a check-in into a cleaning room without creating lifecycle records', async () => {
@@ -109,7 +110,7 @@ describe('StaysService lifecycle', () => {
     const database = {
       transaction: vi.fn().mockRejectedValue({ code: '23505', constraint: 'stays_one_active_per_reservation_idx' }),
     } as unknown as Database;
-    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService, { read: vi.fn() } as unknown as FolioService, { emitToProperty: vi.fn() } as unknown as RealtimeGateway);
+    const service = new StaysService(database, { record: vi.fn() } as unknown as AuditService, { read: vi.fn() } as unknown as FolioService, { enqueue: vi.fn().mockResolvedValue(undefined) } as any);
 
     await expect(service.checkIn(actor, reservation.id, {}, 'key', context)).rejects.toBeInstanceOf(ConflictException);
   });

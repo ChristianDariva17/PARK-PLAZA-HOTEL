@@ -80,6 +80,76 @@ describe('hotelReducer persistent operational boundary', () => {
   });
 });
 
+describe('hotelReducer cleaning events', () => {
+  const task = { id: 'task-1', roomId: 'room-1', status: 'Completada' };
+  const state = {
+    cleaningTasks: [task],
+    rooms: [{ id: 'room-1', status: 'En limpieza' }],
+    cleaningRequest: { status: 'idle', error: null },
+    cleaningCommandRequest: { status: 'idle', error: null, retryBlocked: false },
+  };
+
+  it('preserves known tasks during a failed refresh and updates the room from a command response', () => {
+    const loading = hotelReducer(state, { type: 'CLEANING_LOAD_STARTED' });
+    const failed = hotelReducer(loading, { type: 'CLEANING_LOAD_FAILED', error: 'Sin conexión' });
+    const committed = hotelReducer(failed, {
+      type: 'CLEANING_COMMAND_COMMITTED',
+      task: { ...task, status: 'Aprobada' },
+      room: { id: 'room-1', status: 'Disponible' },
+    });
+
+    expect(failed.cleaningTasks).toBe(state.cleaningTasks);
+    expect(failed.cleaningRequest).toEqual({ status: 'error', error: 'Sin conexión' });
+    expect(committed.cleaningTasks[0].status).toBe('Aprobada');
+    expect(committed.rooms[0].status).toBe('Disponible');
+  });
+
+  it('marks ambiguous commands as reconciling and blocks blind retry until recovery', () => {
+    const reconciling = hotelReducer(state, { type: 'CLEANING_COMMAND_RECONCILING', error: 'Actualización requerida' });
+    const failed = hotelReducer(reconciling, { type: 'CLEANING_COMMAND_FAILED', error: 'No se pudo actualizar', retryBlocked: true });
+
+    expect(reconciling.cleaningCommandRequest).toEqual({ status: 'reconciling', error: 'Actualización requerida', retryBlocked: true });
+    expect(failed.cleaningCommandRequest).toEqual({ status: 'error', error: 'No se pudo actualizar', retryBlocked: true });
+  });
+});
+
+describe('hotelReducer maintenance events', () => {
+  const ticket = { id: 'ticket-1', roomId: 'room-1', status: 'Pendiente', blocksRoom: true };
+  const state = {
+    maintenanceTickets: [ticket],
+    incidents: [],
+    rooms: [{ id: 'room-1', status: 'En mantenimiento' }],
+    maintenanceRequest: { status: 'idle', error: null },
+    maintenanceCommandRequest: { status: 'idle', error: null, retryBlocked: false },
+  };
+
+  it('preserves tickets on refresh errors and commits the authoritative ticket, incident, and room', () => {
+    const loading = hotelReducer(state, { type: 'MAINTENANCE_LOAD_STARTED' });
+    const failed = hotelReducer(loading, { type: 'MAINTENANCE_LOAD_FAILED', error: 'Sin conexión' });
+    const committed = hotelReducer(failed, {
+      type: 'MAINTENANCE_COMMAND_COMMITTED',
+      ticket: { ...ticket, status: 'Cerrado', blocksRoom: false },
+      incident: { id: 'ticket-1', type: 'Mantenimiento', status: 'Cerrada' },
+      room: { id: 'room-1', status: 'Disponible' },
+    });
+
+    expect(failed.maintenanceTickets).toBe(state.maintenanceTickets);
+    expect(failed.maintenanceRequest).toEqual({ status: 'error', error: 'Sin conexión' });
+    expect(committed.maintenanceTickets[0].status).toBe('Cerrado');
+    expect(committed.incidents[0].status).toBe('Cerrada');
+    expect(committed.rooms[0].status).toBe('Disponible');
+    expect(committed.maintenanceCommandRequest).toEqual({ status: 'success', error: null, retryBlocked: false });
+  });
+
+  it('blocks blind retry while an ambiguous mutation is being reconciled', () => {
+    const reconciling = hotelReducer(state, { type: 'MAINTENANCE_COMMAND_RECONCILING', error: 'Actualización requerida' });
+    const failed = hotelReducer(reconciling, { type: 'MAINTENANCE_COMMAND_FAILED', error: 'No se pudo actualizar', retryBlocked: true });
+
+    expect(reconciling.maintenanceCommandRequest).toEqual({ status: 'reconciling', error: 'Actualización requerida', retryBlocked: true });
+    expect(failed.maintenanceCommandRequest).toEqual({ status: 'error', error: 'No se pudo actualizar', retryBlocked: true });
+  });
+});
+
 describe('hotelReducer restaurant events', () => {
   const seededOrder = { id: 'seeded-order', status: 'draft' };
   const adaptedOrder = { id: 'B04502DD', status: 'confirmed' };
@@ -164,6 +234,69 @@ describe('hotelReducer restaurant events', () => {
     expect(inventoryUpdated.inventory).toEqual([secondInventoryItem, { ...firstInventoryItem, name: 'Cherry tomatoes' }]);
     expect(inventoryUpdated.inventory).not.toBe(inventoryCreated.inventory);
     expect(inventoryUpdated.inventory[0]).toBe(secondInventoryItem);
+  });
+
+  it('tracks managed menu mutations and import preview lifecycle', () => {
+    const state = { ...restaurantInitial, managedMenu: [], menuPendingMutations: [], menuImportRequest: { status: 'idle', preview: null, contentHash: null, error: null } };
+    const item = { id: 'menu-1', name: 'Coffee' };
+    const pending = hotelReducer(state, { type: 'MENU_MUTATION_STARTED', itemId: item.id });
+    const committed = hotelReducer(pending, { type: 'MENU_ITEM_COMMITTED', item });
+    const ready = hotelReducer(committed, { type: 'MENU_MUTATION_DONE', itemId: item.id });
+    const previewing = hotelReducer(ready, { type: 'MENU_IMPORT_PREVIEW_STARTED' });
+    const previewed = hotelReducer(previewing, { type: 'MENU_IMPORT_PREVIEW_DONE', result: { runId: 'run-1' }, contentHash: 'hash-1' });
+    const applying = hotelReducer(previewed, { type: 'MENU_IMPORT_APPLY_STARTED' });
+    const applied = hotelReducer(applying, { type: 'MENU_IMPORT_APPLY_DONE', result: { runId: 'run-2' } });
+
+    expect(pending.menuPendingMutations).toEqual(['menu-1']);
+    expect(committed.managedMenu).toEqual([item]);
+    expect(ready.menuPendingMutations).toEqual([]);
+    expect(previewed.menuImportRequest).toMatchObject({ status: 'previewed', contentHash: 'hash-1' });
+    expect(applying.menuImportRequest.status).toBe('applying');
+    expect(applied.menuImportRequest).toMatchObject({ status: 'applied', contentHash: null });
+  });
+
+  it('tracks shared resource states through refresh, empty, offline and forbidden outcomes', () => {
+    const resourceState = {
+      restaurantResources: {
+        orders: { status: 'idle', permission: 'orders.read', generation: 0, error: null, errorDetails: null, updatedAt: null },
+      },
+      orders: [],
+    };
+    const loading = hotelReducer(resourceState, { type: 'RESOURCE_LOAD_STARTED', resourceKey: 'orders', generation: 1 });
+    const loaded = hotelReducer(loading, {
+      type: 'RESOURCE_LOAD_SUCCEEDED',
+      resourceKey: 'orders',
+      domainKey: 'orders',
+      generation: 1,
+      data: [{ id: 'order-1' }],
+      identityKey: 'account:property',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    });
+    const refreshing = hotelReducer(loaded, { type: 'RESOURCE_LOAD_STARTED', resourceKey: 'orders', generation: 2 });
+    const empty = hotelReducer(refreshing, {
+      type: 'RESOURCE_LOAD_SUCCEEDED',
+      resourceKey: 'orders',
+      domainKey: 'orders',
+      generation: 2,
+      data: [],
+      identityKey: 'account:property',
+      updatedAt: '2026-09-15T00:01:00.000Z',
+    });
+    const offline = hotelReducer(empty, {
+      type: 'RESOURCE_LOAD_FAILED',
+      resourceKey: 'orders',
+      generation: 3,
+      error: 'No se pudo conectar.',
+      errorDetails: { type: 'network', status: null, code: 'transport' },
+    });
+    const forbidden = hotelReducer(offline, { type: 'RESOURCE_ACCESS_FORBIDDEN', resourceKey: 'orders', generation: 4 });
+
+    expect(loading.restaurantResources.orders.status).toBe('loading');
+    expect(loaded.restaurantResources.orders.status).toBe('success');
+    expect(refreshing.restaurantResources.orders.status).toBe('refreshing');
+    expect(empty.restaurantResources.orders.status).toBe('empty');
+    expect(offline.restaurantResources.orders).toMatchObject({ status: 'offline', error: 'No se pudo conectar.', errorDetails: { type: 'network' } });
+    expect(forbidden.restaurantResources.orders).toMatchObject({ status: 'forbidden', error: null, errorDetails: null });
   });
 });
 

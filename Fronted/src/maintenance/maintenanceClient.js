@@ -9,6 +9,11 @@ export class MaintenanceRequestError extends Error {
   }
 }
 
+export const createMaintenanceCancellationError = () =>
+  new MaintenanceRequestError(
+    'La operación fue reemplazada porque los datos de mantenimiento cambiaron. Actualice la información antes de reintentar.',
+  );
+
 function normalize(error) {
   if (!(error instanceof AuthRequestError))
     return new MaintenanceRequestError('No se pudo confirmar la operacion. Actualice antes de reintentar.', null, true);
@@ -24,6 +29,7 @@ async function request(url, options) {
   try {
     return await authRequest(url, options);
   } catch (error) {
+    if (options?.signal?.aborted) throw createMaintenanceCancellationError();
     throw normalize(error);
   }
 }

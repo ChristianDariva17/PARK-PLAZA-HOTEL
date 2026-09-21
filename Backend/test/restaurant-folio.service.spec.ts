@@ -26,7 +26,7 @@ function setup(selections: unknown[][]) {
   };
   const db = { transaction: vi.fn((run: (transaction: typeof tx) => unknown) => run(tx)) } as unknown as Database;
   const folios = { postRestaurantCharge: vi.fn(), reverseRestaurantCharge: vi.fn() } as unknown as FolioService;
-  return { service: new RestaurantService(db, folios, { emitToProperty: vi.fn(), emitToStay: vi.fn() } as any), folios, updates };
+  return { service: new RestaurantService(db, folios, { enqueue: vi.fn().mockResolvedValue(undefined) } as any), folios, updates };
 }
 
 describe('Restaurant folio posting behavior', () => {

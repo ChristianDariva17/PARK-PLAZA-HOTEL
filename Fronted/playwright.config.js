@@ -1,6 +1,25 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
+
+if (existsSync('.env.e2e.local')) {
+  delete process.env.E2E_EMAIL;
+  delete process.env.E2E_PASSWORD;
+}
+
+try {
+  loadEnvFile('.env.e2e.local');
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
 
 const hasQaCredentials = Boolean(process.env.E2E_EMAIL && process.env.E2E_PASSWORD);
+const e2eApiPort = process.env.E2E_API_PORT || '3000';
+const e2eApiUrl = `http://127.0.0.1:${e2eApiPort}`;
+if (process.env.E2E_API_PORT) {
+  process.env.API_PORT = e2eApiPort;
+  process.env.VITE_API_PROXY_TARGET = e2eApiUrl;
+}
 
 const projects = [
   {
@@ -21,6 +40,7 @@ if (hasQaCredentials) {
         storageState: 'playwright/.auth/admin.json',
       },
       dependencies: ['auth-setup'],
+      workers: 1,
     },
   );
 }
@@ -48,15 +68,15 @@ export default defineConfig({
       command: 'npm run dev -- --host 127.0.0.1',
       cwd: '.',
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !process.env.CI || process.env.E2E_REUSE_EXISTING_SERVER === 'true',
       timeout: 120000,
     },
     {
       name: 'backend',
       command: 'npm run start:dev',
       cwd: '../Backend',
-      url: 'http://127.0.0.1:3000/api/auth/session',
-      reuseExistingServer: !process.env.CI,
+      url: `${e2eApiUrl}/api/auth/session`,
+      reuseExistingServer: !process.env.CI || process.env.E2E_REUSE_EXISTING_SERVER === 'true',
       timeout: 120000,
     },
   ],

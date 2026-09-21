@@ -4,7 +4,8 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { z } from 'zod';
-import { databaseUrlFromEnv, validateEnv } from '../config/environment.js';
+import { validateEnv } from '../config/environment.js';
+import { postgresPoolOptions } from './connection-options.js';
 import { properties, roomCategories, rooms } from './schema/index.js';
 import { acquirePropertyTransactionLock } from './transaction-policy.js';
 
@@ -59,7 +60,7 @@ export async function provisionRoomInventory(propertyCode: string): Promise<void
   const code = propertyCodeSchema.parse(propertyCode);
   await import('dotenv/config');
   const env = validateEnv(process.env);
-  const pool = new Pool({ connectionString: databaseUrlFromEnv(env), ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false, max: 1 });
+  const pool = new Pool(postgresPoolOptions(env, { max: 1 }));
   const database = drizzle(pool, { schema: { properties, roomCategories, rooms } });
   try {
     await database.transaction(async (tx) => {

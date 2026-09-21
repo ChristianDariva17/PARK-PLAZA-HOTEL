@@ -24,7 +24,7 @@ function setup(selections: unknown[][]) {
   };
   const database = { transaction: vi.fn((run: (transaction: typeof tx) => unknown) => run(tx)) } as unknown as Database;
   const audit = { record: vi.fn() } as unknown as AuditService;
-  return { service: new RestaurantService(database, {} as FolioService, { emitToProperty: vi.fn(), emitToStay: vi.fn() } as any), tx };
+  return { service: new RestaurantService(database, {} as FolioService, { enqueue: vi.fn().mockResolvedValue(undefined) } as any), tx };
 }
 
 describe('Restaurant property reference enforcement', () => {

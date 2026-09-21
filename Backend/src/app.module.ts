@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv } from './config/environment.js';
+import type { Environment } from './config/environment.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthController } from './health/health.controller.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -32,11 +33,28 @@ import { CommunicationsModule } from './communications/communications.module.js'
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { ExperiencesModule } from './experiences/experiences.module.js';
+import { InfrastructureModule } from './infrastructure/infrastructure.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
+import { RedisThrottlerStorage } from './infrastructure/redis-throttler.storage.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    InfrastructureModule,
+    ObservabilityModule,
+    ThrottlerModule.forRootAsync({
+      imports: [InfrastructureModule],
+      inject: [ConfigService, RedisThrottlerStorage],
+      useFactory: (
+        config: ConfigService<Environment, true>,
+        storage: RedisThrottlerStorage,
+      ) => {
+        const throttlers = [{ ttl: 60_000, limit: 120 }];
+        return config.get('API_REPLICA_MODE', { infer: true }) === 'shared'
+          ? { throttlers, storage }
+          : throttlers;
+      },
+    }),
     DatabaseModule,
     RealtimeModule,
     AuditModule,

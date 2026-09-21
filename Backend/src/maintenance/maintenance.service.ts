@@ -20,6 +20,7 @@ export interface MaintenanceTicketResponse {
   status: string;
   blocksRoom: boolean;
   evidence: string[];
+  evidenceCount?: number;
   solution: string;
   createdAt: string;
   updatedAt: string;
@@ -55,7 +56,7 @@ export class MaintenanceService {
       .leftJoin(rooms, and(eq(incidents.roomId, rooms.id), eq(incidents.propertyId, rooms.propertyId)))
       .where(and(eq(incidents.propertyId, propertyId), eq(incidents.type, 'maintenance')))
       .orderBy(incidents.createdAt);
-    return rows.map((row) => this.format(row.ticket, row.roomId ? { id: row.roomId, number: row.roomNumber!, status: row.roomStatus! } : null));
+    return rows.map((row) => this.formatList(row.ticket, row.roomId ? { id: row.roomId, number: row.roomNumber!, status: row.roomStatus! } : null));
   }
 
   async create(
@@ -305,6 +306,11 @@ export class MaintenanceService {
       createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
     };
+  }
+
+  private formatList(row: any, room: MaintenanceTicketResponse['room'] = null): MaintenanceTicketResponse {
+    const response = this.format(row, room);
+    return { ...response, evidence: [], evidenceCount: response.evidence.length };
   }
 
   private auditBase(actor: AuthenticatedAccount, context: RequestContext) {

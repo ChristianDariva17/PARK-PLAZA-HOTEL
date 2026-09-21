@@ -26,7 +26,7 @@ import type { AuthenticatedCustomer } from '../customer/customer.types.js';
 import type { CustomerCancelOrderDto, CustomerCreateOrderDto } from '../customer/customer.dto.js';
 
 import { FolioService } from '../folios/folio.service.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { OutboxService } from '../audit/outbox.service.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 
 import type {
@@ -39,71 +39,24 @@ import type {
   CreateMenuItemDto,
   CreateOrderDto,
 } from './restaurant.dto.js';
+import { determineStation, planOrderAdvance, planOrderPricing } from './order-domain.js';
+import {
+  calculateInventoryRequirements,
+  convertIngredientToInventoryUnit,
+  planInventoryConsumption,
+  planInventoryRelease,
+  planInventoryReservation,
+  type InventoryRequirement,
+} from './inventory-domain.js';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
-
-const ORDER_FLOW = [
-  'Pedido recibido',
-  'Confirmado',
-  'En preparacion',
-  'Listo',
-  'Entregado',
-  'Pagado',
-] as const;
-
-export function determineStation(category?: string | null): 'bar' | 'coffee' | 'kitchen' {
-  if (!category) return 'kitchen';
-  const c = category.toLowerCase().trim();
-  if (c.includes('bar') || c.includes('tiki') || c.includes('autor') || c.includes('cerveza') || c.includes('gaseosa') || c.includes('bebida') || c.includes('refresco')) {
-    return 'bar';
-  }
-  if (c.includes('café') || c.includes('cafe') || c.includes('infusion') || c.includes('frappe')) {
-    return 'coffee';
-  }
-  return 'kitchen';
-}
-
-export function convertIngredientToInventoryUnit(qty: number, recipeUnit?: string | null, inventoryUnit?: string | null): number {
-  if (!recipeUnit || !inventoryUnit) return qty;
-  const rUnit = recipeUnit.toLowerCase().trim();
-  const iUnit = inventoryUnit.toLowerCase().trim();
-  if (rUnit === iUnit) return qty;
-
-  // Bar conversion: oz to bottle / liter / ml
-  if (rUnit === 'oz' || rUnit === 'onza' || rUnit === 'onzas') {
-    if (iUnit.includes('750')) return qty / 25.3605;
-    if (iUnit.includes('1000') || iUnit.includes('litro') || iUnit === 'l' || iUnit === 'lt') return qty / 33.814;
-    if (iUnit === 'ml' || iUnit.includes('mili')) return qty * 29.5735;
-    if (iUnit.includes('botella')) return qty / 25.3605;
-  }
-
-  // Bar conversion: dash to bottle / ml
-  if (rUnit === 'dash' || rUnit === 'gotas' || rUnit === 'golpe') {
-    if (iUnit.includes('botella') || iUnit.includes('frasco')) return qty / 200;
-    if (iUnit === 'ml') return qty * 0.92;
-    if (iUnit === 'oz') return qty / 32;
-  }
-
-  // Kitchen conversion: g to kg
-  if ((rUnit === 'g' || rUnit === 'gr' || rUnit === 'gramos') && (iUnit === 'kg' || iUnit === 'kilo' || iUnit === 'kilos')) {
-    return qty / 1000;
-  }
-  if ((rUnit === 'kg' || rUnit === 'kilo' || rUnit === 'kilos') && (iUnit === 'g' || iUnit === 'gr' || iUnit === 'gramos')) {
-    return qty * 1000;
-  }
-  if (rUnit === 'ml' && (iUnit === 'l' || iUnit === 'lt' || iUnit === 'litro' || iUnit === 'litros')) {
-    return qty / 1000;
-  }
-
-  return qty;
-}
 
 @Injectable()
 export class RestaurantService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly folios: FolioService,
-    private readonly realtime: RealtimeGateway,
+    private readonly outbox: OutboxService,
   ) {}
 
   // ─── Menu ────────────────────────────────────────────────────────────────────
@@ -297,7 +250,9 @@ export class RestaurantService {
 
   async adjustInventory(actor: AuthenticatedAccount, itemId: string, dto: AdjustInventoryDto, _ctx: unknown) {
     return this.db.transaction(async (tx) => {
-      const [item] = await tx.select().from(inventoryItems).where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.propertyId, actor.propertyId)));
+      const [item] = await tx.select().from(inventoryItems)
+        .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.propertyId, actor.propertyId)))
+        .for('update', { of: inventoryItems });
       if (!item) throw new NotFoundException('Insumo no encontrado.');
       const newStock = Math.max(0, Number(item.stock) + dto.quantity);
       const [updated] = await tx.update(inventoryItems).set({ stock: String(newStock.toFixed(4)), updatedAt: new Date() }).where(eq(inventoryItems.id, itemId)).returning();
@@ -335,108 +290,130 @@ export class RestaurantService {
     return ordersList.map((order) => ({ ...order, items: allItems.filter((i) => i.orderId === order.id) }));
   }
 
-  private async reserveOrderInventory(tx: Transaction, actor: AuthenticatedAccount, orderId: string, lines: Array<typeof orderItems.$inferSelect>) {
-    const allIngredients = lines.length
-      ? await tx.select().from(menuItemIngredients).where(inArray(menuItemIngredients.menuItemId, lines.map((l) => l.menuItemId)))
+  private async loadOrderInventory(tx: Transaction, propertyId: string, lines: Array<typeof orderItems.$inferSelect>) {
+    const menuItemIds = [...new Set(lines.map((line) => line.menuItemId))];
+    if (!menuItemIds.length) {
+      return { inventoryById: new Map<string, typeof inventoryItems.$inferSelect>(), requirements: [] as InventoryRequirement[] };
+    }
+
+    const allIngredients = await tx.select().from(menuItemIngredients).where(and(
+      eq(menuItemIngredients.propertyId, propertyId),
+      inArray(menuItemIngredients.menuItemId, menuItemIds),
+    ));
+    const inventoryItemIds = [...new Set(allIngredients.map((ingredient) => ingredient.inventoryItemId))];
+    const inventoryRows = inventoryItemIds.length
+      ? await tx.select().from(inventoryItems)
+        .where(and(eq(inventoryItems.propertyId, propertyId), inArray(inventoryItems.id, inventoryItemIds)))
+        .orderBy(inventoryItems.id)
+        .for('update', { of: inventoryItems })
       : [];
-    for (const line of lines) {
-      const ings = allIngredients.filter((i) => i.menuItemId === line.menuItemId);
-      for (const ing of ings) {
-        const [invItem] = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, ing.inventoryItemId));
-        if (!invItem) continue;
-        const convertedPerPortion = convertIngredientToInventoryUnit(Number(ing.quantity), ing.unit, invItem.unit);
-        const needed = convertedPerPortion * line.quantity;
-        const available = Number(invItem.stock) - Number(invItem.reserved);
-        if (available < needed) {
-          throw new BadRequestException(`Stock insuficiente para: ${invItem.name}. Disponible: ${available.toFixed(2)} ${invItem.unit}, necesario: ${needed.toFixed(2)} ${invItem.unit}`);
-        }
-        await tx.update(inventoryItems).set({ reserved: String((Number(invItem.reserved) + needed).toFixed(4)) }).where(eq(inventoryItems.id, ing.inventoryItemId));
-        await tx.insert(inventoryLedger).values({
-          propertyId: actor.propertyId,
-          inventoryItemId: ing.inventoryItemId,
-          type: 'Reserva',
-          quantity: String((-needed).toFixed(4)),
-          referenceId: orderId,
-          note: `Reserva por comanda ${orderId}`,
-          responsible: actor.email,
-        });
+    const inventoryById = new Map(inventoryRows.map((item) => [item.id, item]));
+    const requirements = calculateInventoryRequirements(lines, allIngredients, inventoryRows);
+
+    return { inventoryById, requirements };
+  }
+
+  private async reserveOrderInventory(tx: Transaction, actor: AuthenticatedAccount, orderId: string, lines: Array<typeof orderItems.$inferSelect>) {
+    const { inventoryById, requirements } = await this.loadOrderInventory(tx, actor.propertyId, lines);
+    const plans = [];
+    for (const { inventoryItemId, quantity } of requirements) {
+      const inventoryItem = inventoryById.get(inventoryItemId);
+      if (!inventoryItem) continue;
+      const result = planInventoryReservation(inventoryItem, quantity, orderId);
+      if (!result.ok) {
+        throw new BadRequestException(`Stock insuficiente para: ${result.failure.itemName}. Disponible: ${result.failure.available.toFixed(2)} ${result.failure.unit}, necesario: ${result.failure.required.toFixed(2)} ${result.failure.unit}`);
       }
+      plans.push({ inventoryItemId, plan: result.plan });
+    }
+
+    const ledgerRows = [];
+    for (const { inventoryItemId, plan } of plans) {
+      const inventoryItem = inventoryById.get(inventoryItemId);
+      if (!inventoryItem) continue;
+      await tx.update(inventoryItems).set(plan.update).where(and(eq(inventoryItems.id, inventoryItemId), eq(inventoryItems.propertyId, actor.propertyId)));
+      ledgerRows.push({
+        propertyId: actor.propertyId,
+        inventoryItemId,
+        ...plan.ledger,
+        referenceId: orderId,
+        responsible: actor.email,
+      });
+    }
+    if (ledgerRows.length) {
+      await tx.insert(inventoryLedger).values(ledgerRows);
     }
   }
 
   private async consumeOrderInventory(tx: Transaction, actor: AuthenticatedAccount, orderId: string, lines: Array<typeof orderItems.$inferSelect>) {
-    const allIngredients = lines.length
-      ? await tx.select().from(menuItemIngredients).where(inArray(menuItemIngredients.menuItemId, lines.map((l) => l.menuItemId)))
-      : [];
-    for (const line of lines) {
-      const ings = allIngredients.filter((i) => i.menuItemId === line.menuItemId);
-      for (const ing of ings) {
-        const [invItem] = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, ing.inventoryItemId));
-        if (!invItem) continue;
-        const convertedPerPortion = convertIngredientToInventoryUnit(Number(ing.quantity), ing.unit, invItem.unit);
-        const needed = convertedPerPortion * line.quantity;
-        await tx.update(inventoryItems).set({
-          stock: String(Math.max(0, Number(invItem.stock) - needed).toFixed(4)),
-          reserved: String(Math.max(0, Number(invItem.reserved) - needed).toFixed(4)),
-        }).where(eq(inventoryItems.id, ing.inventoryItemId));
-        await tx.insert(inventoryLedger).values({
-          propertyId: actor.propertyId,
-          inventoryItemId: ing.inventoryItemId,
-          type: 'Consumo',
-          quantity: String((-needed).toFixed(4)),
-          referenceId: orderId,
-          note: `Consumo por comanda ${orderId}`,
-          responsible: actor.email,
-        });
-      }
+    const { inventoryById, requirements } = await this.loadOrderInventory(tx, actor.propertyId, lines);
+    const ledgerRows = [];
+    for (const { inventoryItemId, quantity } of requirements) {
+      const inventoryItem = inventoryById.get(inventoryItemId);
+      if (!inventoryItem) continue;
+      const plan = planInventoryConsumption(inventoryItem, quantity, orderId);
+      await tx.update(inventoryItems).set(plan.update).where(and(eq(inventoryItems.id, inventoryItemId), eq(inventoryItems.propertyId, actor.propertyId)));
+      ledgerRows.push({
+        propertyId: actor.propertyId,
+        inventoryItemId,
+        ...plan.ledger,
+        referenceId: orderId,
+        responsible: actor.email,
+      });
+    }
+    if (ledgerRows.length) {
+      await tx.insert(inventoryLedger).values(ledgerRows);
     }
   }
 
-  async createOrder(actor: AuthenticatedAccount, dto: CreateOrderDto, _ctx: unknown) {
+  async createOrder(actor: AuthenticatedAccount, dto: CreateOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
       const menuIds = dto.items.map((i) => i.menuItemId);
       const menuRows = await tx.select().from(menuItems).where(and(inArray(menuItems.id, menuIds), eq(menuItems.propertyId, actor.propertyId)));
       const notFound = menuIds.filter((id) => !menuRows.find((m) => m.id === id && m.status === 'active'));
       if (notFound.length) throw new BadRequestException(`Items de menu no encontrados o archivados: ${notFound.join(', ')}`);
 
-      let total = 0;
-      const lines = dto.items.map((item) => {
-        const menu = menuRows.find((m) => m.id === item.menuItemId)!;
-        const subtotal = Number(menu.salePrice) * item.quantity;
-        total += subtotal;
-        const station = item.station || determineStation(menu.category);
-        return {
-          menuItemId: item.menuItemId,
-          menuItemName: menu.name,
-          quantity: item.quantity,
-          unitPrice: String(Number(menu.salePrice).toFixed(2)),
-          subtotal: String(subtotal.toFixed(2)),
-          station,
-          status: 'recibido',
-          notes: item.notes ?? null,
-        };
-      });
+      const pricing = planOrderPricing(dto.items, menuRows);
+      const lines = pricing.lines;
 
       const orderInsert = await tx.insert(orders).values({
         propertyId: actor.propertyId,
         source: dto.source, stayId: dto.stayId ?? null,
         paymentMethod: dto.paymentMethod, estimatedMinutes: dto.estimatedMinutes,
-        comment: dto.comment ?? null, total: String(total.toFixed(2)),
+        comment: dto.comment ?? null, total: pricing.total,
         responsible: actor.email,
       }).returning();
 
       const newOrder = orderInsert[0]!;
       await tx.insert(orderItems).values(lines.map((l) => ({ ...l, orderId: newOrder.id, propertyId: actor.propertyId })));
       const result = { ...newOrder, items: lines };
-      this.realtime.emitToProperty(actor.propertyId, 'order:created', result);
-      if (result.stayId) this.realtime.emitToStay(result.stayId, 'order:created', result);
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'order:created',
+        aggregateType: 'order',
+        aggregateId: newOrder.id,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: result as unknown as Record<string, unknown>,
+      });
+      if (result.stayId) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          stayId: result.stayId,
+          eventType: 'order:created',
+          aggregateType: 'order',
+          aggregateId: newOrder.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: result as unknown as Record<string, unknown>,
+        });
+      }
       return result;
     });
   }
 
-  async updateOrder(actor: AuthenticatedAccount, orderId: string, dto: CreateOrderDto, _ctx: unknown) {
+  async updateOrder(actor: AuthenticatedAccount, orderId: string, dto: CreateOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
+      const [order] = await tx.select().from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)))
+        .for('update', { of: orders });
       if (!order) throw new NotFoundException('Pedido no encontrado.');
       if (!['Pedido recibido', 'Confirmado'].includes(order.status)) throw new BadRequestException('El pedido ya no se puede editar.');
 
@@ -449,42 +426,45 @@ export class RestaurantService {
       if (menuRows.length !== new Set(menuIds).size) {
         throw new BadRequestException('Items de menu no encontrados, fuera de la propiedad o archivados.');
       }
-      let total = 0;
-      const lines = dto.items.map((item) => {
-        const menu = menuRows.find((m) => m.id === item.menuItemId)!;
-        const subtotal = Number(menu.salePrice) * item.quantity;
-        total += subtotal;
-        const station = item.station || determineStation(menu.category);
-        return {
-          menuItemId: item.menuItemId,
-          menuItemName: menu.name,
-          quantity: item.quantity,
-          unitPrice: String(Number(menu.salePrice).toFixed(2)),
-          subtotal: String(subtotal.toFixed(2)),
-          station,
-          status: 'recibido',
-          notes: item.notes ?? null,
-          orderId,
-        };
-      });
+      const pricing = planOrderPricing(dto.items, menuRows);
+      const lines = pricing.lines.map((line) => ({ ...line, orderId }));
 
       await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
       await tx.insert(orderItems).values(lines.map((l) => ({ ...l, propertyId: actor.propertyId })));
       const [updated] = await tx.update(orders).set({
         source: dto.source, stayId: dto.stayId ?? null, paymentMethod: dto.paymentMethod,
         estimatedMinutes: dto.estimatedMinutes, comment: dto.comment ?? null,
-        total: String(total.toFixed(2)), updatedAt: new Date(),
+        total: pricing.total, updatedAt: new Date(),
       }).where(eq(orders.id, orderId)).returning();
       const result = { ...updated, items: lines };
-      this.realtime.emitToProperty(actor.propertyId, 'order:updated', result);
-      if (result.stayId) this.realtime.emitToStay(result.stayId, 'order:updated', result);
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'order:updated',
+        aggregateType: 'order',
+        aggregateId: orderId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: result as unknown as Record<string, unknown>,
+      });
+      if (result.stayId) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          stayId: result.stayId,
+          eventType: 'order:updated',
+          aggregateType: 'order',
+          aggregateId: orderId,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: result as unknown as Record<string, unknown>,
+        });
+      }
       return result;
     });
   }
 
   async advanceOrderItem(actor: AuthenticatedAccount, orderId: string, itemId: string, dto: AdvanceOrderItemDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
+      const [order] = await tx.select().from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)))
+        .for('update', { of: orders });
       if (!order) throw new NotFoundException('Pedido no encontrado.');
 
       const [item] = await tx.select().from(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId), eq(orderItems.propertyId, actor.propertyId)));
@@ -492,7 +472,10 @@ export class RestaurantService {
 
       await tx.update(orderItems).set({ status: dto.status }).where(eq(orderItems.id, itemId));
 
-      const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+      const allItems = await tx.select().from(orderItems).where(and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.propertyId, actor.propertyId),
+      ));
 
       // Si al menos un item pasa a en_preparacion y la orden estaba en Pedido recibido
       if (allItems.some((i) => i.status === 'en_preparacion' || i.status === 'listo') && order.inventoryStage === 'Sin reservar') {
@@ -511,25 +494,52 @@ export class RestaurantService {
       const [updatedOrder] = await tx.select().from(orders).where(eq(orders.id, orderId));
       const updatedItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
       const result = { ...updatedOrder, items: updatedItems };
-      this.realtime.emitToProperty(actor.propertyId, 'order:status_changed', result);
-      if (result.stayId) this.realtime.emitToStay(result.stayId, 'order:status_changed', result);
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'order:status_changed',
+        aggregateType: 'order',
+        aggregateId: orderId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: result as unknown as Record<string, unknown>,
+      });
+      if (result.stayId) {
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          stayId: result.stayId,
+          eventType: 'order:status_changed',
+          aggregateType: 'order',
+          aggregateId: orderId,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: result as unknown as Record<string, unknown>,
+        });
+      }
       return result;
     });
   }
 
   async advanceOrder(actor: AuthenticatedAccount, orderId: string, dto: AdvanceOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
+      const [order] = await tx.select().from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)))
+        .for('update', { of: orders });
       if (!order) throw new NotFoundException('Pedido no encontrado.');
-      if (order.status !== dto.expectedStatus) throw new ConflictException('El pedido cambio de estado; actualiza la operacion.');
-
-      const currentIndex = ORDER_FLOW.indexOf(order.status as (typeof ORDER_FLOW)[number]);
-      if (currentIndex < 0 || currentIndex >= ORDER_FLOW.length - 1) throw new BadRequestException('El pedido no puede avanzar mas.');
-      const nextStatus = ORDER_FLOW[currentIndex + 1];
-      if (order.stayId && order.status === 'Entregado') throw new BadRequestException('Stay-linked delivered orders are financially terminal.');
+      const transition = planOrderAdvance({
+        currentStatus: order.status,
+        expectedStatus: dto.expectedStatus,
+        stayId: order.stayId,
+      });
+      if (!transition.ok) {
+        if (transition.failure.kind === 'stale') throw new ConflictException('El pedido cambio de estado; actualiza la operacion.');
+        if (transition.failure.kind === 'financially_terminal') throw new BadRequestException('Stay-linked delivered orders are financially terminal.');
+        throw new BadRequestException('El pedido no puede avanzar mas.');
+      }
+      const nextStatus = transition.nextStatus;
 
       let inventoryStage = order.inventoryStage;
-      const lines = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+      const lines = await tx.select().from(orderItems).where(and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.propertyId, actor.propertyId),
+      ));
 
       // Al confirmar: reservar stock
       if (nextStatus === 'En preparacion' && order.inventoryStage === 'Sin reservar') {
@@ -563,27 +573,36 @@ export class RestaurantService {
 
   async cancelOrder(actor: AuthenticatedAccount, orderId: string, dto: CancelOrderDto, context: RequestContext) {
     return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)));
+      const [order] = await tx.select().from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.propertyId, actor.propertyId)))
+        .for('update', { of: orders });
       if (!order) throw new NotFoundException('Pedido no encontrado.');
       if (['Pagado', 'Cancelado'].includes(order.status)) throw new BadRequestException('El pedido no se puede cancelar.');
       if (order.stayId && order.status === 'Entregado') await this.folios.reverseRestaurantCharge(tx, actor, order.stayId, order.id, dto.reason, context);
 
       // Revertir reservas si aplica
       if (order.inventoryStage === 'Reservado') {
-        const lines = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-        const allIngredients = lines.length
-          ? await tx.select().from(menuItemIngredients).where(inArray(menuItemIngredients.menuItemId, lines.map((l) => l.menuItemId)))
-          : [];
-        for (const line of lines) {
-          const ings = allIngredients.filter((i) => i.menuItemId === line.menuItemId);
-          for (const ing of ings) {
-            const [invItem] = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, ing.inventoryItemId));
-            if (!invItem) continue;
-            const convertedPerPortion = convertIngredientToInventoryUnit(Number(ing.quantity), ing.unit, invItem.unit);
-            const needed = convertedPerPortion * line.quantity;
-            await tx.update(inventoryItems).set({ reserved: String(Math.max(0, Number(invItem.reserved) - needed).toFixed(4)) }).where(eq(inventoryItems.id, ing.inventoryItemId));
-            await tx.insert(inventoryLedger).values({ propertyId: actor.propertyId, inventoryItemId: ing.inventoryItemId, type: 'Devolucion', quantity: String(needed.toFixed(4)), referenceId: orderId, note: `Devolucion por cancelacion de pedido ${orderId}`, responsible: actor.email });
-          }
+        const lines = await tx.select().from(orderItems).where(and(
+          eq(orderItems.orderId, orderId),
+          eq(orderItems.propertyId, actor.propertyId),
+        ));
+        const { inventoryById, requirements } = await this.loadOrderInventory(tx, actor.propertyId, lines);
+        const ledgerRows = [];
+        for (const { inventoryItemId, quantity } of requirements) {
+          const inventoryItem = inventoryById.get(inventoryItemId);
+          if (!inventoryItem) continue;
+          const plan = planInventoryRelease(inventoryItem, quantity, orderId);
+          await tx.update(inventoryItems).set(plan.update).where(and(eq(inventoryItems.id, inventoryItemId), eq(inventoryItems.propertyId, actor.propertyId)));
+          ledgerRows.push({
+            propertyId: actor.propertyId,
+            inventoryItemId,
+            ...plan.ledger,
+            referenceId: orderId,
+            responsible: actor.email,
+          });
+        }
+        if (ledgerRows.length) {
+          await tx.insert(inventoryLedger).values(ledgerRows);
         }
       }
 
@@ -661,7 +680,7 @@ export class RestaurantService {
     };
   }
 
-  async createCustomerOrder(customer: AuthenticatedCustomer, dto: CustomerCreateOrderDto, idempotencyKey: string) {
+  async createCustomerOrder(customer: AuthenticatedCustomer, dto: CustomerCreateOrderDto, idempotencyKey: string, context: RequestContext = {}) {
     if (dto.paymentMode !== 'room_charge' && dto.paymentMode !== 'amenity_tab') {
       throw new HttpException({ version: 1, outcome: 'rejected', code: 'PAYMENT_MODE_UNSUPPORTED' }, HttpStatus.UNPROCESSABLE_ENTITY);
     }
@@ -762,8 +781,25 @@ export class RestaurantService {
       });
 
       for (const order of insertedOrders) {
-        this.realtime.emitToProperty(customer.propertyId, 'order:created', order);
-        if (dto.stayId) this.realtime.emitToStay(dto.stayId, 'order:created', order);
+        await this.outbox.enqueue(tx, {
+          propertyId: customer.propertyId,
+          eventType: 'order:created',
+          aggregateType: 'order',
+          aggregateId: order.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: order as unknown as Record<string, unknown>,
+        });
+        if (dto.stayId) {
+          await this.outbox.enqueue(tx, {
+            propertyId: customer.propertyId,
+            stayId: dto.stayId,
+            eventType: 'order:created',
+            aggregateType: 'order',
+            aggregateId: order.id,
+            ...(context.requestId ? { requestId: context.requestId } : {}),
+            payload: order as unknown as Record<string, unknown>,
+          });
+        }
       }
 
       return responseBody;

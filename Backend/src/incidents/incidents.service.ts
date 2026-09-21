@@ -19,6 +19,7 @@ export interface IncidentResponse {
   status: string;
   blocksRoom: boolean;
   evidence: string[];
+  evidenceCount?: number;
   solution: string;
   createdAt: string;
   updatedAt: string;
@@ -45,7 +46,7 @@ export class IncidentsService {
       .from(incidents)
       .where(eq(incidents.propertyId, propertyId))
       .orderBy(incidents.createdAt);
-    return rows.map((r) => this.format(r));
+    return rows.map((r) => this.formatList(r));
   }
 
   async create(
@@ -258,6 +259,11 @@ export class IncidentsService {
       createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
     };
+  }
+
+  private formatList(row: any): IncidentResponse {
+    const response = this.format(row);
+    return { ...response, evidence: [], evidenceCount: response.evidence.length };
   }
 
   private auditBase(actor: AuthenticatedAccount, context: RequestContext) {

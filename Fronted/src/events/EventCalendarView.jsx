@@ -2,7 +2,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, MapPin } from 'lucide-react';
 import { useEventsResource } from './useEventsResource';
 import { eventsClient } from './eventsClient';
+import { FilterBar } from '../components/ui/FilterBar';
 import { P1Button } from '../components/ui/P1Atoms';
+import { PageShell } from '../components/views/SharedViewParts.jsx';
 
 const pad = (value) => String(value).padStart(2, '0');
 const keyFor = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -37,7 +39,7 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
   }, {}), [filteredEvents]);
 
   return (
-    <div className="view-container events-module-view">
+    <PageShell className="events-module-view">
       {/* Top Header */}
       <header className="page-heading events-page-heading">
         <div>
@@ -59,7 +61,7 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
       </header>
 
       {/* Filter by Space Bar */}
-      <div className="events-filter-bar">
+      <FilterBar label="Filtros del calendario de eventos" className="events-filter-bar">
         <div className="events-filter-control">
           <MapPin size={16} color="#D97706" />
           <span className="events-filter-label">Filtrar por Salón:</span>
@@ -78,7 +80,7 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
         <div className="events-filter-result">
           Mostrando <strong>{filteredEvents.length}</strong> eventos agendados
         </div>
-      </div>
+      </FilterBar>
 
       {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
 
@@ -156,6 +158,6 @@ export function EventCalendarView({ onSelectEvent, onCreateEvent }) {
         <span><i className="legend-dot legend-other" /> En Preparación / Finalizado</span>
         {loading ? <span className="calendar-loading">Cargando calendario...</span> : null}
       </div>
-    </div>
+    </PageShell>
   );
 }

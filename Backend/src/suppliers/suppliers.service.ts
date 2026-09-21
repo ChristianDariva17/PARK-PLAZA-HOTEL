@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { suppliers, supplierCommands, supplierBankDetails, purchaseOrders } from '../database/schema/suppliers.schema.js';
+import { suppliers, supplierCommands, supplierBankDetails, purchaseOrders, purchaseOrderSequences } from '../database/schema/suppliers.schema.js';
 import { inventoryItems, inventoryLedger } from '../database/schema/restaurant.schema.js';
 import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { 
@@ -199,11 +199,29 @@ export class SuppliersService {
         throw new NotFoundException('One or more inventory items were not found in this property');
       }
 
-      const countRes = await tx.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.propertyId, propertyId));
-      const nextSeq = Number(countRes?.[0]?.count ?? 0) + 1;
       const now = new Date();
       const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const orderNumber = `OC-${yearMonth}-${String(nextSeq).padStart(4, '0')}`;
+      const [sequence] = await tx.select({ nextValue: purchaseOrderSequences.nextValue })
+        .from(purchaseOrderSequences)
+        .where(and(
+          eq(purchaseOrderSequences.propertyId, propertyId),
+          eq(purchaseOrderSequences.yearMonth, yearMonth),
+        ))
+        .limit(1)
+        .for('update');
+
+      const nextValue = sequence
+        ? (await tx.update(purchaseOrderSequences)
+          .set({ nextValue: sql`${purchaseOrderSequences.nextValue} + 1`, updatedAt: now })
+          .where(and(
+            eq(purchaseOrderSequences.propertyId, propertyId),
+            eq(purchaseOrderSequences.yearMonth, yearMonth),
+          ))
+          .returning({ nextValue: purchaseOrderSequences.nextValue }))[0]?.nextValue
+        : (await tx.insert(purchaseOrderSequences).values({ propertyId, yearMonth, nextValue: 2 }).returning({ nextValue: purchaseOrderSequences.nextValue }))[0]?.nextValue;
+
+      if (nextValue === undefined) throw new Error('Purchase order sequence allocation failed');
+      const orderNumber = `OC-${yearMonth}-${String(Number(nextValue) - 1).padStart(4, '0')}`;
 
       let subtotal = 0;
       const computedItems = dto.items.map(item => {

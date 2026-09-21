@@ -3,6 +3,7 @@ import { Public } from '../auth/decorators/public.decorator.js';
 import { AmenitiesService } from '../amenities/amenities.service.js';
 import { CustomerSessionGuard } from './customer-session.guard.js';
 import type { CustomerAuthenticatedRequest } from './customer.types.js';
+import { getRequestContext } from '../auth/request-context.js';
 import { z } from 'zod';
 import { parseCustomerIdempotencyKey } from './customer.dto.js';
 import { parseZodHttp } from '../http/zod-parser.js';
@@ -40,6 +41,6 @@ export class CustomerAmenitiesController {
   @UseGuards(CustomerSessionGuard)
   async createReservation(@Req() req: CustomerAuthenticatedRequest, @Body() body: any, @Headers('idempotency-key') idempotencyKey: unknown) {
     const data = parseZodHttp(CreateReservationSchema, body, 'Invalid amenity reservation');
-    return this.amenitiesService.createReservation(req.customer!, data, parseCustomerIdempotencyKey(idempotencyKey));
+    return this.amenitiesService.createReservation(req.customer!, data, parseCustomerIdempotencyKey(idempotencyKey), getRequestContext(req));
   }
 }

@@ -17,14 +17,8 @@
 /* 5. Barra superior, notificaciones, buscador Spotlight y perfil */
 @import './styles/topbar.css';
 
-/* 6. Componentes troncales: Tarjetas, KPIs, métricas, botones e insignias */
-@import './styles/components.css';
+/* 6. Componentes críticos: jerarquía, dashboard, tarjetas y botones */
+@import './styles/components-critical.css';
 
-/* 7. Tablas operativas de alta precisión y barras de filtrado/búsqueda */
-@import './styles/tables-forms.css';
-
-/* 8. Overlays, modales de lujo, cajones laterales y botones rápidos */
-@import './styles/overlays.css';
-
-/* 9. Módulos especializados y reglas operativas por dominio */
-@import './styles/modules.css';
+/* 7. Estilos mínimos necesarios para el primer render público y autenticado */
+@import './styles/critical.css';

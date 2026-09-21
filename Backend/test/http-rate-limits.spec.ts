@@ -3,6 +3,7 @@ import { AttendanceController } from '../src/attendance/attendance.controller.js
 import { AuthController } from '../src/auth/auth.controller.js';
 import { CustomerAuthController } from '../src/customer/customer-auth.controller.js';
 import { HealthController } from '../src/health/health.controller.js';
+import { ClientTelemetryController } from '../src/observability/client-telemetry.controller.js';
 
 const limitFor = (handler: object) => Reflect.getMetadata('THROTTLER:LIMITdefault', handler);
 const ttlFor = (handler: object) => Reflect.getMetadata('THROTTLER:TTLdefault', handler);
@@ -13,6 +14,7 @@ describe('HTTP rate limits', () => {
     expect(limitFor(AuthController.prototype.google)).toBe(5);
     expect(limitFor(CustomerAuthController.prototype.exchange)).toBe(10);
     expect(limitFor(AttendanceController.prototype.issueBiometricCapability)).toBe(10);
+    expect(limitFor(ClientTelemetryController.prototype.record)).toBe(60);
     expect(ttlFor(AuthController.prototype.login)).toBe(60_000);
   });
 

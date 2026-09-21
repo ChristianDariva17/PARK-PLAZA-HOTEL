@@ -6,6 +6,7 @@ import type { Environment } from '../config/environment.js';
 import { parseCustomerCancelOrderDto, parseCustomerCreateOrderDto, parseCustomerIdempotencyKey, parseCustomerReservationId } from './customer.dto.js';
 import { CustomerSessionGuard } from './customer-session.guard.js';
 import type { CustomerAuthenticatedRequest } from './customer.types.js';
+import { getRequestContext } from '../auth/request-context.js';
 
 @Controller('customer/restaurant')
 export class CustomerRestaurantController {
@@ -41,7 +42,8 @@ export class CustomerRestaurantController {
     return this.restaurant.createCustomerOrder(
       request.customer!,
       parseCustomerCreateOrderDto(body),
-      parseCustomerIdempotencyKey(key)
+      parseCustomerIdempotencyKey(key),
+      getRequestContext(request),
     );
   }
 

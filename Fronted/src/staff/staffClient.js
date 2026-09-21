@@ -31,13 +31,6 @@ export const staffClient = {
     });
   },
 
-  reportBiometricAttendance: async (payload) => {
-    return authRequest('/api/attendance/biometric', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-
   createStaff: async (payload) => {
     return authRequest('/api/staff', {
       method: 'POST',

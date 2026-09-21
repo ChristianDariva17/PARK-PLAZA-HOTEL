@@ -10,3 +10,9 @@ vistaclienteprototipp/
 .atl/
 **/skills-lock.json
 backups/
+ops/local-tls/certs/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+.playwright-mcp/

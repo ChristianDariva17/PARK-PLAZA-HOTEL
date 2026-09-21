@@ -1,13 +1,12 @@
 import { authRequest } from '../auth/authClient.js';
+import { normalizeRequestError, RequestError } from '../api/requestError.js';
 
 const BASE = '/api/restaurant';
 
-export class RestaurantRequestError extends Error {
-  constructor(message, status, type, originalError = null) {
-    super(message);
+export class RestaurantRequestError extends RequestError {
+  constructor(message, options = {}, originalError = null) {
+    super(message, options);
     this.name = 'RestaurantRequestError';
-    this.status = status;
-    this.type = type; // 'unauthorized' | 'forbidden' | 'network' | 'server' | 'invalid-response' | 'unknown' | 'conflict' | 'ambiguous'
     this.originalError = originalError;
   }
 }
@@ -16,16 +15,9 @@ const withNormalizedErrors = async (requestPromise) => {
   try {
     return await requestPromise;
   } catch (error) {
-    if (error.name === 'AuthRequestError') {
-      const type = error.status === 401 ? 'unauthorized' 
-                 : error.status === 403 ? 'forbidden'
-                 : error.status === 409 ? 'conflict'
-                 : error.status >= 500 ? 'ambiguous'
-                 : !error.status ? 'ambiguous'
-                 : 'invalid-response';
-      throw new RestaurantRequestError(error.message, error.status, type, error);
-    }
-    throw new RestaurantRequestError('Error inesperado de red o servidor.', null, 'ambiguous', error);
+    if (error?.name === 'AbortError') throw error;
+    const normalized = normalizeRequestError(error);
+    throw new RestaurantRequestError(normalized.message, normalized, error);
   }
 };
 

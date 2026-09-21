@@ -2,8 +2,10 @@ import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog } from '../ui/Overlay';
 import { canAccessRoute } from './navigation';
+import { useHotelSearchState } from '../../state/hotelContext';
 
-export default function GlobalSearch({ open, onClose, state, onNavigate, can }) {
+export default function GlobalSearch({ open, onClose, onNavigate, can }) {
+  const state = useHotelSearchState();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);

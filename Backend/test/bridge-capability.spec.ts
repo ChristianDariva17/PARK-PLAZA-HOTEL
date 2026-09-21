@@ -13,7 +13,7 @@ describe('BridgeCapabilityService', () => {
     expect(Reflect.getMetadata('design:paramtypes', BridgeCapabilityService)).toBeUndefined();
   });
 
-  it('issues a signed, subject-bound capability that expires in one minute', () => {
+  it('issues a signed, subject-bound capability with a bounded operation lifetime', () => {
     const result = new BridgeCapabilityService().issue('verify', { type: 'employee', id: '11111111-1111-4111-8111-111111111111' });
     const [payload, signature] = result.token.split('.');
     const decoded = JSON.parse(Buffer.from(payload!, 'base64url').toString('utf8'));

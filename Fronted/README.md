@@ -33,9 +33,6 @@ Los enlaces hash permiten recargar una vista y usar Atrás/Adelante sin configur
 - `src/components/ui/Overlay.jsx`: `Dialog`, `Drawer` y `Tabs` accesibles.
 - `src/components/views/CoreViews.jsx`: recepción y módulos operativos existentes.
 - `src/components/views/ExtendedViews.jsx`: contratos, finanzas, mascotas, recreación, cocina/bar, proveedores, incidencias, encuestas, permisos, auditoría y configuración.
-- `src/integrations/biometrics/zkBridgeClient.js`: cliente del contrato local ZK9500 sin transportar biometría.
-- `src/components/biometrics/`: controles reutilizables de enrolamiento, verificación y asistencia.
-- `bridge/`: servicio Windows x86, almacenamiento cifrado local, configuración y scripts operativos. Ver `bridge/README.md`.
 
 ## Flujo conectado
 
@@ -48,7 +45,7 @@ La confirmación de una reserva actualiza disponibilidad y registra adelanto del
 - No se procesan pagos ni se emiten comprobantes fiscales.
 - No se generan, firman, almacenan ni envían documentos reales.
 - Correo, WhatsApp y pasarelas están pendientes de integración.
-- El lector QR y la valla no están conectados. La biometría requiere iniciar y configurar el bridge local; la interfaz informa indisponibilidad y no simula resultados.
+- El lector QR y la valla no están conectados.
 - No existen copias de seguridad ni almacenamiento seguro de evidencias.
 - Las acciones externas nunca informan un éxito ficticio: muestran su estado pendiente o no disponible.
 

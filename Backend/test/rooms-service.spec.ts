@@ -29,8 +29,8 @@ function mutationService(current: RoomRow | null = row) {
   const tx = { execute: vi.fn().mockResolvedValue(undefined), select: vi.fn(() => selected), update: vi.fn(() => update), insert: vi.fn() };
   const database = { transaction: vi.fn((callback) => callback(tx)) } as unknown as Database;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  const realtime = { emitToProperty: vi.fn(), emitToStay: vi.fn() };
-  return { service: new RoomsService(database, audit, realtime as any), tx, selected, update, audit };
+  const outbox = { enqueue: vi.fn().mockResolvedValue(undefined) };
+  return { service: new RoomsService(database, audit, outbox as any), tx, selected, update, audit, outbox };
 }
 
 describe('RoomsService', () => {
@@ -56,7 +56,7 @@ describe('RoomsService', () => {
     const categories = queryResult([{ id: 'category-id', code: 'SIMPLE', name: 'Simple', capacity: 1, baseNightlyRate: '95.00', createdAt }]);
     const roomRows = queryResult([row]);
     const database = { select: vi.fn().mockReturnValueOnce(categories).mockReturnValueOnce(roomRows) } as unknown as Database;
-    const result = await new RoomsService(database, {} as AuditService).list(actor.propertyId);
+    const result = await new RoomsService(database, {} as AuditService, {} as any).list(actor.propertyId);
     expect(new PgDialect().sqlToQuery(vi.mocked(categories.where as ReturnType<typeof vi.fn>).mock.calls[0]![0]).params).toEqual([actor.propertyId]);
     expect(vi.mocked(categories.orderBy as ReturnType<typeof vi.fn>).mock.calls[0]).toHaveLength(3);
     expect(vi.mocked(roomRows.orderBy as ReturnType<typeof vi.fn>).mock.calls[0]).toHaveLength(3);
@@ -104,10 +104,10 @@ describe('RoomsService', () => {
   });
 
   it('maps only room-number uniqueness to conflict', async () => {
-    const known = new RoomsService({ transaction: vi.fn().mockRejectedValue({ code: '23505', constraint: 'rooms_property_id_number_key' }) } as unknown as Database, {} as AuditService);
+    const known = new RoomsService({ transaction: vi.fn().mockRejectedValue({ code: '23505', constraint: 'rooms_property_id_number_key' }) } as unknown as Database, {} as AuditService, {} as any);
     await expect(known.update(actor, row.id, { number: '102' }, {})).rejects.toBeInstanceOf(ConflictException);
     const unknownError = { code: '23505', constraint: 'future_constraint' };
-    const unknown = new RoomsService({ transaction: vi.fn().mockRejectedValue(unknownError) } as unknown as Database, {} as AuditService);
+    const unknown = new RoomsService({ transaction: vi.fn().mockRejectedValue(unknownError) } as unknown as Database, {} as AuditService, {} as any);
     await expect(unknown.update(actor, row.id, { number: '102' }, {})).rejects.toBe(unknownError);
   });
 

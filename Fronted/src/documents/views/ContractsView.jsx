@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDocuments } from '../useDocuments.js';
+import { FilterBar } from '../../components/ui/FilterBar.jsx';
 import { PageHeader, MetricStrip, DataTable, StatusBadge } from '../../components/views/SharedViewParts.jsx';
 import { Drawer } from '../../components/ui/Overlay.jsx';
 import { Search, FileText, CheckCircle2 } from 'lucide-react';
@@ -33,7 +34,7 @@ export function ContractsView() {
         { label: 'Borradores / Pendientes', value: data.items.filter(i => ['Borrador', 'Pendiente', 'DRAFT', 'PENDING_SIGNATURE'].includes(i.status) && !i.metadata?.signatures?.guestSignature).length },
       ]} />
       
-      <div className="filter-bar contracts-filter-bar">
+      <FilterBar label="Filtros de contratos" className="contracts-filter-bar">
         <label className="search-label contracts-search-label">
           <Search size={16} />
           <input
@@ -65,7 +66,7 @@ export function ContractsView() {
         <button className="btn btn-outline" onClick={() => refresh()}>
           Actualizar
         </button>
-      </div>
+      </FilterBar>
       
       {error && <div className="alert-banner alert-banner-error">{error}</div>}
       

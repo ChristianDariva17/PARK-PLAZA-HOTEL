@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedAccount, RequestContext } from '../auth/auth.types.js';
@@ -6,7 +6,7 @@ import { DATABASE, type Database } from '../database/database.module.js';
 import { cleaningCommands, cleaningTasks, incidents, rooms, stays } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
 import type { CreateCleaningTaskDto, CreateIncidentDto, ProgressCleaningTaskDto, UpdateCleaningTaskDto } from './cleaning.dto.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { OutboxService } from '../audit/outbox.service.js';
 
 export interface PersistentCleaningTaskResponse {
   id: string;
@@ -35,7 +35,7 @@ export class CleaningService {
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     private readonly audit: AuditService,
-    private readonly realtime: RealtimeGateway,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(propertyId: string): Promise<PersistentCleaningTaskResponse[]> {
@@ -53,7 +53,7 @@ export class CleaningService {
     key: string,
     context: RequestContext,
   ): Promise<CleaningCommandResponse> {
-    return this.command(actor, 'cleaning_create', key, async (tx) => {
+    return this.command(actor, 'cleaning_create', key, context, async (tx) => {
       const roomRows = await tx
         .select()
         .from(rooms)
@@ -115,7 +115,7 @@ export class CleaningService {
     key: string,
     context: RequestContext,
   ): Promise<CleaningCommandResponse> {
-    return this.command(actor, 'cleaning_update', key, async (tx) => {
+    return this.command(actor, 'cleaning_update', key, context, async (tx) => {
       const rows = await tx
         .select()
         .from(cleaningTasks)
@@ -125,6 +125,7 @@ export class CleaningService {
 
       const task = rows[0];
       if (!task) throw new NotFoundException('Cleaning task not found');
+      if (task.status === 'approved') throw new ConflictException('Cleaning task is already approved');
 
       const evidence = dto.evidence ? [...task.evidence, dto.evidence] : task.evidence;
       const now = new Date();
@@ -162,7 +163,7 @@ export class CleaningService {
     key: string,
     context: RequestContext,
   ): Promise<CleaningCommandResponse> {
-    return this.command(actor, 'cleaning_progress', key, async (tx) => {
+    return this.command(actor, 'cleaning_progress', key, context, async (tx) => {
       const rows = await tx
         .select()
         .from(cleaningTasks)
@@ -190,20 +191,22 @@ export class CleaningService {
       let incidentResponse: { id: string; status: string; blocksRoom: boolean } | undefined = undefined;
       let room: { id: string; status: string } | undefined = undefined;
 
-      if (nextStatus === 'approved' && task.stayId) {
-        const stayRows = await tx
-          .select({ id: stays.id })
-          .from(stays)
-          .where(and(
-            eq(stays.id, task.stayId),
-            eq(stays.propertyId, actor.propertyId),
-            eq(stays.roomId, task.roomId),
-            eq(stays.status, 'checked_out'),
-          ))
-          .limit(1)
-          .for('update', { of: stays });
+      if (nextStatus === 'approved') {
+        if (task.stayId) {
+          const stayRows = await tx
+            .select({ id: stays.id })
+            .from(stays)
+            .where(and(
+              eq(stays.id, task.stayId),
+              eq(stays.propertyId, actor.propertyId),
+              eq(stays.roomId, task.roomId),
+              eq(stays.status, 'checked_out'),
+            ))
+            .limit(1)
+            .for('update', { of: stays });
 
-        if (!stayRows[0]) throw new ConflictException('Cleaning task is not linked to a checked-out stay');
+          if (!stayRows[0]) throw new ConflictException('Cleaning task is not linked to a checked-out stay');
+        }
 
         const roomRows = await tx
           .select({ id: rooms.id, status: rooms.status })
@@ -294,7 +297,7 @@ export class CleaningService {
     key: string,
     context: RequestContext,
   ): Promise<CleaningCommandResponse> {
-    return this.command(actor, 'cleaning_incident', key, async (tx) => {
+    return this.command(actor, 'cleaning_incident', key, context, async (tx) => {
       const rows = await tx
         .select()
         .from(cleaningTasks)
@@ -356,6 +359,7 @@ export class CleaningService {
     actor: AuthenticatedAccount,
     operation: string,
     key: string,
+    context: RequestContext,
     run: (tx: any) => Promise<CleaningCommandResponse>,
   ): Promise<CleaningCommandResponse> {
     return this.database.transaction(async (tx) => {
@@ -383,9 +387,23 @@ export class CleaningService {
         response: response as unknown as Record<string, unknown>,
       });
 
-      this.realtime.emitToProperty(actor.propertyId, 'cleaning:task_updated', response.task);
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'cleaning:task_updated',
+        aggregateType: 'cleaning_task',
+        aggregateId: response.task.id,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: response.task as unknown as Record<string, unknown>,
+      });
       if (response.room) {
-        this.realtime.emitToProperty(actor.propertyId, 'room:status_changed', response.room);
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'room:status_changed',
+          aggregateType: 'room',
+          aggregateId: response.room.id,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: response.room as unknown as Record<string, unknown>,
+        });
       }
 
       return response;

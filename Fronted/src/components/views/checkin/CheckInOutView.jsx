@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePermissions } from '../../../auth/authContext';
 import { PERMISSIONS } from '../../../auth/permissions';
 import { formatReservationInstant, reservationStatusToLabel } from '../../../reservations/reservationModel';
@@ -6,23 +6,32 @@ import { useHotel } from '../../../state/hotelContext';
 import FolioPanel from '../../../folios/FolioPanel';
 import { Dialog, TabPanel, Tabs } from '../../ui/Overlay';
 import { DetailGrid, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
+import { AsyncButton } from '../../ui/P1Atoms';
 import { SignatureCanvas } from '../../common/SignatureCanvas.jsx';
 import { StayConditionsDocument } from '../../../documents/StayConditionsDocument.jsx';
 import { DEFAULT_CHECKLIST, HOTEL_INFO } from '../../../documents/stayConditionsModel.js';
 import { documentsClient } from '../../../documents/documentsClient.js';
 import { FileCheck, PenTool, CheckCircle2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 
-function CheckInDialog({ reservation, guest, room, onClose, notify }) {
+export function CheckInDialog({ reservation, guest, room, onClose, notify }) {
   const { state, stayCommands } = useHotel();
   const [step, setStep] = useState('validation'); // 'validation' | 'document'
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
   const [guestSignature, setGuestSignature] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const submitLockRef = useRef(false);
+  const errorRef = useRef(null);
 
   const receptionistName = state.account?.name || state.account?.email || 'Recepción Park Plaza';
 
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
   const submit = async () => {
+    if (submitLockRef.current || busy || state.stayCommandRequest.retryBlocked || !guest || !room || !guestSignature) return;
+    submitLockRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -71,8 +80,8 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
 
       try {
         await documentsClient.createContract(docPayload);
-      } catch (docErr) {
-        console.warn('Advertencia al guardar documento en backend:', docErr);
+      } catch {
+        throw new Error('No se pudo guardar el documento firmado. Verifique la conexión antes de completar el check-in.');
       }
 
       // 2. Perform check-in command
@@ -83,6 +92,7 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
       setError(failure.message || 'No se pudo completar el check-in.');
     } finally {
       setBusy(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -188,20 +198,22 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
             />
           </div>
 
-          {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
+          {error ? <div ref={errorRef} className="alert-banner alert-banner-danger" role="alert" tabIndex="-1">{error}</div> : null}
           {state.stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{state.stayCommandRequest.error}</div> : null}
 
           <div className="form-actions checkin-dialog-actions">
             <button className="btn btn-outline checkin-inline-button" disabled={busy} onClick={() => setStep('validation')}>
               <ArrowLeft size={16} /> Volver a validación
             </button>
-            <button
-              disabled={busy || state.stayCommandRequest.retryBlocked || !guest || !room || !guestSignature}
+            <AsyncButton
+              pending={busy}
+              pendingLabel="Confirmando check-in y guardando documento…"
+              disabled={state.stayCommandRequest.retryBlocked || !guest || !room || !guestSignature}
               onClick={submit}
-              className="btn btn-primary checkin-inline-button"
+              className="checkin-inline-button"
             >
-              {busy ? 'Confirmando check-in y guardando documento…' : '✓ Confirmar Check-in y Guardar Documento'}
-            </button>
+              ✓ Confirmar Check-in y Guardar Documento
+            </AsyncButton>
           </div>
         </div>
       )}
@@ -209,19 +221,30 @@ function CheckInDialog({ reservation, guest, room, onClose, notify }) {
   );
 }
 
-function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
+export function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
   const { state, stayCommands } = useHotel();
   const { can } = usePermissions();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
   const [folio, setFolio] = useState(null);
+  const [folioStatus, setFolioStatus] = useState('loading');
+  const submitLockRef = useRef(false);
+  const errorRef = useRef(null);
 
   const balanceNumber = Number(folio?.balance || 0);
   const hasDebt = balanceNumber > 0;
   const canOverride = can(PERMISSIONS.staysCheckOutOverride);
+  const stayCommandRequest = state.stayCommandRequest || { retryBlocked: false, error: '' };
+  const folioReady = folio && folioStatus === 'success';
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   const submit = async () => {
+    if (submitLockRef.current || busy || stayCommandRequest.retryBlocked || !room || !folioReady) return;
+    submitLockRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -241,13 +264,14 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
       setError(failure.message || 'No se pudo completar el check-out.');
     } finally {
       setBusy(false);
+      submitLockRef.current = false;
     }
   };
 
   const guestName = guest?.name || (guest?.firstName ? `${guest.firstName} ${guest.lastName || ''}`.trim() : 'Huésped Titular');
 
   return (
-    <div className="detail-stack checkout-dialog-stack">
+    <div className="detail-stack checkout-dialog-stack" aria-busy={busy}>
       {/* Top Details Card */}
       <div className="checkout-details-card">
         <div>
@@ -279,6 +303,7 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
         canPay={can(PERMISSIONS.financePayment)}
         canReverse={can(PERMISSIONS.financeReverse)}
         onFolioChange={setFolio}
+        onStatusChange={setFolioStatus}
       />
 
       {/* Debt / Override Handling Box */}
@@ -314,8 +339,8 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
         </div>
       )}
 
-      {error ? <div className="alert-banner alert-banner-danger" role="alert">{error}</div> : null}
-      {state.stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{state.stayCommandRequest.error}</div> : null}
+      {error ? <div ref={errorRef} className="alert-banner alert-banner-danger" role="alert" tabIndex="-1">{error}</div> : null}
+      {stayCommandRequest.retryBlocked ? <div className="alert-banner alert-banner-danger" role="alert">{stayCommandRequest.error}</div> : null}
 
       <div className="form-actions checkout-dialog-actions">
         <button type="button" className="btn btn-outline" disabled={busy} onClick={onClose}>
@@ -323,12 +348,15 @@ function CheckOutDialog({ stay, reservation, room, guest, onClose, notify }) {
         </button>
         <button
           type="button"
-          disabled={busy || state.stayCommandRequest.retryBlocked || !room || (hasDebt && !overrideReason.trim())}
+          disabled={busy || stayCommandRequest.retryBlocked || !room || !folioReady || (hasDebt && !overrideReason.trim())}
           onClick={submit}
+          aria-busy={busy}
           className={`btn btn-primary checkout-submit-button${hasDebt ? ' is-debt' : ''}`}
         >
           {busy
             ? 'Procesando check-out…'
+            : !folioReady
+            ? folioStatus === 'error' ? 'Actualiza el folio para continuar' : 'Cargando saldo del folio…'
             : hasDebt
             ? '⚠️ Autorizar Salida con Cuenta por Cobrar'
             : '✓ Confirmar Check-out y Liberar Habitación'}

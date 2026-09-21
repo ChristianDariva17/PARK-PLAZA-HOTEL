@@ -14,7 +14,7 @@ describe('verified administrative clients', () => {
 
     await documentsClient.listContracts();
 
-    expect(fetch.mock.calls[0][0]).toMatch(/^\/api\/documents\/contracts\?/);
+    expect(fetch.mock.calls[0][0]).toMatch(/^\/api\/v1\/documents\/contracts\?/);
     expect(fetch.mock.calls[0][1]).toMatchObject({ credentials: 'include' });
   });
 
@@ -25,8 +25,8 @@ describe('verified administrative clients', () => {
     await Promise.all([fetchNotifications(propertyId), fetchExperiences(propertyId)]);
 
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
-      `/api/properties/${propertyId}/communications/notifications`,
-      `/api/properties/${propertyId}/experiences`,
+      `/api/v1/properties/${propertyId}/communications/notifications`,
+      `/api/v1/properties/${propertyId}/experiences`,
     ]);
   });
 });

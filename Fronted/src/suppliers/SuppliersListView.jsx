@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSuppliersResource } from './useSuppliersResource';
 import { suppliersClient } from './suppliersClient';
 import { DataTable, EmptyState, MetricStrip, PageHeader, StatusBadge } from '../components/views/SharedViewParts';
+import { FilterBar } from '../components/ui/FilterBar';
 import { PurchaseOrderModal } from './PurchaseOrderModal';
 import { 
   Building2, 
@@ -227,7 +228,7 @@ export function SuppliersListView({ onSelectSupplier, onCreateSupplier }) {
       {activeTab === 'suppliers' && (
         <>
           {/* Filter and Search Bar */}
-          <div className="filter-bar supplier-element-variant-a-extended">
+          <FilterBar label="Filtros de proveedores" className="supplier-element-variant-a-extended">
             <form onSubmit={handleSearch} className="supplier-stack-field">
               <label className="supplier-text-variant-variant-i">Buscar por Razón Social, Nombre Comercial o RUC</label>
               <div className="supplier-element-variant-b-extended">
@@ -263,7 +264,7 @@ export function SuppliersListView({ onSelectSupplier, onCreateSupplier }) {
             >
               <RefreshCw size={14} className={loading ? 'spin' : ''} /> Filtrar
             </button>
-          </div>
+          </FilterBar>
 
           {/* Suppliers Table */}
           <DataTable

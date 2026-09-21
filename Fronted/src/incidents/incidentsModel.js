@@ -6,6 +6,7 @@ const TYPE_FROM_API     = { cleaning: 'Limpieza', maintenance: 'Mantenimiento' }
 const TYPE_TO_API       = { Limpieza: 'cleaning', Mantenimiento: 'maintenance', Servicio: 'maintenance' };
 
 export function adaptIncident(dto) {
+  const evidence = Array.isArray(dto.evidence) ? dto.evidence : [];
   return {
     id: dto.id,
     roomId: dto.roomId ?? null,
@@ -16,7 +17,8 @@ export function adaptIncident(dto) {
     responsible: dto.responsible ?? 'Por asignar',
     status: STATUS_FROM_API[dto.status] ?? dto.status,
     blocksRoom: Boolean(dto.blocksRoom),
-    evidence: Array.isArray(dto.evidence) ? dto.evidence : [],
+    evidence,
+    evidenceCount: Number.isInteger(dto.evidenceCount) ? dto.evidenceCount : evidence.length,
     solution: dto.solution ?? '',
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,

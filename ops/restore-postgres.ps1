@@ -29,6 +29,8 @@ $localPlaintext = Join-Path ([System.IO.Path]::GetTempPath()) $plainFileName
 $containerBackup = "/tmp/$plainFileName"
 $sourceDatabase = (docker compose exec -T postgres sh -c 'printf %s "$POSTGRES_DB"').Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not read the configured PostgreSQL database name.' }
+$databaseUser = (docker compose exec -T postgres sh -c 'printf %s "$POSTGRES_USER"').Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($databaseUser)) { throw 'Could not read the configured PostgreSQL user.' }
 if ($TargetDatabase -eq $sourceDatabase) {
   throw "Refusing to restore over the configured database '$sourceDatabase'. Use a separate restore database."
 }
@@ -54,6 +56,10 @@ try {
   $restoreCommand = "set -eu; pg_restore --format=custom --clean --if-exists --no-owner --dbname='$TargetDatabase' -U `"`$POSTGRES_USER`" '$containerBackup'"
   docker compose exec -T postgres sh -c $restoreCommand
   if ($LASTEXITCODE -ne 0) { throw 'pg_restore failed.' }
+
+  $validationQuery = "select 'reservations', count(*) from information_schema.tables where table_schema = 'public' and table_name = 'reservations'; select 'schema_sentinel', coalesce((select version from schema_sentinels where key = 'application_schema'), 'missing');"
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U $databaseUser -d $TargetDatabase -Atc $validationQuery
+  if ($LASTEXITCODE -ne 0) { throw 'Restored database validation failed.' }
   Write-Output "Backup restored into isolated database: $TargetDatabase"
 }
 finally {

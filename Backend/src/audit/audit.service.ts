@@ -142,6 +142,7 @@ export class AuditService {
         eventType: 'notification:new',
         ...(event.subjectType ? { aggregateType: event.subjectType } : {}),
         ...(event.subjectId ? { aggregateId: event.subjectId } : {}),
+        ...(event.requestId ? { requestId: event.requestId } : {}),
         payload: {
           ...details,
           id: notificationRows[0]!.id,

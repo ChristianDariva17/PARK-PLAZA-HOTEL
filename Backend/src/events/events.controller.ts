@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Patch, Put, Body, Param, Query, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Put, Body, Headers, Param, Query, Req } from '@nestjs/common';
 import { EventsService } from './events.service.js';
 import { EventsIdentityMigrationService } from './events-identity-migration.service.js';
-import { createEventDto, updateEventDto, listEventsDto, eventCommandDto, cancelEventDto, confirmEventDto, quoteEventDto, replaceSpaceServicesDto, resolveIdentityDto, updateSpacePolicyDto, checkAvailabilityDto } from './events.dto.js';
+import { createEventDto, updateEventDto, listEventsDto, eventCommandDto, cancelEventDto, confirmEventDto, quoteEventDto, replaceSpaceServicesDto, resolveIdentityDto, updateSpacePolicyDto, checkAvailabilityDto, parseIdempotencyKey } from './events.dto.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
 import type { AuthenticatedAccount, AuthenticatedRequest } from '../auth/auth.types.js';
@@ -27,13 +27,15 @@ export class EventsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
+    @Req() request: AuthenticatedRequest,
   ) {
     const parsedBody = parseZodHttp(resolveIdentityDto, body);
     return this.migrationService.resolveIdentity(
       { accountId: account.accountId, propertyId: account.propertyId },
       id,
       parsedBody.resolutionType as any,
-      parsedBody.selectedId
+      parsedBody.selectedId,
+      getRequestContext(request),
     );
   }
 
@@ -99,9 +101,9 @@ export class EventsController {
 
   @Post()
   @RequirePermissions('events.create')
-  async createEvent(@CurrentAccount() account: AuthenticatedAccount, @Body() body: any) {
+  async createEvent(@CurrentAccount() account: AuthenticatedAccount, @Body() body: any, @Headers('idempotency-key') key: unknown, @Req() request: AuthenticatedRequest) {
     const parsedBody = parseZodHttp(createEventDto, body);
-    return this.eventsService.createEvent(account.propertyId, account.accountId, parsedBody);
+    return this.eventsService.createEvent(account.propertyId, account.accountId, parsedBody, parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Patch(':id')
@@ -110,9 +112,11 @@ export class EventsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
+    @Headers('idempotency-key') key: unknown,
+    @Req() request: AuthenticatedRequest,
   ) {
     const parsedBody = parseZodHttp(updateEventDto, body);
-    return this.eventsService.updateEvent(account.propertyId, id, account.accountId, parsedBody);
+    return this.eventsService.updateEvent(account.propertyId, id, account.accountId, parsedBody, parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/confirm')
@@ -121,9 +125,11 @@ export class EventsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
+    @Headers('idempotency-key') key: unknown,
+    @Req() request: AuthenticatedRequest,
   ) {
     const parsedBody = parseZodHttp(confirmEventDto, body);
-    return this.eventsService.confirmEvent(account.propertyId, id, account.accountId, parsedBody);
+    return this.eventsService.confirmEvent(account.propertyId, id, account.accountId, parsedBody, parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/cancel')
@@ -132,27 +138,29 @@ export class EventsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
+    @Headers('idempotency-key') key: unknown,
+    @Req() request: AuthenticatedRequest,
   ) {
     const parsedBody = parseZodHttp(cancelEventDto, body);
-    return this.eventsService.cancelEvent(account.propertyId, id, account.accountId, parsedBody);
+    return this.eventsService.cancelEvent(account.propertyId, id, account.accountId, parsedBody, parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/preparing')
   @RequirePermissions('events.update')
-  async preparing(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'preparing', parseZodHttp(eventCommandDto, body));
+  async preparing(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown, @Req() request: AuthenticatedRequest) {
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'preparing', parseZodHttp(eventCommandDto, body), parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/start')
   @RequirePermissions('events.update')
-  async start(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'in_progress', parseZodHttp(eventCommandDto, body));
+  async start(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown, @Req() request: AuthenticatedRequest) {
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'in_progress', parseZodHttp(eventCommandDto, body), parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/complete')
   @RequirePermissions('events.update')
-  async complete(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown) {
-    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'completed', parseZodHttp(eventCommandDto, body));
+  async complete(@CurrentAccount() account: AuthenticatedAccount, @Param('id') id: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown, @Req() request: AuthenticatedRequest) {
+    return this.eventsService.advanceEvent(account.propertyId, id, account.accountId, 'completed', parseZodHttp(eventCommandDto, body), parseIdempotencyKey(key), getRequestContext(request));
   }
 
   @Post(':id/archive')
@@ -161,8 +169,10 @@ export class EventsController {
     @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
+    @Headers('idempotency-key') key: unknown,
+    @Req() request: AuthenticatedRequest,
   ) {
     const parsedBody = parseZodHttp(eventCommandDto, body);
-    return this.eventsService.archiveEvent(account.propertyId, id, account.accountId, parsedBody);
+    return this.eventsService.archiveEvent(account.propertyId, id, account.accountId, parsedBody, parseIdempotencyKey(key), getRequestContext(request));
   }
 }

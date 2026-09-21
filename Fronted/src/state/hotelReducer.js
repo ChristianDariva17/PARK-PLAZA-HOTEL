@@ -14,6 +14,7 @@ import {
   validateOrder,
   validateReservation,
 } from '../domain/hotelModel.js';
+import { RESOURCE_STATUS } from '../api/resourceState.js';
 
 const PERSISTENT_ROOM_ACTIONS = new Set([
   'ROOM_UPDATE', 'ROOM_BLOCK', 'ROOM_UNBLOCK',
@@ -113,26 +114,6 @@ export const validateHotelAction = (state, action) => {
     return { ok: false, message: 'Esta operación no está disponible hasta contar con persistencia operativa de habitaciones.' };
   }
   switch (action.type) {
-    case 'BIOMETRIC_ENROLLED': {
-      const collection = action.subjectType === 'client' ? state.clients : action.subjectType === 'employee' ? state.staff : [];
-      const subject = collection.find((item) => item.id === action.subjectId && item.status !== 'Archivado');
-      const message = !subject ? 'La persona biométrica no existe o no está activa.' : !hasText(action.templateReference) || !hasText(action.enrolledAt) ? 'Faltan la referencia opaca o la fecha de enrolamiento.' : null;
-      return { ok: !message, message };
-    }
-    case 'BIOMETRIC_ATTEMPT': {
-      const collection = action.subjectType === 'client' ? state.clients : action.subjectType === 'employee' ? state.staff : [];
-      const subject = collection.find((item) => item.id === action.subjectId);
-      const scoreValid = action.score == null || Number.isFinite(Number(action.score));
-      const message = !subject ? 'La persona biométrica no existe.' : !['enroll', 'verify'].includes(action.kind) || !hasText(action.result) ? 'El intento biométrico no tiene metadatos válidos.' : !scoreValid ? 'El puntaje biométrico no es finito.' : null;
-      return { ok: !message, message };
-    }
-    case 'STAFF_ATTENDANCE_VERIFIED': {
-      const person = state.staff.find((item) => item.id === action.staffId && item.status !== 'Archivado');
-      const context = getAttendanceContext(state, action.staffId);
-      const referenceMatches = hasText(action.templateReference) && (!person?.biometric?.templateReference || action.templateReference === person.biometric.templateReference);
-      const message = !person ? 'La persona no está activa.' : action.matched !== true || !referenceMatches ? 'La coincidencia biométrica no corresponde al registro enrolado.' : !hasText(action.requestId) ? 'La operación biométrica no tiene identificador estable.' : state.attendanceLog.some((item) => item.requestId === action.requestId) ? 'La asistencia biométrica ya fue aplicada.' : !Number.isFinite(Number(action.score)) ? 'El puntaje biométrico no es finito.' : !['Entrada', 'Salida'].includes(context.expectedMovement) ? 'La secuencia de asistencia no es válida.' : null;
-      return { ok: !message, message };
-    }
     case 'CLIENT_CREATE':
     case 'CLIENT_UPDATE': {
       const current = action.type === 'CLIENT_UPDATE' ? state.clients.find((client) => client.id === action.clientId) : null;
@@ -195,10 +176,10 @@ export const validateHotelAction = (state, action) => {
       const advancePayment = state.payments.find((item) => item.reservationId === reservation?.id && !item.reversalOf && item.status === 'Registrado');
       const today = currentCalendarDate();
       const identity = action.identityValidation;
-      const identityValid = identity?.method === 'biometric' ? identity.matched === true : identity?.method === 'documentary' && identity.documentType === client?.documentType && normalizeDocument(identity.documentNumber) === normalizeDocument(client?.documentNumber) && hasText(identity.result) && hasText(identity.responsible) && hasText(identity.verifiedAt);
+      const identityValid = identity?.method === 'documentary' && identity.documentType === client?.documentType && normalizeDocument(identity.documentNumber) === normalizeDocument(client?.documentNumber) && hasText(identity.result) && hasText(identity.responsible) && hasText(identity.verifiedAt);
       const referencesValid = room && client?.status !== 'Archivado' && contract && contract.reservationId === reservation?.id && contract.clientId === reservation?.clientId && contract.roomId === reservation?.roomId && contract.status !== 'Anulado';
       const financialsValid = reservation && isFiniteAtLeast(reservation.total) && isFiniteAtLeast(reservation.advance) && reservation.advance <= reservation.total && (!reservation.advance || (advancePayment && advancePayment.amount === reservation.advance));
-      const message = !reservation || reservation.status !== 'Confirmada' ? 'La reserva no está confirmada.' : !referencesValid ? 'La habitación, el cliente o el contrato de la reserva no existen o no son coherentes.' : !financialsValid ? 'Los importes o el adelanto de la reserva no son coherentes.' : state.stays.some((item) => item.reservationId === reservation.id) ? 'La reserva ya tiene una estadía vinculada.' : !identityValid ? 'Registrá una validación biométrica coincidente o una validación documental completa.' : today < reservation.checkIn || today >= reservation.checkOut ? 'El check-in debe realizarse dentro del intervalo reservado.' : room.activeStayId ? 'La habitación ya tiene una estadía activa.' : !['Disponible', 'Reservada'].includes(room.status) ? `La habitación está ${room.status.toLowerCase()}.` : null;
+      const message = !reservation || reservation.status !== 'Confirmada' ? 'La reserva no está confirmada.' : !referencesValid ? 'La habitación, el cliente o el contrato de la reserva no existen o no son coherentes.' : !financialsValid ? 'Los importes o el adelanto de la reserva no son coherentes.' : state.stays.some((item) => item.reservationId === reservation.id) ? 'La reserva ya tiene una estadía vinculada.' : !identityValid ? 'Registrá una validación documental completa.' : today < reservation.checkIn || today >= reservation.checkOut ? 'El check-in debe realizarse dentro del intervalo reservado.' : room.activeStayId ? 'La habitación ya tiene una estadía activa.' : !['Disponible', 'Reservada'].includes(room.status) ? `La habitación está ${room.status.toLowerCase()}.` : null;
       return { ok: !message, message };
     }
     case 'CONTRACT_ADDENDUM':
@@ -535,6 +516,15 @@ export const validateHotelAction = (state, action) => {
     case 'RESTAURANT_MENU_ITEM_UPDATED':
     case 'RESTAURANT_INVENTORY_ITEM_CREATED':
     case 'RESTAURANT_INVENTORY_ITEM_UPDATED':
+    case 'MENU_ITEM_COMMITTED':
+    case 'MENU_MUTATION_STARTED':
+    case 'MENU_MUTATION_DONE':
+    case 'MENU_IMPORT_PREVIEW_STARTED':
+    case 'MENU_IMPORT_PREVIEW_DONE':
+    case 'MENU_IMPORT_APPLY_STARTED':
+    case 'MENU_IMPORT_APPLY_DONE':
+    case 'MENU_IMPORT_ERROR':
+    case 'MENU_IMPORT_CLEARED':
     case 'RESOURCE_LOAD_STARTED':
     case 'RESOURCE_LOAD_SUCCEEDED':
     case 'RESOURCE_LOAD_FAILED':
@@ -610,7 +600,7 @@ export function hotelReducer(state, action) {
     case 'STAY_COMMAND_CANCELLED':
       return { ...state, stayCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
     case 'CLEANING_RESET':
-      return { ...state, cleaningRequest: { status: 'idle', error: null }, cleaningCommandRequest: { status: 'idle', error: null } };
+      return { ...state, cleaningRequest: { status: 'idle', error: null }, cleaningCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
     case 'CLEANING_LOAD_STARTED':
       return { ...state, cleaningRequest: { status: 'loading', error: null } };
     case 'CLEANING_LOAD_SUCCEEDED':
@@ -620,17 +610,21 @@ export function hotelReducer(state, action) {
     case 'CLEANING_LOAD_CANCELLED':
       return { ...state, cleaningRequest: { status: state.cleaningTasks.length ? 'success' : 'idle', error: null } };
     case 'CLEANING_COMMAND_STARTED':
-      return { ...state, cleaningCommandRequest: { status: 'saving', error: null } };
+      return { ...state, cleaningCommandRequest: { status: 'saving', error: null, retryBlocked: false } };
+    case 'CLEANING_COMMAND_RECONCILING':
+      return { ...state, cleaningCommandRequest: { status: 'reconciling', error: action.error, retryBlocked: true } };
     case 'CLEANING_COMMAND_COMMITTED': {
       const existing = state.cleaningTasks.some((task) => task.id === action.task.id);
       const cleaningTasks = existing ? state.cleaningTasks.map((task) => task.id === action.task.id ? action.task : task) : [action.task, ...state.cleaningTasks];
       const rooms = action.room ? state.rooms.map((room) => room.id === action.room.id ? { ...room, status: action.room.status } : room) : state.rooms;
-      return { ...state, cleaningTasks, rooms, cleaningCommandRequest: { status: 'success', error: null } };
+      return { ...state, cleaningTasks, rooms, cleaningCommandRequest: { status: 'success', error: null, retryBlocked: false } };
     }
     case 'CLEANING_COMMAND_FAILED':
-      return { ...state, cleaningCommandRequest: { status: 'error', error: action.error } };
+      return { ...state, cleaningCommandRequest: { status: 'error', error: action.error, retryBlocked: Boolean(action.retryBlocked) } };
+    case 'CLEANING_COMMAND_RECONCILED':
+      return { ...state, cleaningCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
     case 'CLEANING_COMMAND_CANCELLED':
-      return { ...state, cleaningCommandRequest: { status: 'idle', error: null } };
+      return { ...state, cleaningCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
 
     case 'INCIDENTS_RESET':
       return { ...state, incidentRequest: { status: 'idle', error: null }, incidentCommandRequest: { status: 'idle', error: null } };
@@ -644,7 +638,7 @@ export function hotelReducer(state, action) {
       return { ...state, incidentRequest: { status: state.incidents.length ? 'success' : 'idle', error: null } };
 
     case 'MAINTENANCE_RESET':
-      return { ...state, maintenanceRequest: { status: 'idle', error: null }, maintenanceCommandRequest: { status: 'idle', error: null } };
+      return { ...state, maintenanceRequest: { status: 'idle', error: null }, maintenanceCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
     case 'MAINTENANCE_LOAD_STARTED':
       return { ...state, maintenanceRequest: { status: 'loading', error: null } };
     case 'MAINTENANCE_LOAD_SUCCEEDED':
@@ -653,6 +647,30 @@ export function hotelReducer(state, action) {
       return { ...state, maintenanceRequest: { status: 'error', error: action.error } };
     case 'MAINTENANCE_LOAD_CANCELLED':
       return { ...state, maintenanceRequest: { status: state.maintenanceTickets.length ? 'success' : 'idle', error: null } };
+    case 'MAINTENANCE_COMMAND_STARTED':
+      return { ...state, maintenanceCommandRequest: { status: 'saving', error: null, retryBlocked: false } };
+    case 'MAINTENANCE_COMMAND_RECONCILING':
+      return { ...state, maintenanceCommandRequest: { status: 'reconciling', error: action.error, retryBlocked: true } };
+    case 'MAINTENANCE_COMMAND_COMMITTED': {
+      const existingTicket = state.maintenanceTickets.some((ticket) => ticket.id === action.ticket.id);
+      const maintenanceTickets = existingTicket
+        ? state.maintenanceTickets.map((ticket) => ticket.id === action.ticket.id ? action.ticket : ticket)
+        : [action.ticket, ...state.maintenanceTickets];
+      const incidents = action.incident
+        ? state.incidents.some((incident) => incident.id === action.incident.id)
+          ? state.incidents.map((incident) => incident.id === action.incident.id ? action.incident : incident)
+          : [action.incident, ...state.incidents]
+        : state.incidents;
+      const rooms = action.room
+        ? state.rooms.map((room) => room.id === action.room.id ? { ...room, status: action.room.status } : room)
+        : state.rooms;
+      return { ...state, maintenanceTickets, incidents, rooms, maintenanceCommandRequest: { status: 'success', error: null, retryBlocked: false } };
+    }
+    case 'MAINTENANCE_COMMAND_FAILED':
+      return { ...state, maintenanceCommandRequest: { status: 'error', error: action.error, retryBlocked: Boolean(action.retryBlocked) } };
+    case 'MAINTENANCE_COMMAND_RECONCILED':
+    case 'MAINTENANCE_COMMAND_CANCELLED':
+      return { ...state, maintenanceCommandRequest: { status: 'idle', error: null, retryBlocked: false } };
 
     case 'CASH_RESET':
       return { ...state, cashRequest: { status: 'idle', error: null }, cashCommandRequest: { status: 'idle', error: null } };
@@ -796,23 +814,6 @@ export function hotelReducer(state, action) {
       nextState = { ...nextState, rooms: updateRoomStatus(nextState, action.roomId) };
       return addAudit(nextState, 'Desbloqueó habitación', 'Habitaciones', action.roomId, action.reason, { user: action.responsible || 'Administrador demo' });
     }
-    case 'BIOMETRIC_ENROLLED': {
-      const collection = action.subjectType === 'client' ? 'clients' : 'staff';
-      if (!state[collection].some((item) => item.id === action.subjectId)) return state;
-      const records = state[collection].map((item) => item.id === action.subjectId ? { ...item, biometric: { templateReference: action.templateReference, enrolledAt: action.enrolledAt } } : item);
-      return addAudit({ ...state, [collection]: records }, 'Enroló huella', 'Biometría', action.subjectId, `Referencia opaca ${action.templateReference}`);
-    }
-    case 'BIOMETRIC_ATTEMPT':
-      return addAudit(state, action.kind === 'enroll' ? 'Intento de enrolamiento' : 'Intento de verificación', 'Biometría', action.subjectId, `${action.result}${action.score == null ? '' : `; puntaje ${action.score}`}${action.errorCode ? `; ${action.errorCode}` : ''}`);
-    case 'STAFF_ATTENDANCE_VERIFIED': {
-      const person = state.staff.find((item) => item.id === action.staffId);
-      if (!person) return state;
-      const createdAt = new Date().toISOString();
-      const context = getAttendanceContext(state, person.id, new Date(createdAt));
-      const attendance = `${context.expectedMovement} biométrica ${new Date(createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`;
-      const entry = { id: nextId('ASI', state.attendanceLog), staffId: person.id, movement: context.expectedMovement, method: 'Biométrica', responsible: 'Bridge ZK9500', reason: 'Coincidencia reportada por bridge local', observation: `Puntaje ${action.score}`, requestId: action.requestId, calendarDate: context.calendarDate, shiftId: context.shiftId, createdAt };
-      return addAudit({ ...state, attendanceLog: [entry, ...state.attendanceLog], staff: state.staff.map((item) => item.id === person.id ? { ...item, attendance, attendanceVerifiedAt: createdAt } : item) }, 'Registró asistencia biométrica', 'Personal', person.id, `Coincidencia confirmada; puntaje ${action.score}`);
-    }
     case 'RESERVATION_CONFIRM': {
       const room = state.rooms.find((item) => item.id === action.payload.roomId);
       const nights = nightsBetween(action.payload.checkIn, action.payload.checkOut);
@@ -871,10 +872,10 @@ export function hotelReducer(state, action) {
       return addAudit({
         ...state,
         reservations: state.reservations.map((item) => item.id === reservation.id ? { ...item, status: 'Cliente presente' } : item),
-        contracts: state.contracts.map((item) => item.id === reservation.contractId ? { ...item, status: 'Firmado', signedDocument: action.identityValidation.method === 'documentary' ? `Validación documental ${action.identityValidation.documentType} ${action.identityValidation.documentNumber}` : 'Identidad biométrica verificada por bridge local' } : item),
+        contracts: state.contracts.map((item) => item.id === reservation.contractId ? { ...item, status: 'Firmado', signedDocument: `Validación documental ${action.identityValidation.documentType} ${action.identityValidation.documentNumber}` } : item),
         rooms: state.rooms.map((item) => item.id === reservation.roomId ? { ...item, status: 'Ocupada', guestId: reservation.clientId, activeStayId: stayId, checkInAt: stay.checkInAt, expectedCheckOut: stay.expectedCheckOut, balance: reservation.balance } : item),
         stays: [stay, ...state.stays], accounts: [account, ...state.accounts],
-      }, 'Completó check-in', 'Check-in', stayId, `${action.identityValidation.method === 'biometric' ? 'Identidad biométrica coincidente' : `Documento ${action.identityValidation.documentType} validado por ${action.identityValidation.responsible}`}; habitación ${reservation.roomId}`);
+      }, 'Completó check-in', 'Check-in', stayId, `Documento ${action.identityValidation.documentType} validado por ${action.identityValidation.responsible}; habitación ${reservation.roomId}`);
     }
     case 'ORDER_ADVANCE': {
       const order = state.orders.find((item) => item.id === action.orderId);
@@ -1321,34 +1322,39 @@ export function hotelReducer(state, action) {
         ...state,
         restaurantResources: {
           identityKey: action.identityKey || null,
-          menu: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
-          orders: { status: 'idle', permission: 'orders.read', generation: 0, error: null, updatedAt: null },
-          inventory: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
-          inventoryLedger: { status: 'idle', permission: 'inventory.read', generation: 0, error: null, updatedAt: null },
+          menu: { status: RESOURCE_STATUS.IDLE, permission: 'orders.read', generation: 0, error: null, errorDetails: null, updatedAt: null },
+          orders: { status: RESOURCE_STATUS.IDLE, permission: 'orders.read', generation: 0, error: null, errorDetails: null, updatedAt: null },
+          inventory: { status: RESOURCE_STATUS.IDLE, permission: 'inventory.read', generation: 0, error: null, errorDetails: null, updatedAt: null },
+          inventoryLedger: { status: RESOURCE_STATUS.IDLE, permission: 'inventory.read', generation: 0, error: null, errorDetails: null, updatedAt: null },
         },
       };
-    case 'RESOURCE_LOAD_STARTED':
+    case 'RESOURCE_LOAD_STARTED': {
+      const current = state.restaurantResources?.[action.resourceKey];
+      const hasPreviousData = [RESOURCE_STATUS.SUCCESS, RESOURCE_STATUS.EMPTY, RESOURCE_STATUS.STALE].includes(current?.status);
       return {
         ...state,
         restaurantResources: {
           ...state.restaurantResources,
           [action.resourceKey]: {
-            ...state.restaurantResources?.[action.resourceKey],
-            status: 'loading',
+            ...current,
+            status: hasPreviousData ? RESOURCE_STATUS.REFRESHING : RESOURCE_STATUS.LOADING,
             generation: action.generation,
             error: null,
+            errorDetails: null,
           },
         },
       };
+    }
     case 'RESOURCE_LOAD_SUCCEEDED': {
       const nextResources = {
         ...state.restaurantResources,
         identityKey: action.identityKey || state.restaurantResources?.identityKey,
         [action.resourceKey]: {
           ...state.restaurantResources?.[action.resourceKey],
-          status: 'success',
+          status: Array.isArray(action.data) && action.data.length === 0 ? RESOURCE_STATUS.EMPTY : RESOURCE_STATUS.SUCCESS,
           generation: action.generation,
           error: null,
+          errorDetails: null,
           updatedAt: action.updatedAt || new Date().toISOString(),
         },
       };
@@ -1367,9 +1373,10 @@ export function hotelReducer(state, action) {
           identityKey: action.identityKey || state.restaurantResources?.identityKey,
           [action.resourceKey]: {
             ...state.restaurantResources?.[action.resourceKey],
-            status: 'error',
+            status: action.errorDetails?.type === 'network' ? RESOURCE_STATUS.OFFLINE : RESOURCE_STATUS.ERROR,
             generation: action.generation,
             error: action.error,
+            errorDetails: action.errorDetails || null,
           },
         },
       };
@@ -1381,23 +1388,30 @@ export function hotelReducer(state, action) {
           identityKey: action.identityKey || state.restaurantResources?.identityKey,
           [action.resourceKey]: {
             ...state.restaurantResources?.[action.resourceKey],
-            status: 'forbidden',
+            status: RESOURCE_STATUS.FORBIDDEN,
             generation: action.generation,
             error: null,
+            errorDetails: null,
           },
         },
       };
-    case 'RESOURCE_LOAD_CANCELLED':
+    case 'RESOURCE_LOAD_CANCELLED': {
+      const current = state.restaurantResources?.[action.resourceKey];
       return {
         ...state,
         restaurantResources: {
           ...state.restaurantResources,
           [action.resourceKey]: {
-            ...state.restaurantResources?.[action.resourceKey],
-            status: state.restaurantResources?.[action.resourceKey]?.status === 'loading' ? 'idle' : state.restaurantResources?.[action.resourceKey]?.status,
+            ...current,
+            status: current?.status === RESOURCE_STATUS.LOADING
+              ? RESOURCE_STATUS.IDLE
+              : current?.status === RESOURCE_STATUS.REFRESHING
+                ? (current.updatedAt ? RESOURCE_STATUS.SUCCESS : RESOURCE_STATUS.IDLE)
+                : current?.status,
           },
         },
       };
+    }
 
     // ─── Managed Menu (Cocina y Bar 5★) ──────────────────────────────────────
     case 'MANAGED_MENU_LOAD_STARTED':
@@ -1408,6 +1422,41 @@ export function hotelReducer(state, action) {
       return { ...state, menuManagementRequest: { status: 'error', error: action.error } };
     case 'MANAGED_MENU_LOAD_CANCELLED':
       return { ...state, menuManagementRequest: { status: 'idle', error: null } };
+
+    case 'MENU_ITEM_COMMITTED': {
+      const managedMenu = state.managedMenu || [];
+      const exists = managedMenu.some((item) => item.id === action.item.id);
+      return {
+        ...state,
+        managedMenu: exists
+          ? managedMenu.map((item) => item.id === action.item.id ? action.item : item)
+          : [action.item, ...managedMenu],
+      };
+    }
+    case 'MENU_MUTATION_STARTED':
+      return {
+        ...state,
+        menuPendingMutations: state.menuPendingMutations.includes(action.itemId)
+          ? state.menuPendingMutations
+          : [...state.menuPendingMutations, action.itemId],
+      };
+    case 'MENU_MUTATION_DONE':
+      return {
+        ...state,
+        menuPendingMutations: state.menuPendingMutations.filter((itemId) => itemId !== action.itemId),
+      };
+    case 'MENU_IMPORT_PREVIEW_STARTED':
+      return { ...state, menuImportRequest: { status: 'previewing', preview: null, contentHash: null, error: null } };
+    case 'MENU_IMPORT_PREVIEW_DONE':
+      return { ...state, menuImportRequest: { status: 'previewed', preview: action.result, contentHash: action.contentHash, error: null } };
+    case 'MENU_IMPORT_APPLY_STARTED':
+      return { ...state, menuImportRequest: { ...state.menuImportRequest, status: 'applying', error: null } };
+    case 'MENU_IMPORT_APPLY_DONE':
+      return { ...state, menuImportRequest: { status: 'applied', preview: action.result, contentHash: null, error: null } };
+    case 'MENU_IMPORT_ERROR':
+      return { ...state, menuImportRequest: { ...state.menuImportRequest, status: 'error', error: action.error } };
+    case 'MENU_IMPORT_CLEARED':
+      return { ...state, menuImportRequest: { status: 'idle', preview: null, contentHash: null, error: null } };
 
     case 'RESTAURANT_LOAD_STARTED':
       return { ...state, restaurantRequest: { status: 'loading' } };

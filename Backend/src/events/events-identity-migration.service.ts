@@ -5,6 +5,7 @@ import { DATABASE } from '../database/database.module.js';
 import * as schema from '../database/schema/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
+import type { RequestContext } from '../auth/auth.types.js';
 
 @Injectable()
 export class EventsIdentityMigrationService {
@@ -36,7 +37,8 @@ export class EventsIdentityMigrationService {
     actor: { accountId: string; propertyId: string },
     eventId: string,
     resolutionType: 'guest' | 'customerAccount',
-    selectedId: string
+    selectedId: string,
+    context: RequestContext = {},
   ) {
     if (resolutionType !== 'guest' && resolutionType !== 'customerAccount') {
       throw new BadRequestException('La resolución debe asignar un guest o un customerAccount explícitamente.');
@@ -69,6 +71,7 @@ export class EventsIdentityMigrationService {
       }).where(eq(schema.events.id, eventId));
 
       await this.auditService.record({
+        ...context,
         actorAccountId: actor.accountId,
         propertyId: actor.propertyId,
         eventType: 'event.quarantine_resolved',

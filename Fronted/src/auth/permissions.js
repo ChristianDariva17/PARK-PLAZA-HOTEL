@@ -8,7 +8,7 @@ export const PERMISSIONS = Object.freeze({
   experiencesRead: 'experiences.read', experiencesCreate: 'experiences.create', experiencesUpdate: 'experiences.update', experiencesParticipate: 'experiences.participate',
   staysRead: 'stays.read', staysCheckIn: 'stays.check_in', staysCheckOut: 'stays.check_out', staysCheckOutOverride: 'stays.check_out_override',
   financeRead: 'finance.read', financeCharge: 'finance.charge', financePayment: 'finance.payment', financeReverse: 'finance.reverse',
-  guestsRead: 'guests.read', guestsCreate: 'guests.create', guestsUpdate: 'guests.update', guestsArchive: 'guests.archive', guestsBiometric: 'guests.biometric',
+  guestsRead: 'guests.read', guestsCreate: 'guests.create', guestsUpdate: 'guests.update', guestsArchive: 'guests.archive',
   cleaningRead: 'cleaning.read', cleaningAssign: 'cleaning.assign', cleaningProgress: 'cleaning.progress', cleaningReportIncident: 'cleaning.report_incident',
   maintenanceRead: 'maintenance.read', maintenanceCreate: 'maintenance.create', maintenanceUpdate: 'maintenance.update', maintenanceProgress: 'maintenance.progress',
   incidentsRead: 'incidents.read', incidentsCreate: 'incidents.create', incidentsUpdate: 'incidents.update', incidentsProgress: 'incidents.progress',
@@ -21,7 +21,7 @@ export const PERMISSIONS = Object.freeze({
   petsRead: 'pets.read', petsCreate: 'pets.create', petsUpdate: 'pets.update', petsArchive: 'pets.archive',
   recreationRead: 'recreation.read', recreationSell: 'recreation.sell', recreationScan: 'recreation.scan', recreationManual: 'recreation.manual',
   eventsRead: 'events.read', eventsCreate: 'events.create', eventsUpdate: 'events.update', eventsConfirm: 'events.confirm', eventsCancel: 'events.cancel', eventsArchive: 'events.archive',
-  staffRead: 'staff.read', staffCreate: 'staff.create', staffUpdate: 'staff.update', staffArchive: 'staff.archive', staffShifts: 'staff.shifts', staffAttendance: 'staff.attendance', staffBiometric: 'staff.biometric',
+  staffRead: 'staff.read', staffCreate: 'staff.create', staffUpdate: 'staff.update', staffArchive: 'staff.archive', staffShifts: 'staff.shifts', staffAttendance: 'staff.attendance',
   staffAttendanceManual: 'staff.attendance.manual', staffAttendanceCorrect: 'staff.attendance.correct', staffAttendanceApprove: 'staff.attendance.approve', staffAttendanceRead: 'staff.attendance.read',
   cashRead: 'cash.read', cashOpen: 'cash.open', cashMove: 'cash.move', cashCount: 'cash.count', cashClose: 'cash.close',
   reportsRead: 'reports.read', settingsRead: 'settings.read',
@@ -82,8 +82,6 @@ const PRIMARY_ACTION_PERMISSIONS = Object.freeze({
 });
 export const permissionForPrimaryAction = (route, label) => PRIMARY_ACTION_PERMISSIONS[route]?.[label] || null;
 export const permissionForAction = (action) => {
-  if (action?.type === 'BIOMETRIC_ENROLLED') return action.subjectType === 'employee' ? PERMISSIONS.staffBiometric : PERMISSIONS.guestsBiometric;
-  if (action?.type === 'BIOMETRIC_ATTEMPT') return action.subjectType === 'employee' ? PERMISSIONS.staffBiometric : action.subjectType === 'client' ? PERMISSIONS.guestsBiometric : null;
   return ACTION_PERMISSIONS[action?.type] || null;
 };
 

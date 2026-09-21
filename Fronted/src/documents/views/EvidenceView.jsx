@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useDocuments } from '../useDocuments.js';
 import { useHotel } from '../../state/hotelContext.js';
+import { FilterBar } from '../../components/ui/FilterBar.jsx';
 import { PageHeader, MetricStrip, StatusBadge, EmptyState } from '../../components/views/SharedViewParts.jsx';
 import { Dialog } from '../../components/ui/Overlay.jsx';
 import {
@@ -190,7 +191,7 @@ export function EvidenceView() {
       />
 
       {/* Filter and Switcher Toolbar */}
-      <div className="filter-bar evidence-filter-bar">
+      <FilterBar label="Filtros de evidencias" className="evidence-filter-bar">
         <div className="evidence-filter-controls">
           <label className="search-label evidence-search-label">
             <Search size={16} />
@@ -247,7 +248,7 @@ export function EvidenceView() {
             <List size={16} />
           </button>
         </div>
-      </div>
+      </FilterBar>
 
       {error && <div className="alert-banner alert-banner-danger">{error}</div>}
 

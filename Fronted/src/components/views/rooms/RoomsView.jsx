@@ -6,6 +6,7 @@ import { ROOM_STATUSES } from '../../../domain/hotelModel';
 import { useCollectionTable } from '../../../hooks/useCollectionTable';
 import { useHotel, useHotelCommands } from '../../../state/hotelContext';
 import { Pagination, SortableHeader } from '../../ui/CollectionTable';
+import { FilterBar } from '../../ui/FilterBar';
 import { Dialog, Drawer } from '../../ui/Overlay';
 import { EmptyState, MetricStrip, PageHeader, StatusBadge } from '../SharedViewParts';
 import { getCategoryAudit, getRoomAmenities, updateCategoryAmenities } from '../../../rooms/roomsClient';
@@ -622,7 +623,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
         </div>
       ) : null}
 
-      <div className="filter-bar rooms-filter-bar">
+      <FilterBar label="Filtros de habitaciones" className="rooms-filter-bar">
         <div className="rooms-filter-main">
           <label className="search-label rooms-search-label">
             <Search size={16} />
@@ -664,7 +665,7 @@ export default function RoomsView({ navigate, notify, navigationIntent, consumeN
             {viewMode === 'categories' ? `${state.roomCategories.length} categorías` : `${records.length} habitaciones`}
           </span>
         </div>
-      </div>
+      </FilterBar>
 
       {/* TABLE VIEW */}
       {viewMode === 'table' && state.roomRequest.status !== 'loading' && table.total ? (

@@ -246,7 +246,7 @@ export function StaffDirectoryView() {
         <section className="card">
           <EmptyState
             title={staff.length === 0 ? 'Todavía no hay personal registrado' : 'Sin resultados para la búsqueda'}
-            description={staff.length === 0 ? 'Creá el primer perfil para organizar tareas, asistencia biométrica y horarios.' : 'Probá modificando los términos de búsqueda o el filtro de departamento.'}
+            description={staff.length === 0 ? 'Creá el primer perfil para organizar tareas de asistencia y horarios.' : 'Probá modificando los términos de búsqueda o el filtro de departamento.'}
           />
         </section>
       ) : (

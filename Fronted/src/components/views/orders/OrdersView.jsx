@@ -1,10 +1,13 @@
-import { useState, useCallback, useEffect } from 'react';
-import { ShoppingCart, Clock, CheckCircle2, XCircle, Flame, Bell, Star, Search, RefreshCw, Plus, ArrowRight, Wine, Coffee, UtensilsCrossed, Minus } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { ShoppingCart, Clock, CheckCircle2, XCircle, Flame, Bell, Star, Search, RefreshCw, Plus, ArrowRight, Wine, Coffee, UtensilsCrossed, Minus, ChevronDown } from 'lucide-react';
 import { useHotel } from '../../../state/hotelContext.js';
+import { createIdempotencyKey } from '../../../auth/authClient.js';
 import { formatMoney } from '../../../domain/hotelModel.js';
 import { useRestaurantResource } from '../../../restaurant/useRestaurantResource.js';
+import { getRecipeMaxQuantity, validateOrderForm } from '../../../restaurant/restaurantModel.js';
 import { Dialog } from '../../ui/Overlay';
 import { P1Button, P1Input, P1Select } from '../../ui/P1Atoms';
+import { ConfirmAction, ResourceState } from '../SharedViewParts';
 
 const ORDER_STATUSES = ['Pedido recibido', 'Confirmado', 'En preparacion', 'Listo', 'Entregado', 'Pagado'];
 const KANBAN_STAGES = ['Pedido recibido', 'Confirmado', 'En preparacion', 'Listo'];
@@ -54,6 +57,23 @@ function MetricCard({ icon: Icon, label, value, color }) {
       <div className="module-metric-content">
         <div className="module-metric-value">{value}</div>
         <div className="module-metric-label">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function OrdersLoadingSkeleton() {
+  return (
+    <div className="orders-loading-skeleton" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Cargando comandas...</span>
+      <div className="orders-loading-board" aria-hidden="true">
+        {['received', 'confirmed', 'preparing', 'ready'].map((stage) => (
+          <div className="orders-loading-column" key={stage}>
+            <span className="loading-skeleton orders-loading-column-header" />
+            <span className="loading-skeleton orders-loading-card" />
+            <span className="loading-skeleton orders-loading-card orders-loading-card-short" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -172,7 +192,144 @@ function KanbanBoard({ orders, onAdvance, onAdvanceItem, onCancel, stationFilter
   );
 }
 
-function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, notify }) {
+
+function ProductSearchSelect({ recipes, value, onChange, ariaLabel, error, errorId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const selectedRecipe = (recipes || []).find(r => String(r.id) === String(value));
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const filtered = (recipes || []).filter(r => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      (r.name && r.name.toLowerCase().includes(term)) ||
+      (r.category && r.category.toLowerCase().includes(term))
+    );
+  });
+
+  return (
+    <div className="product-search-select-wrapper" ref={wrapperRef}>
+      <button
+        type="button"
+        className={`product-select-trigger ${selectedRecipe ? 'has-value' : ''}`}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearchTerm('');
+        }}
+        aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? errorId : undefined}
+      >
+        {selectedRecipe ? (
+          <div className="product-select-selected-info">
+            <span className="product-select-selected-name">{selectedRecipe.name}</span>
+            <span className="product-select-selected-cat">{selectedRecipe.category}</span>
+            <strong className="product-select-selected-price">
+              S/ {Number(selectedRecipe.salePrice || 0).toFixed(2)}
+            </strong>
+          </div>
+        ) : (
+          <span className="product-select-placeholder">🔍 Buscar o seleccionar producto...</span>
+        )}
+        <ChevronDown size={14} className={`product-select-chevron ${isOpen ? 'rotate' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="product-select-dropdown">
+          <div className="product-select-search-bar">
+            <Search size={14} className="product-search-icon" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="product-select-search-input"
+              placeholder="Buscar por nombre o categoría..."
+              value={searchTerm}
+              aria-label="Buscar producto"
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') setIsOpen(false);
+              }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className="product-select-clear-search"
+                onClick={() => setSearchTerm('')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="product-select-options-list" role="listbox" aria-label="Productos disponibles">
+            {filtered.length === 0 ? (
+              <div className="product-select-no-results">
+                No se encontraron productos coincidentes
+              </div>
+            ) : (
+              filtered.map(r => {
+                const isSelected = String(r.id) === String(value);
+                return (
+                  <div
+                    key={r.id}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex="0"
+                    className={`product-select-option ${isSelected ? 'is-selected' : ''}`}
+                    onClick={() => {
+                      onChange(r.id);
+                      setIsOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onChange(r.id);
+                        setIsOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="product-option-left">
+                      <span className="product-option-name">{r.name}</span>
+                      <span className="product-option-category">{r.category}</span>
+                    </div>
+                    <strong className="product-option-price">
+                      S/ {Number(r.salePrice || 0).toFixed(2)}
+                    </strong>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function OrderFormModal({ order, stays, recipes, inventory, menuState = 'success', menuError, onRetryMenu, onClose, restaurantCommands, notify }) {
   const [form, setForm] = useState({
     source: order?.source || 'Barra',
     stayId: order?.stayId || '',
@@ -182,26 +339,76 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
     comment: order?.comment || '',
   });
   const activeRecipes = (recipes || []).filter(r => r.status === 'active');
-  const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
+  const idempotencyKeyRef = useRef(null);
+  const errorRef = useRef(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const setField = (k, v) => {
+    idempotencyKeyRef.current = null;
+    setForm(f => ({ ...f, [k]: v, ...(k === 'source' && v !== 'Habitación' ? { stayId: '' } : {}) }));
+    setError('');
+    clearFieldError(k);
+    if (k === 'source' && v !== 'Habitación') clearFieldError('stayId');
+  };
 
   const setItemField = (idx, k, v) => {
     const updated = [...form.items];
     updated[idx] = { ...updated[idx], [k]: v };
     setForm(f => ({ ...f, items: updated }));
+    idempotencyKeyRef.current = null;
+    setError('');
+    clearFieldError(`items.${idx}.${k}`);
+    if (k === 'menuItemId') clearFieldError(`items.${idx}.quantity`);
   };
 
-  const addItem = () => setForm(f => ({ ...f, items: [...f.items, { menuItemId: '', quantity: 1, notes: '' }] }));
-  const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, j) => j !== i) }));
+  const addItem = () => {
+    idempotencyKeyRef.current = null;
+    setForm(f => ({ ...f, items: [...f.items, { menuItemId: '', quantity: 1, notes: '' }] }));
+    setError('');
+  };
+  const removeItem = (i) => {
+    idempotencyKeyRef.current = null;
+    setForm(f => ({ ...f, items: f.items.filter((_, j) => j !== i) }));
+    setError('');
+    setFieldErrors({});
+  };
 
   const total = form.items.reduce((s, item) => {
     const recipe = (recipes || []).find(r => r.id === item.menuItemId);
     if (!recipe) return s;
     const price = Number(recipe.salePrice || 0);
-    return s + (price * item.quantity);
+    return s + (price * Number(item.quantity || 0));
   }, 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLockRef.current || submitting) return;
+    if (menuState !== 'success') {
+      setError('El menú todavía no está disponible. Actualice los datos antes de enviar el pedido.');
+      return;
+    }
+    const validationErrors = validateOrderForm(form, recipes, inventory);
+    if (Object.keys(validationErrors).length) {
+      setFieldErrors(validationErrors);
+      setError(validationErrors.items || 'Revise los campos marcados antes de enviar el pedido.');
+      return;
+    }
     const body = {
       source: form.source,
       stayId: form.stayId || null,
@@ -212,17 +419,37 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
       estimatedMinutes: Number(form.estimatedMinutes),
       comment: form.comment || null,
     };
+    let idempotencyKey = idempotencyKeyRef.current;
     try {
-      if (order) { await restaurantCommands.updateOrder(order.id, body); notify?.('Pedido actualizado', 'Los cambios se han guardado.', 'success'); }
-      else { await restaurantCommands.createOrder(body); notify?.('Pedido creado', 'El pedido está visible en cocina y bar.', 'success'); }
+      if (!idempotencyKey) {
+        idempotencyKey = createIdempotencyKey();
+        idempotencyKeyRef.current = idempotencyKey;
+      }
+    } catch (keyError) {
+      setError(keyError.message || 'No se pudo preparar una clave segura para el pedido.');
+      return;
+    }
+    submitLockRef.current = true;
+    setSubmitting(true);
+    setError('');
+    try {
+      if (order) { await restaurantCommands.updateOrder(order.id, body, idempotencyKey); notify?.('Pedido actualizado', 'Los cambios se han guardado.', 'success'); }
+      else { await restaurantCommands.createOrder(body, idempotencyKey); notify?.('Pedido creado', 'El pedido está visible en cocina y bar.', 'success'); }
       onClose();
-    } catch (err) { notify?.('Error', err.message, 'error'); }
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar el pedido. Revise el stock y vuelva a intentar.');
+    } finally {
+      submitLockRef.current = false;
+      setSubmitting(false);
+    }
   };
   return (
     <Dialog open onClose={onClose} title={order ? 'Editar Comanda' : 'Nueva Comanda (Cocina / Bar)'} wide>
-        <form className="order-form" onSubmit={handleSubmit}>
+        <form className="order-form" onSubmit={handleSubmit} noValidate>
+          {error ? <div ref={errorRef} className="alert-banner alert-banner-danger" role="alert" tabIndex="-1">{error}</div> : null}
+          {menuState !== 'success' ? <ResourceState status={menuState} error={menuError} onRetry={onRetryMenu} emptyTitle="Sin productos disponibles" emptyDescription="No hay productos activos para crear el pedido." /> : null}
           <div className="order-form-grid">
-            <P1Select label="Origen" value={form.source} onChange={e => setField('source', e.target.value)}>
+            <P1Select label="Origen" value={form.source} error={fieldErrors.source} onChange={e => setField('source', e.target.value)}>
                 {['Barra', 'Habitación', 'Terraza', 'Restaurante'].map(s => <option key={s}>{s}</option>)}
             </P1Select>
             <P1Select label="Método de pago" value={form.paymentMethod} onChange={e => setField('paymentMethod', e.target.value)}>
@@ -230,7 +457,7 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
             </P1Select>
           </div>
           {form.source === 'Habitación' && (
-            <P1Select label="Estadía / Habitación" value={form.stayId} onChange={e => setField('stayId', e.target.value)}>
+            <P1Select label="Estadía / Habitación" value={form.stayId} error={fieldErrors.stayId} onChange={e => setField('stayId', e.target.value)}>
                 <option value="">-- Sin vincular --</option>
                 {(stays||[]).map(s => <option key={s.id} value={s.id}>Hab. {s.roomNumber || s.roomId}</option>)}
             </P1Select>
@@ -240,22 +467,32 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
               <span>Productos y Notas de Preparación</span>
               <P1Button type="button" variant="secondary" className="btn-sm" onClick={addItem}><Plus size={14} />Agregar</P1Button>
             </div>
-            {form.items.map((item, i) => (
+            {form.items.map((item, i) => {
+              const recipe = activeRecipes.find((candidate) => String(candidate.id) === String(item.menuItemId));
+              const maxQuantity = getRecipeMaxQuantity(recipe, inventory);
+              const quantityError = fieldErrors[`items.${i}.quantity`];
+              const productError = fieldErrors[`items.${i}.menuItemId`];
+              return (
               <div key={i} className="order-form-item">
                 <div className="order-form-item-grid">
-                  <select className="form-control" value={item.menuItemId} onChange={e => setItemField(i, 'menuItemId', e.target.value)} aria-label={`Producto ${i + 1}`}>
-                    <option value=''>-- Seleccionar producto --</option>
-                    {activeRecipes.map(r => (
-                      <option key={r.id} value={r.id}>{r.name} - S/ {Number(r.salePrice || 0).toFixed(2)} ({r.category})</option>
-                    ))}
-                  </select>
+                  <ProductSearchSelect
+                    recipes={activeRecipes}
+                    value={item.menuItemId}
+                    onChange={(newVal) => setItemField(i, 'menuItemId', newVal)}
+                    ariaLabel={`Producto ${i + 1}`}
+                    error={productError}
+                    errorId={`order-item-${i}-product-error`}
+                  />
+                  {productError ? <span id={`order-item-${i}-product-error`} className="form-error" role="alert">{productError}</span> : null}
                   <div className="order-quantity-control">
                     <button type="button" className="icon-button" aria-label={`Reducir cantidad del producto ${i + 1}`} onClick={() => setItemField(i, 'quantity', Math.max(1, item.quantity - 1))}><Minus size={14} /></button>
-                    <span aria-live="polite">{item.quantity}</span>
-                    <button type="button" className="icon-button" aria-label={`Aumentar cantidad del producto ${i + 1}`} onClick={() => setItemField(i, 'quantity', item.quantity + 1)}><Plus size={14} /></button>
+                    <span aria-live="polite" aria-label={`Cantidad del producto ${i + 1}`}>{item.quantity}</span>
+                    <button type="button" className="icon-button" aria-label={`Aumentar cantidad del producto ${i + 1}`} disabled={maxQuantity !== null && item.quantity >= maxQuantity} onClick={() => setItemField(i, 'quantity', item.quantity + 1)}><Plus size={14} /></button>
                   </div>
                   <button type="button" className="icon-button btn-danger" aria-label={`Eliminar producto ${i + 1}`} onClick={() => removeItem(i)}><XCircle size={15} /></button>
                 </div>
+                {maxQuantity !== null ? <span className="form-helper" role="status">Disponible para {maxQuantity} unidad(es) con el inventario actual.</span> : null}
+                {quantityError ? <span className="form-error" role="alert">{quantityError}</span> : null}
                 <P1Input
                   aria-label={`Notas del producto ${i + 1}`}
                   placeholder="Especificación (ej: Sin cebolla, término medio, sin hielo)"
@@ -263,15 +500,16 @@ function OrderFormModal({ order, stays, recipes, onClose, restaurantCommands, no
                   onChange={e => setItemField(i, 'notes', e.target.value)}
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="order-form-total">
             <span>Total Estimado:</span>
             <strong>{formatMoney(total)}</strong>
           </div>
           <div className="form-actions">
-            <P1Button type="button" variant="secondary" onClick={onClose}>Cancelar</P1Button>
-            <P1Button type="submit">{order ? 'Guardar Cambios' : 'Enviar Comanda'}</P1Button>
+            <P1Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancelar</P1Button>
+            <P1Button type="submit" disabled={submitting || menuState !== 'success'} aria-busy={submitting}>{submitting ? 'Enviando...' : order ? 'Guardar Cambios' : 'Enviar Comanda'}</P1Button>
           </div>
         </form>
     </Dialog>
@@ -282,15 +520,41 @@ export default function OrdersView({ notify }) {
   const { state, restaurantCommands } = useHotel();
   const ordersResource = useRestaurantResource(state, restaurantCommands, 'orders');
   const menuResource = useRestaurantResource(state, restaurantCommands, 'menu');
+  const { status: menuStatus, reload: reloadMenu } = menuResource;
+
+  useEffect(() => {
+    if (menuStatus !== 'idle') return;
+    reloadMenu()?.catch(() => {});
+  }, [menuStatus, reloadMenu]);
   
   const [stationFilter, setStationFilter] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Activos');
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState(undefined);
+  const [pendingCancellation, setPendingCancellation] = useState(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
   const orders = ordersResource.data;
   const recipes = menuResource.data;
   const stays = state.stays || [];
+  const ordersState = ordersResource.isForbidden
+    ? 'forbidden'
+    : ordersResource.status === 'error'
+      ? orders.length ? 'refreshing' : 'error'
+      : ordersResource.isEmpty
+        ? 'empty'
+        : ordersResource.isSuccess
+          ? 'success'
+          : 'loading';
+  const menuState = menuResource.isForbidden
+    ? 'forbidden'
+    : menuResource.status === 'error'
+      ? 'error'
+      : menuResource.isEmpty
+        ? 'empty'
+        : menuResource.isSuccess
+          ? 'success'
+          : 'loading';
 
   const filtered = orders.filter(o => {
     const mStatus = filterStatus === 'Todos' ? true : filterStatus === 'Activos' ? !['Pagado','Cancelado'].includes(o.status) : filterStatus === 'Historial' ? ['Pagado','Cancelado'].includes(o.status) : o.status === filterStatus;
@@ -320,13 +584,22 @@ export default function OrdersView({ notify }) {
     } catch (err) { notify?.('Error', err.message, 'error'); }
   }, [restaurantCommands, notify]);
 
-  const handleCancel = useCallback(async (order) => {
-    if (!window.confirm('¿Cancelar esta comanda? Se liberará el stock reservado.')) return;
+  const handleCancel = useCallback((order) => {
+    setPendingCancellation(order);
+  }, []);
+
+  const confirmCancel = useCallback(async () => {
+    if (!pendingCancellation || cancellingOrderId) return;
+    setCancellingOrderId(pendingCancellation.id);
     try {
-      await restaurantCommands.cancelOrder(order.id, { reason: 'Cancelación operativa' });
+      await restaurantCommands.cancelOrder(pendingCancellation.id, { reason: 'Cancelación operativa' });
       notify?.('Comanda cancelada', 'Se ha cancelado la comanda.', 'success');
     } catch (err) { notify?.('Error', err.message, 'error'); }
-  }, [restaurantCommands, notify]);
+    finally {
+      setCancellingOrderId(null);
+      setPendingCancellation(null);
+    }
+  }, [cancellingOrderId, notify, pendingCancellation, restaurantCommands]);
 
   return (
     <div className="view-container orders-view">
@@ -400,25 +673,48 @@ export default function OrdersView({ notify }) {
       </div>
 
       {/* Kanban Board */}
-      <KanbanBoard
-        orders={filtered}
-        onAdvance={handleAdvance}
-        onAdvanceItem={handleAdvanceItem}
-        onCancel={handleCancel}
-        stationFilter={stationFilter}
-      />
+      <ResourceState
+        status={ordersState}
+        error={ordersResource.error}
+        onRetry={ordersResource.reload}
+        loadingFallback={<OrdersLoadingSkeleton />}
+        emptyTitle="Sin pedidos registrados"
+        emptyDescription="Los pedidos nuevos aparecerán aquí cuando se envíen desde el editor."
+      >
+        {ordersResource.status === 'error' && orders.length ? <div className="alert-banner alert-banner-danger" role="alert"><span>{ordersResource.error}</span> <button type="button" className="btn btn-sm btn-outline" onClick={ordersResource.reload}>Reintentar</button></div> : null}
+        <KanbanBoard
+          orders={filtered}
+          onAdvance={handleAdvance}
+          onAdvanceItem={handleAdvanceItem}
+          onCancel={handleCancel}
+          stationFilter={stationFilter}
+        />
+      </ResourceState>
 
       {/* Editor Modal */}
       {editor !== undefined && (
-        <OrderFormModal
-          order={editor}
-          stays={stays}
-          recipes={recipes}
-          onClose={() => setEditor(undefined)}
+              <OrderFormModal
+                order={editor}
+                stays={stays}
+                recipes={recipes}
+                inventory={state.inventory || []}
+                menuState={menuState}
+                menuError={menuResource.error}
+                onRetryMenu={menuResource.reload}
+                onClose={() => setEditor(undefined)}
           restaurantCommands={restaurantCommands}
           notify={notify}
         />
       )}
+      <ConfirmAction
+        open={Boolean(pendingCancellation)}
+        onCancel={() => setPendingCancellation(null)}
+        onConfirm={confirmCancel}
+        title="Cancelar comanda"
+        description="Se liberará el stock reservado para esta comanda."
+        confirmLabel="Cancelar comanda"
+        busy={Boolean(cancellingOrderId)}
+      />
     </div>
   );
 }

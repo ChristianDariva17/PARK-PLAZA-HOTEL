@@ -85,7 +85,7 @@ export const customerAmenityCommands = pgTable('customer_amenity_commands', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   foreignKey({ name: 'customer_amenity_commands_property_fkey', columns: [table.propertyId], foreignColumns: [properties.id] }).onDelete('restrict'),
-  foreignKey({ name: 'customer_amenity_commands_reservation_fkey', columns: [table.amenityReservationId], foreignColumns: [amenityReservations.id] }).onDelete('cascade'),
+  foreignKey({ name: 'customer_amenity_commands_reservation_property_fkey', columns: [table.amenityReservationId, table.propertyId], foreignColumns: [amenityReservations.id, amenityReservations.propertyId] }).onDelete('cascade'),
   unique('customer_amenity_commands_customer_key_unique').on(table.customerAccountId, table.idempotencyKey),
   index('customer_amenity_commands_reservation_idx').on(table.amenityReservationId, table.createdAt),
 ]);

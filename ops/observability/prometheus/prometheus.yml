@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: park-plaza-api
+    metrics_path: /api/metrics
+    bearer_token: park-plaza-local-metrics-token-2026
+    static_configs:
+      - targets: ['api:3000']

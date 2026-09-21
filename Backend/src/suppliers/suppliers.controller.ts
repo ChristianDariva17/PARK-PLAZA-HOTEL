@@ -12,6 +12,7 @@ import {
 import { SuppliersService } from './suppliers.service.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import { CurrentAccount } from '../auth/decorators/current-account.decorator.js';
+import type { AuthenticatedAccount } from '../auth/auth.types.js';
 import {
   parseCreateSupplierDto,
   parseUpdateSupplierDto,
@@ -31,14 +32,14 @@ export class SuppliersController {
 
   @Get('reorder-suggestions')
   @RequirePermissions('suppliers.read')
-  async getReorderSuggestions(@CurrentAccount() account: any) {
+  async getReorderSuggestions(@CurrentAccount() account: AuthenticatedAccount) {
     return this.suppliersService.getReorderSuggestions(account.propertyId);
   }
 
   @Get('purchase-orders')
   @RequirePermissions('suppliers.read')
   async listPurchaseOrders(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Query('supplierId') supplierId?: string,
     @Query('status') status?: string,
   ) {
@@ -51,7 +52,7 @@ export class SuppliersController {
   @Get('purchase-orders/:id')
   @RequirePermissions('suppliers.read')
   async getPurchaseOrder(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string
   ) {
     return this.suppliersService.getPurchaseOrder(account.propertyId, id);
@@ -60,40 +61,40 @@ export class SuppliersController {
   @Post('purchase-orders')
   @RequirePermissions('suppliers.create')
   async createPurchaseOrder(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     const dto = parseCreatePurchaseOrderDto(body);
-    return this.suppliersService.createPurchaseOrder(account.propertyId, dto, parseIdempotencyKey(idempotencyKey), account.id);
+    return this.suppliersService.createPurchaseOrder(account.propertyId, dto, parseIdempotencyKey(idempotencyKey), account.accountId);
   }
 
   @Post('purchase-orders/:id/send')
   @RequirePermissions('suppliers.update')
   async sendPurchaseOrder(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
-    return this.suppliersService.sendPurchaseOrder(account.propertyId, id, parseIdempotencyKey(idempotencyKey), account.id);
+    return this.suppliersService.sendPurchaseOrder(account.propertyId, id, parseIdempotencyKey(idempotencyKey), account.accountId);
   }
 
   @Post('purchase-orders/:id/receive')
   @RequirePermissions('suppliers.update')
   async receivePurchaseOrder(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     const dto = parseReceivePurchaseOrderDto(body);
-    return this.suppliersService.receivePurchaseOrder(account.propertyId, id, dto, parseIdempotencyKey(idempotencyKey), account.id);
+    return this.suppliersService.receivePurchaseOrder(account.propertyId, id, dto, parseIdempotencyKey(idempotencyKey), account.accountId);
   }
 
   @Post(':id/rate')
   @RequirePermissions('suppliers.update')
   async rateSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any
   ) {
@@ -104,7 +105,7 @@ export class SuppliersController {
   @Get()
   @RequirePermissions('suppliers.read')
   async listSuppliers(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Query('page') pageStr?: string,
     @Query('pageSize') pageSizeStr?: string,
     @Query('q') query?: string,
@@ -118,7 +119,7 @@ export class SuppliersController {
   @Get(':id')
   @RequirePermissions('suppliers.read')
   async getSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string
   ) {
     return this.suppliersService.getSupplier(account.propertyId, id);
@@ -127,7 +128,7 @@ export class SuppliersController {
   @Get(':id/inventory')
   @RequirePermissions('suppliers.read')
   async getSupplierInventory(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string
   ) {
     return this.suppliersService.getSupplierInventory(account.propertyId, id);
@@ -136,7 +137,7 @@ export class SuppliersController {
   @Post(':id/inventory/assign')
   @RequirePermissions('suppliers.update')
   async assignSupplierInventory(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any
   ) {
@@ -147,32 +148,32 @@ export class SuppliersController {
   @Post(':id/restock')
   @RequirePermissions('suppliers.update')
   async restockFromSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     if (!idempotencyKey) throw new BadRequestException('Idempotency-Key header is required');
     const dto = parseRestockFromSupplierDto(body);
-    return this.suppliersService.restockFromSupplier(account.propertyId, id, dto, idempotencyKey, account.id);
+    return this.suppliersService.restockFromSupplier(account.propertyId, id, dto, idempotencyKey, account.accountId);
   }
 
   @Post()
   @RequirePermissions('suppliers.create')
   async createSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     if (!idempotencyKey) throw new BadRequestException('Idempotency-Key header is required');
     const dto = parseCreateSupplierDto(body);
-    return this.suppliersService.createSupplier(account.propertyId, dto, idempotencyKey, account.id);
+    return this.suppliersService.createSupplier(account.propertyId, dto, idempotencyKey, account.accountId);
   }
 
   @Patch(':id')
   @RequirePermissions('suppliers.update')
   async updateSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
@@ -182,32 +183,32 @@ export class SuppliersController {
     if (typeof expectedVersion !== 'number') throw new BadRequestException('expectedVersion is required');
     
     const dto = parseUpdateSupplierDto(body);
-    return this.suppliersService.updateSupplier(account.propertyId, id, dto, expectedVersion, idempotencyKey, account.id);
+    return this.suppliersService.updateSupplier(account.propertyId, id, dto, expectedVersion, idempotencyKey, account.accountId);
   }
 
   @Post(':id/archive')
   @RequirePermissions('suppliers.archive')
   async archiveSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     if (!idempotencyKey) throw new BadRequestException('Idempotency-Key header is required');
     const dto = parseArchiveSupplierDto(body);
-    return this.suppliersService.archiveSupplier(account.propertyId, id, dto, idempotencyKey, account.id);
+    return this.suppliersService.archiveSupplier(account.propertyId, id, dto, idempotencyKey, account.accountId);
   }
 
   @Post(':id/reactivate')
   @RequirePermissions('suppliers.archive')
   async reactivateSupplier(
-    @CurrentAccount() account: any,
+    @CurrentAccount() account: AuthenticatedAccount,
     @Param('id') id: string,
     @Body() body: any,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
     if (!idempotencyKey) throw new BadRequestException('Idempotency-Key header is required');
     const dto = parseReactivateSupplierDto(body);
-    return this.suppliersService.reactivateSupplier(account.propertyId, id, dto, idempotencyKey, account.id);
+    return this.suppliersService.reactivateSupplier(account.propertyId, id, dto, idempotencyKey, account.accountId);
   }
 }

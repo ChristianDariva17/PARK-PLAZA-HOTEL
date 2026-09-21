@@ -5,7 +5,7 @@ import { DEFAULT_PARKING_SPACES } from './ParkingVisualMap.jsx';
 const visualMapSource = readFileSync(new URL('./ParkingVisualMap.jsx', import.meta.url), 'utf8');
 const exitModalSource = readFileSync(new URL('./ParkingExitModal.jsx', import.meta.url), 'utf8');
 const ticketModalSource = readFileSync(new URL('./ParkingTicketModal.jsx', import.meta.url), 'utf8');
-const p1ViewsSource = readFileSync(new URL('../components/views/P1Views.jsx', import.meta.url), 'utf8');
+const parkingViewSource = readFileSync(new URL('./ParkingView.jsx', import.meta.url), 'utf8');
 
 describe('Parking Enhancements Contract and Integration', () => {
   it('defines 16 standard spaces with auto and moto segregation', () => {
@@ -45,15 +45,14 @@ describe('Parking Enhancements Contract and Integration', () => {
     expect(ticketModalSource).toContain('Conserve este ticket');
   });
 
-  it('P1Views integrates map toggle, exit modal, ticket modal, and check-out vehicle warning', () => {
-    expect(p1ViewsSource).toContain('import { ParkingVisualMap, DEFAULT_PARKING_SPACES } from "../../parking/ParkingVisualMap.jsx";');
-    expect(p1ViewsSource).toContain('import { ParkingExitModal } from "../../parking/ParkingExitModal.jsx";');
-    expect(p1ViewsSource).toContain('import { ParkingTicketModal } from "../../parking/ParkingTicketModal.jsx";');
-    expect(p1ViewsSource).toContain('🗺️ Mapa Visual');
-    expect(p1ViewsSource).toContain('📋 Lista de Registros');
-    expect(p1ViewsSource).toContain('<ParkingVisualMap');
-    expect(p1ViewsSource).toContain('<ParkingExitModal');
-    expect(p1ViewsSource).toContain('<ParkingTicketModal');
-    expect(p1ViewsSource).toContain('Vehículo(s) aún registrados en cochera:');
+  it('ParkingView integrates map toggle, exit modal, and ticket modal', () => {
+    expect(parkingViewSource).toContain("from './ParkingVisualMap.jsx'");
+    expect(parkingViewSource).toContain("from './ParkingExitModal.jsx'");
+    expect(parkingViewSource).toContain("from './ParkingTicketModal.jsx'");
+    expect(parkingViewSource).toContain('🗺️ Mapa Visual');
+    expect(parkingViewSource).toContain('📋 Lista de Registros');
+    expect(parkingViewSource).toContain('<ParkingVisualMap');
+    expect(parkingViewSource).toContain('<ParkingExitModal');
+    expect(parkingViewSource).toContain('<ParkingTicketModal');
   });
 });

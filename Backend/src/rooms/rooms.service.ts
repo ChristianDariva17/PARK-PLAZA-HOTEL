@@ -6,7 +6,7 @@ import { DATABASE, type Database } from '../database/database.module.js';
 import { getPostgresErrorFields } from '../database/postgres-error.js';
 import { accounts, auditEvents, roomCategories, roomCategoryAmenities, rooms } from '../database/schema/index.js';
 import { acquirePropertyTransactionLock } from '../database/transaction-policy.js';
-import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { OutboxService } from '../audit/outbox.service.js';
 import type { BlockRoomDto, UpdateCategoryAmenitiesDto, UpdateCategoryDto, UpdateRoomDto } from './rooms.dto.js';
 import { MASTER_ROOM_AMENITIES } from './rooms-amenities.catalog.js';
 
@@ -81,7 +81,7 @@ export class RoomsService {
   constructor(
     @Inject(DATABASE) private readonly database: Database,
     private readonly audit: AuditService,
-    private readonly realtime: RealtimeGateway,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(propertyId: string): Promise<{ rooms: RoomResponse[]; categories: RoomCategoryResponse[] }> {
@@ -96,8 +96,8 @@ export class RoomsService {
     return { categories: categoryRows.map((row) => this.toCategoryResponse(row)), rooms: roomRows.map((row) => this.toRoomResponse(row)) };
   }
 
-  async listCategories(propertyId: string): Promise<RoomCategoryResponse[]> {
-    const rows = await this.database.select(categorySelection).from(roomCategories)
+  async listCategories(propertyId: string, executor: Pick<Database, 'select'> = this.database): Promise<RoomCategoryResponse[]> {
+    const rows = await executor.select(categorySelection).from(roomCategories)
       .where(eq(roomCategories.propertyId, propertyId))
       .orderBy(asc(roomCategories.name), asc(roomCategories.code), asc(roomCategories.id));
     return rows.map((row) => this.toCategoryResponse(row));
@@ -137,7 +137,7 @@ export class RoomsService {
           ...this.auditBase(actor, context), eventType: 'room.updated', subjectType: 'room', subjectId: roomId,
           metadata: { fields: changedFields },
         }, tx);
-        return this.toRoomResponse({
+        const response = this.toRoomResponse({
           ...updated,
           categoryId: category.id,
           categoryCode: category.code,
@@ -146,9 +146,17 @@ export class RoomsService {
           categoryBaseNightlyRate: category.baseNightlyRate,
           categoryCreatedAt: category.createdAt,
         });
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'room:updated',
+          aggregateType: 'room',
+          aggregateId: roomId,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: response as unknown as Record<string, unknown>,
+        });
+        return response;
       });
 
-      this.realtime.emitToProperty(actor.propertyId, 'room:updated', response);
       return response;
     } catch (error) {
       this.rethrowConstraint(error);
@@ -181,13 +189,19 @@ export class RoomsService {
           ...this.auditBase(actor, context), eventType: 'room_category.updated', subjectType: 'room_category', subjectId: categoryId,
           metadata: { fields: changedFields, changes },
         }, tx);
-        return this.toCategoryResponse(saved);
-      });
-
-      const allCategories = await this.listCategories(actor.propertyId);
-      this.realtime.emitToProperty(actor.propertyId, 'room:category_updated', {
-        category: updated,
-        categories: allCategories,
+        const response = this.toCategoryResponse(saved);
+        await this.outbox.enqueue(tx, {
+          propertyId: actor.propertyId,
+          eventType: 'room:category_updated',
+          aggregateType: 'room_category',
+          aggregateId: categoryId,
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+          payload: {
+            category: response,
+            categories: await this.listCategories(actor.propertyId, tx as any),
+          },
+        });
+        return response;
       });
 
       return updated;
@@ -196,8 +210,8 @@ export class RoomsService {
     }
   }
 
-  async listAmenities(propertyId: string) {
-    const rows = await this.database.select({
+  async listAmenities(propertyId: string, executor: Pick<Database, 'select'> = this.database) {
+    const rows = await executor.select({
       categoryId: roomCategoryAmenities.categoryId,
       amenityKey: roomCategoryAmenities.amenityKey,
     })
@@ -266,13 +280,19 @@ export class RoomsService {
         subjectId: categoryId,
         metadata: { categoryName: cat[0].name, amenitiesCount: uniqueKeys.length, amenityKeys: uniqueKeys },
       }, tx);
-    });
 
-    const allData = await this.listAmenities(actor.propertyId);
-    this.realtime.emitToProperty(actor.propertyId, 'room:amenities_updated', {
-      categoryId,
-      amenityKeys,
-      ...allData,
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'room:amenities_updated',
+        aggregateType: 'room_category',
+        aggregateId: categoryId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: {
+          categoryId,
+          amenityKeys: uniqueKeys,
+          ...await this.listAmenities(actor.propertyId, tx as any),
+        },
+      });
     });
 
     return { success: true, categoryId, amenityKeys };
@@ -327,11 +347,26 @@ export class RoomsService {
         ...this.auditBase(actor, context), eventType: input.blocked ? 'room.blocked' : 'room.unblocked', subjectType: 'room', subjectId: roomId,
         metadata: { reason: input.reason, previousStatus: current.status, nextStatus: target },
       }, tx);
-      return this.toRoomResponse({ ...current, ...updated });
+      const response = this.toRoomResponse({ ...current, ...updated });
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'room:status_changed',
+        aggregateType: 'room',
+        aggregateId: roomId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: response as unknown as Record<string, unknown>,
+      });
+      await this.outbox.enqueue(tx, {
+        propertyId: actor.propertyId,
+        eventType: 'room:updated',
+        aggregateType: 'room',
+        aggregateId: roomId,
+        ...(context.requestId ? { requestId: context.requestId } : {}),
+        payload: response as unknown as Record<string, unknown>,
+      });
+      return response;
     });
 
-    this.realtime.emitToProperty(actor.propertyId, 'room:status_changed', response);
-    this.realtime.emitToProperty(actor.propertyId, 'room:updated', response);
     return response;
   }
 

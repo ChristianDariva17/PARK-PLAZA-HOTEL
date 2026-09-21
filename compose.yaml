@@ -14,6 +14,15 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   setup:
     build:
       context: Backend
@@ -25,7 +34,6 @@ services:
       NODE_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_SSL: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,20 +55,69 @@ services:
       NODE_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_SSL: "false"
       API_HOST: 0.0.0.0
       API_PORT: 3000
+      API_REPLICA_MODE: shared
+      API_TRUST_PROXY_HOPS: 1
+      METRICS_TOKEN: park-plaza-local-metrics-token-2026
+      REDIS_URL: redis://redis:6379
+      REDIS_TLS: 'false'
+      REDIS_TLS_REQUIRED: 'false'
+      DATABASE_SSL_REQUIRED: 'false'
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       setup:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 10s
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: [observability]
+    volumes:
+      - ./ops/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-park-plaza-local}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/observability/grafana/frontend-quality-dashboard.json:/var/lib/grafana/dashboards/frontend-quality-dashboard.json:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     restart: unless-stopped
 
   frontend:
@@ -97,3 +154,5 @@ services:
 
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:

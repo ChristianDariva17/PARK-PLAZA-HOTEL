@@ -7,8 +7,13 @@
   "engines": {
     "node": ">=22"
   },
+  "overrides": {
+    "fastify": "$fastify"
+  },
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src test",
     "start": "node dist/src/main.js",
     "start:dev": "nest start --watch",
     "migrate": "tsx src/database/migrate.ts",
@@ -16,8 +21,11 @@
     "provision:rooms": "tsx src/database/provision-room-inventory.ts",
     "db:test-query": "tsx src/database/test-query.js",
     "audit:production": "npm audit --omit=dev --audit-level=high",
+    "architecture:check": "dependency-cruiser --config .dependency-cruiser.cjs src",
     "test": "vitest run --exclude test/database.integration.spec.ts",
-    "test:integration": "vitest run test/database.integration.spec.ts"
+    "test:coverage": "vitest run --coverage --exclude test/database.integration.spec.ts",
+    "test:integration": "vitest run test/database.integration.spec.ts",
+    "verify:contract": "node ../ops/verify-api-contract.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -27,15 +35,19 @@
     "@nestjs/core": "^11.2.3",
     "@nestjs/platform-fastify": "^11.2.3",
     "@nestjs/platform-socket.io": "^11.2.3",
+    "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.2.3",
+    "@prometheus-io/client": "^0.16.1",
+    "@socket.io/redis-adapter": "^8.3.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.45.2",
-    "fastify": "5.11.3",
+    "fastify": "^5.12.4",
     "google-auth-library": "^11.0.2",
     "pg": "^8.16.3",
+    "redis": "^4.7.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
@@ -45,7 +57,10 @@
     "@nestjs/cli": "^11.0.10",
     "@types/node": "^24.3.0",
     "@types/pg": "^8.15.5",
+    "@vitest/coverage-v8": "^3.2.4",
+    "dependency-cruiser": "^18.4.0",
     "drizzle-kit": "^0.31.10",
+    "oxlint": "^1.75.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

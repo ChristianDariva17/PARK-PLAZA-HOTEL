@@ -5,7 +5,16 @@ describe('shared resource boundary', () => {
   it('requires exact money strings and exposes normalized response states', () => {
     expect(serializeExactMoney('12.50')).toBe('12.50');
     expect(() => serializeExactMoney(12.5)).toThrow(TypeError);
-    expect(normalizeResourceError(new AuthRequestError('ignored', { status: 403, code: 'forbidden' }))).toEqual({ code: 'forbidden', status: 403, retry: false, requestId: null });
+    expect(normalizeResourceError(new AuthRequestError('safe message', { status: 403, code: 'forbidden' }))).toMatchObject({
+      message: 'safe message',
+      code: 'forbidden',
+      status: 403,
+      type: 'forbidden',
+      retryable: false,
+      ambiguous: false,
+      reloadRecommended: false,
+      requestId: null,
+    });
   });
 
   it('retains a supplied idempotency key across command retries', async () => {

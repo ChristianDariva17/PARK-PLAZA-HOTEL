@@ -26,7 +26,7 @@
   --color-gold-dark: #8a642c;
   --color-text: #0f172a;
   --color-body: #334155;
-  --color-muted: #64748b;
+  --color-muted: #475569;
   --text-muted: var(--color-muted); /* Fallback de compatibilidad */
   --color-border: #e6e4df;
   --color-border-strong: #cfccc4;
@@ -89,4 +89,3 @@
      --bp-desktop:   1280px (Monitores estándar / Mostrador)
   */
 }
-

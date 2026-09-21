@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adaptMenuItem, adaptOrdersList, getItemDisplayPrice } from './restaurantModel.js';
+import { adaptMenuItem, adaptOrdersList, getItemDisplayPrice, getRecipeMaxQuantity, validateOrderForm } from './restaurantModel.js';
 
 describe('adaptOrdersList', () => {
   it('maps the confirmed minimal order payload without unrelated fields', () => {
@@ -92,5 +92,37 @@ describe('getItemDisplayPrice', () => {
 
   it('returns null for null input', () => {
     expect(getItemDisplayPrice(null)).toBeNull();
+  });
+});
+
+describe('order form validation', () => {
+  const recipe = {
+    id: 'menu-1',
+    status: 'active',
+    salePrice: 12,
+    ingredients: [{ inventoryItemId: 'inventory-1', quantity: 2, unit: 'und' }],
+  };
+  const inventory = [{ id: 'inventory-1', unit: 'und', available: 5 }];
+
+  it('calculates a conservative serving limit from current inventory', () => {
+    expect(getRecipeMaxQuantity(recipe, inventory)).toBe(2);
+  });
+
+  it('reports missing products, room linkage, and insufficient stock', () => {
+    expect(validateOrderForm({
+      source: 'Habitación',
+      stayId: '',
+      items: [{ menuItemId: 'menu-1', quantity: 3 }],
+    }, [recipe], inventory)).toEqual({
+      stayId: 'Seleccione la estadía o habitación asociada.',
+      'items.0.quantity': 'Stock insuficiente. Disponible para 2 unidad(es).',
+    });
+    expect(validateOrderForm({ source: 'Barra', items: [{ menuItemId: '', quantity: 1 }] })).toEqual({
+      'items.0.menuItemId': 'Seleccione un producto.',
+    });
+  });
+
+  it('rejects an empty cart before building the backend payload', () => {
+    expect(validateOrderForm({ source: 'Barra', items: [] })).toEqual({ items: 'Agregue al menos un producto al pedido.' });
   });
 });

@@ -9,6 +9,7 @@ export function EventsModuleRoot({ view = 'list' }) {
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isManagingPolicies, setIsManagingPolicies] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   const handleCreateEvent = () => {
     setSelectedEventId(null);
@@ -22,10 +23,7 @@ export function EventsModuleRoot({ view = 'list' }) {
 
   const handleSaved = () => {
     setIsEditing(false);
-    // Component will unmount editor and list will re-fetch automatically via the useEventsResource hook instance inside it, 
-    // or we can force refresh if we lift the state up. For this implementation, let's keep it simple.
-    // In a real app we'd have a global context or pass refresh.
-    window.location.reload(); // Simple force refresh for this MVP step
+    setRefreshVersion((value) => value + 1);
   };
 
   const handleCancelEdit = () => {
@@ -42,11 +40,13 @@ export function EventsModuleRoot({ view = 'list' }) {
         />
       ) : view === 'calendar' ? (
         <EventCalendarView 
+          key={`calendar-${refreshVersion}`}
           onSelectEvent={setSelectedEventId} 
           onCreateEvent={handleCreateEvent}
         />
       ) : (
         <EventsListView 
+          key={`list-${refreshVersion}`}
           onSelectEvent={setSelectedEventId} 
           onCreateEvent={handleCreateEvent}
           onManagePolicies={() => setIsManagingPolicies(true)}
@@ -58,10 +58,7 @@ export function EventsModuleRoot({ view = 'list' }) {
           eventId={selectedEventId} 
           onClose={() => setSelectedEventId(null)}
           onEdit={handleEditEvent}
-          onRefresh={() => {
-            // refresh data
-            window.location.reload();
-          }}
+          onRefresh={() => setRefreshVersion((value) => value + 1)}
         />
       )}
     </div>

@@ -46,30 +46,30 @@ export const eventsClient = {
   },
 
   async createEvent(data) {
-    const payload = { ...data, idempotencyKey: generateIdempotencyKey() };
     return authRequest('/api/events', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify(data),
     });
   },
 
   async updateEvent(eventId, expectedVersion, data) {
-    const payload = { ...data, expectedVersion, idempotencyKey: generateIdempotencyKey() };
     return authRequest(`/api/events/${eventId}`, {
       method: 'PATCH',
-      body: JSON.stringify(payload),
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify({ ...data, expectedVersion }),
     });
   },
 
   async confirmEvent(eventId, expectedVersion, depositReceivedAmount = 0, paymentMethod = 'Efectivo', notes = '') {
     return authRequest(`/api/events/${eventId}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ 
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify({
         expectedVersion, 
         depositReceivedAmount, 
         paymentMethod, 
-        notes, 
-        idempotencyKey: generateIdempotencyKey() 
+        notes,
       }),
     });
   },
@@ -77,21 +77,24 @@ export const eventsClient = {
   async advanceEvent(eventId, expectedVersion, action) {
     return authRequest(`/api/events/${eventId}/${action}`, {
       method: 'POST',
-      body: JSON.stringify({ expectedVersion, idempotencyKey: generateIdempotencyKey() }),
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify({ expectedVersion }),
     });
   },
 
   async cancelEvent(eventId, expectedVersion, reason) {
     return authRequest(`/api/events/${eventId}/cancel`, {
       method: 'POST',
-      body: JSON.stringify({ expectedVersion, reason, idempotencyKey: generateIdempotencyKey() }),
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify({ expectedVersion, reason }),
     });
   },
 
   async archiveEvent(eventId, expectedVersion) {
     return authRequest(`/api/events/${eventId}/archive`, {
       method: 'POST',
-      body: JSON.stringify({ expectedVersion, idempotencyKey: generateIdempotencyKey() }),
+      headers: { 'Idempotency-Key': generateIdempotencyKey() },
+      body: JSON.stringify({ expectedVersion }),
     });
   }
 };

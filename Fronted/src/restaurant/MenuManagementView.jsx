@@ -21,6 +21,7 @@ import { useHotel } from '../state/hotelContext.js';
 import { useAuth } from '../auth/authContext.js';
 import { hasKitchenManagementAccess } from '../auth/permissions.js';
 import { Dialog } from '../components/ui/Overlay.jsx';
+import { FilterBar } from '../components/ui/FilterBar.jsx';
 import { PageHeader, MetricStrip, StatusBadge, EmptyState } from '../components/views/SharedViewParts.jsx';
 
 // ─── Categories & Icon Helper ──────────────────────────────────────────────────
@@ -1214,7 +1215,7 @@ export function MenuManagementView({ notify }) {
       </div>
 
       {/* ─── Standard Filter Bar ────────────────────────────────────────────── */}
-      <div className="filter-bar menu-surface-secondary69">
+      <FilterBar label="Filtros del menú" className="menu-surface-secondary69">
         <div className="menu-surface-secondary70">
           <label className="search-label menu-surface-secondary71">
             <Search size={16} />
@@ -1261,7 +1262,7 @@ export function MenuManagementView({ notify }) {
           </div>
           <span className="filter-result">{processedItems.length} productos</span>
         </div>
-      </div>
+      </FilterBar>
 
       {/* ─── Content Render: Grid vs Table ─────────────────────────────────── */}
       {processedItems.length === 0 ? (

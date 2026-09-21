@@ -1,0 +1,33 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+  "files": {
+    "includes": [
+      "src/auth/AuthContext.test.jsx",
+      "src/events/EventDetailDrawer.test.jsx",
+      "src/events/EventEditor.test.jsx",
+      "src/events/EventSpacePolicyEditor.test.jsx",
+      "src/events/useEventsResource.test.jsx",
+      "src/suppliers/PurchaseOrderModal.test.jsx",
+      "src/hooks/useWebSocket.test.jsx",
+      "src/views/staff/StaffEditorModal.test.jsx"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": false
+  }
+}

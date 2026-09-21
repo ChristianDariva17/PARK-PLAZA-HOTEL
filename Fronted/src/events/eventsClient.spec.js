@@ -11,7 +11,7 @@ describe('eventsClient', () => {
     vi.clearAllMocks();
   });
 
-  it('includes expectedVersion and idempotencyKey in updateEvent', async () => {
+  it('sends expectedVersion in the body and idempotency key in the header for updateEvent', async () => {
     vi.mocked(authRequest).mockResolvedValueOnce({ id: 'ev-1', version: 2 });
     
     const result = await eventsClient.updateEvent('ev-1', 1, { title: 'Updated' });
@@ -21,18 +21,20 @@ describe('eventsClient', () => {
       body: expect.stringMatching(/"expectedVersion":1/),
     }));
     expect(authRequest).toHaveBeenCalledWith('/api/events/ev-1', expect.objectContaining({
-      body: expect.stringMatching(/"idempotencyKey":/),
+      headers: { 'Idempotency-Key': expect.any(String) },
+      body: expect.not.stringMatching(/"idempotencyKey"/),
     }));
     expect(result).toEqual({ id: 'ev-1', version: 2 });
   });
 
-  it('includes expectedVersion and idempotencyKey in confirmEvent', async () => {
+  it('sends expectedVersion in the body and idempotency key in the header for confirmEvent', async () => {
     vi.mocked(authRequest).mockResolvedValueOnce({ id: 'ev-1', status: 'confirmed' });
     
     await eventsClient.confirmEvent('ev-1', 2);
     
     expect(authRequest).toHaveBeenCalledWith('/api/events/ev-1/confirm', expect.objectContaining({
       method: 'POST',
+      headers: { 'Idempotency-Key': expect.any(String) },
       body: expect.stringMatching(/"expectedVersion":2/),
     }));
   });

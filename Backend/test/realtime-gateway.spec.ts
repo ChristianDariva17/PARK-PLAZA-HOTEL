@@ -1,14 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RealtimeGateway } from '../src/realtime/realtime.gateway.js';
 
-function config() {
+function config(replicaMode = 'single') {
   const values: Record<string, unknown> = {
     AUTH_COOKIE_NAME: 'pp_session',
     CUSTOMER_COOKIE_NAME: 'customer_session',
     CUSTOMER_SESSION_IDLE_HOURS: 24,
+    API_REPLICA_MODE: replicaMode,
   };
   return {
     get: vi.fn((key: string) => values[key]),
+  } as any;
+}
+
+function redis() {
+  return {
+    isEnabled: vi.fn().mockReturnValue(true),
+    getPubSubClients: vi.fn().mockReturnValue({ pubClient: {}, subClient: {} }),
+  } as any;
+}
+
+function metrics() {
+  return {
+    connectionOpened: vi.fn(),
+    connectionClosed: vi.fn(),
   } as any;
 }
 
@@ -35,7 +50,7 @@ function query(rows: unknown[]) {
 describe('RealtimeGateway', () => {
   it('rejects client-selected stay and property identifiers without an authorized session', async () => {
     const database = { select: vi.fn() } as any;
-    const gateway = new RealtimeGateway(database, config());
+    const gateway = new RealtimeGateway(database, config(), redis(), metrics());
     const socket = client(undefined, { stayId: 'another-guest-stay', propertyId: 'another-property' });
 
     await gateway.handleConnection(socket);
@@ -48,7 +63,8 @@ describe('RealtimeGateway', () => {
 
   it('joins staff rooms derived from the authenticated staff session', async () => {
     const database = { select: vi.fn(() => query([{ accountId: 'staff-1', propertyId: 'property-1', email: 'staff@example.com', roleKey: 'reception', accountStatus: 'active' }])) } as any;
-    const gateway = new RealtimeGateway(database, config());
+    const gateway = new RealtimeGateway(database, config(), redis(), metrics());
+    const log = vi.spyOn((gateway as any).logger, 'log');
     const socket = client('pp_session=staff-token');
 
     await gateway.handleConnection(socket);
@@ -56,6 +72,8 @@ describe('RealtimeGateway', () => {
     expect(socket.join).toHaveBeenCalledWith('property:property-1');
     expect(socket.join).toHaveBeenCalledWith('property:property-1:role:reception');
     expect(socket.disconnect).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('(reception)'));
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining('staff@example.com'));
   });
 
   it('keeps consecutive staff connections isolated to their newly authenticated rooms', async () => {
@@ -64,7 +82,7 @@ describe('RealtimeGateway', () => {
         .mockReturnValueOnce(query([{ accountId: 'staff-a', propertyId: 'property-a', email: 'a@example.com', roleKey: 'reception', accountStatus: 'active' }]))
         .mockReturnValueOnce(query([{ accountId: 'staff-b', propertyId: 'property-b', email: 'b@example.com', roleKey: 'kitchen', accountStatus: 'active' }])),
     } as any;
-    const gateway = new RealtimeGateway(database, config());
+    const gateway = new RealtimeGateway(database, config(), redis(), metrics());
     const staffA = client('pp_session=staff-a');
     const staffB = client('pp_session=staff-b');
 
@@ -87,7 +105,7 @@ describe('RealtimeGateway', () => {
       where: vi.fn().mockResolvedValue([{ id: 'authorized-stay' }]),
     };
     const database = { select: vi.fn().mockReturnValueOnce(customerQuery).mockReturnValueOnce(stayQuery) } as any;
-    const gateway = new RealtimeGateway(database, config());
+    const gateway = new RealtimeGateway(database, config(), redis(), metrics());
     const socket = client('customer_session=customer-token', { stayId: 'another-guest-stay', propertyId: 'another-property' });
 
     await gateway.handleConnection(socket);
@@ -96,5 +114,17 @@ describe('RealtimeGateway', () => {
     expect(socket.join).toHaveBeenCalledWith('stay:authorized-stay');
     expect(socket.emit).toHaveBeenCalledWith('connection:ack', { status: 'connected', type: 'customer', stayIds: ['authorized-stay'] });
     expect(socket.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('configures the Socket.IO adapter on the parent server in shared mode', () => {
+    const database = { select: vi.fn() } as any;
+    const gateway = new RealtimeGateway(database, config('shared'), redis(), metrics());
+    const adapter = vi.fn();
+    const namespace = { server: { adapter } } as any;
+
+    gateway.afterInit(namespace);
+
+    expect(adapter).toHaveBeenCalledOnce();
+    expect(adapter.mock.calls[0][0]).toBeTypeOf('function');
   });
 });

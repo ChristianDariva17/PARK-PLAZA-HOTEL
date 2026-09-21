@@ -1,4 +1,3 @@
-import React, { useId } from 'react';
 import { FormField } from './FormField';
 
 export function P1Button({ variant = 'primary', className = '', style: _style, children, ...props }) {
@@ -18,38 +17,29 @@ export function P1Button({ variant = 'primary', className = '', style: _style, c
   );
 }
 
-export function P1Input({ label, type = 'text', className = '', controlClassName = '', style: _style, helperText, error, required, ...props }) {
-  const generatedId = useId();
-  const inputId = props.id || generatedId;
-  const helperId = helperText ? `${inputId}-helper` : null;
-  const errorId = error ? `${inputId}-error` : null;
-  const describedBy = [props['aria-describedby'], helperId, errorId].filter(Boolean).join(' ') || undefined;
+export function AsyncButton({ pending = false, pendingLabel = 'Procesando...', disabled = false, children, ...props }) {
+  return (
+    <P1Button {...props} disabled={disabled || pending} aria-busy={pending}>
+      {pending ? pendingLabel : children}
+    </P1Button>
+  );
+}
 
+export function P1Input({ label, type = 'text', className = '', controlClassName = '', style: _style, helperText, error, required, ...props }) {
   return <FormField label={label} required={required} helperText={helperText} error={error} className={className}>
-    <input {...props} id={inputId} type={type} required={required} className={`form-control ${controlClassName}`.trim()} aria-invalid={error ? 'true' : undefined} aria-describedby={describedBy} />
+    <input {...props} type={type} required={required} className={`form-control ${controlClassName}`.trim()} />
   </FormField>;
 }
 
 export function P1Select({ label, className = '', controlClassName = '', style: _style, helperText, error, required, children, ...props }) {
-  const generatedId = useId();
-  const selectId = props.id || generatedId;
-  const helperId = helperText ? `${selectId}-helper` : null;
-  const errorId = error ? `${selectId}-error` : null;
-  const describedBy = [props['aria-describedby'], helperId, errorId].filter(Boolean).join(' ') || undefined;
-
   return <FormField label={label} required={required} helperText={helperText} error={error} className={className}>
-    <select {...props} id={selectId} required={required} className={`form-control ${controlClassName}`.trim()} aria-invalid={error ? 'true' : undefined} aria-describedby={describedBy}>{children}</select>
+    <select {...props} required={required} className={`form-control ${controlClassName}`.trim()}>{children}</select>
   </FormField>;
 }
 
 export function P1Textarea({ label, className = '', controlClassName = '', style: _style, helperText, error, required, ...props }) {
-  const generatedId = useId();
-  const textareaId = props.id || generatedId;
-  const helperId = helperText ? `${textareaId}-helper` : null;
-  const errorId = error ? `${textareaId}-error` : null;
-  const describedBy = [props['aria-describedby'], helperId, errorId].filter(Boolean).join(' ') || undefined;
   return <FormField label={label} required={required} helperText={helperText} error={error} className={className}>
-    <textarea {...props} id={textareaId} required={required} className={`form-control ${controlClassName}`.trim()} aria-invalid={error ? 'true' : undefined} aria-describedby={describedBy} />
+    <textarea {...props} required={required} className={`form-control ${controlClassName}`.trim()} />
   </FormField>;
 }
 
